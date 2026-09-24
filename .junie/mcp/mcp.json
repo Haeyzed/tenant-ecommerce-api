@@ -1,0 +1,11 @@
+{
+    "mcpServers": {
+        "laravel-boost": {
+            "command": "C:\\Users\\amuibi\\.config\\herd\\bin\\php84\\php.exe",
+            "args": [
+                "C:\\Users\\amuibi\\Herd\\tenant-ecommerce-api\\artisan",
+                "boost:mcp"
+            ]
+        }
+    }
+}
