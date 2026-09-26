@@ -123,4 +123,37 @@ return [
         'store' => env('APP_MAINTENANCE_STORE', 'database'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Platform environment values (spec §77.1)
+    |--------------------------------------------------------------------------
+    */
+
+    // Comma-separated origins of the platform admin frontend (spec §70.9).
+    'platform_admin_origins' => env('PLATFORM_ADMIN_ORIGINS', ''),
+
+    // Live payment credentials and charges are refused unless true (spec §15.9).
+    'payments_live_allowed' => (bool) env('PAYMENTS_LIVE_ALLOWED', env('APP_ENV') === 'production'),
+
+    // Seeded super-admin (spec §7.6).
+    /*
+    | Frontend link targets for emails (password set/reset, verification).
+    | Tenant links use the tenant's primary domain with the given paths.
+    */
+    'frontend' => [
+        'platform_admin_url' => env('PLATFORM_ADMIN_URL', 'http://localhost:3000'),
+        'affiliate_portal_url' => env('AFFILIATE_PORTAL_URL', 'http://localhost:3001'),
+        // The public marketing website; affiliate referral links point here (§21A.2).
+        'website_url' => env('PLATFORM_WEBSITE_URL', 'http://localhost:3002'),
+        'tenant_scheme' => env('TENANT_FRONTEND_SCHEME', 'https'),
+        'tenant_admin_path' => env('TENANT_ADMIN_PATH', '/admin'),
+    ],
+
+    'platform_admin_email' => env('PLATFORM_ADMIN_EMAIL'),
+    'platform_admin_name' => env('PLATFORM_ADMIN_NAME'),
+
+    // Edge proxy authentication for /api/internal/* (spec §7.5).
+    'edge_allowed_ips' => env('EDGE_ALLOWED_IPS', ''),
+    'edge_shared_secret' => env('EDGE_SHARED_SECRET'),
+
 ];

@@ -3,27 +3,21 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
-use Stancl\Tenancy\Middleware\InitializeTenancyByDomain;
-use Stancl\Tenancy\Middleware\PreventAccessFromCentralDomains;
 
 /*
 |--------------------------------------------------------------------------
-| Tenant Routes
+| Tenant routes (spec §70.2)
 |--------------------------------------------------------------------------
 |
-| Here you can register the tenant routes for your application.
-| These routes are loaded by the TenantRouteServiceProvider.
-|
-| Feel free to customize them however you want. Good luck!
+| Every host that is not a landlord domain. Each tenant module has its own
+| file in routes/tenant; each route names its group (tenant.public,
+| tenant.storefront, tenant.customer, tenant.seller, tenant.driver,
+| tenant.admin), which fixes its middleware stack (spec §70.3).
 |
 */
 
-Route::middleware([
-    'web',
-    InitializeTenancyByDomain::class,
-    PreventAccessFromCentralDomains::class,
-])->group(function () {
-    Route::get('/', function () {
-        return 'This is your multi-tenant application. The id of the current tenant is ' . tenant('id');
-    });
+Route::prefix('api')->group(function (): void {
+    foreach (glob(__DIR__.'/tenant/*.php') ?: [] as $file) {
+        require $file;
+    }
 });

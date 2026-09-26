@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
-         bootstrap="vendor/autoload.php"
+         bootstrap="tests/bootstrap.php"
          colors="true"
 >
     <testsuites>
@@ -11,6 +11,12 @@
         <testsuite name="Feature">
             <directory>tests/Feature</directory>
         </testsuite>
+        <testsuite name="Isolation">
+            <directory>tests/Isolation</directory>
+        </testsuite>
+        <testsuite name="Architecture">
+            <directory>tests/Architecture</directory>
+        </testsuite>
     </testsuites>
     <source>
         <include>
@@ -19,16 +25,27 @@
     </source>
     <php>
         <env name="APP_ENV" value="testing"/>
+        <!-- Test-only key: the suite never depends on a developer's .env secret. -->
+        <env name="APP_KEY" value="base64:A4JnFf+M7XgiHLGt/QNibIujf7aIHSL0BEGDI3Wjmcw="/>
+        <env name="APP_URL" value="http://platform.test"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="BROADCAST_CONNECTION" value="null"/>
         <env name="CACHE_STORE" value="array"/>
-        <env name="DB_CONNECTION" value="sqlite"/>
-        <env name="DB_DATABASE" value=":memory:"/>
+        <env name="LANDLORD_CACHE_STORE" value="array"/>
+        <env name="DB_CONNECTION" value="landlord"/>
+        <env name="DB_DATABASE" value="tea_test_landlord"/>
         <env name="DB_URL" value=""/>
+        <env name="TENANCY_DB_PREFIX" value="tea_test_tenant_"/>
+        <env name="PLATFORM_ROOT_DOMAIN" value="platform.test"/>
+        <env name="CENTRAL_DOMAINS" value="localhost"/>
+        <env name="TENANCY_REDIS_PREFIXED_CONNECTIONS" value=""/>
+        <env name="PLATFORM_ADMIN_ORIGINS" value="https://admin.platform.test"/>
+        <env name="PAYMENTS_LIVE_ALLOWED" value="false"/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>
+        <env name="FILESYSTEM_DISK" value="local"/>
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
