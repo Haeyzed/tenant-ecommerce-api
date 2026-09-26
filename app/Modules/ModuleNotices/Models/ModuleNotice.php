@@ -32,6 +32,13 @@ class ModuleNotice extends Model implements Auditable
 
     public const array TYPES = ['update', 'maintenance', 'info'];
 
+    /**
+     * Core commerce is not a registry module but can still be announced or
+     * put in maintenance (Part 6 intro, §18): its routes carry
+     * module.notice:core.
+     */
+    public const string CORE = 'core';
+
     public const array BEHAVIORS = ['hard_block', 'read_only'];
 
     protected $connection = 'landlord';

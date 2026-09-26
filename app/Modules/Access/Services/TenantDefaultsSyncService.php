@@ -8,6 +8,8 @@ use App\Modules\Plans\Enums\ModuleState;
 use App\Modules\Plans\Services\FeatureAccessService;
 use App\Modules\Plans\Support\ModuleRegistry;
 use App\Modules\Tenancy\Models\Tenant;
+use Database\Seeders\Tenant\CmsDefaultsSeeder;
+use Database\Seeders\Tenant\CustomerDefaultsSeeder;
 use Database\Seeders\Tenant\NotificationTemplateSeeder;
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Database\Seeder;
@@ -28,6 +30,8 @@ final class TenantDefaultsSyncService
      */
     private const array SEEDERS = [
         NotificationTemplateSeeder::class,
+        CmsDefaultsSeeder::class,
+        CustomerDefaultsSeeder::class,
     ];
 
     public function __construct(

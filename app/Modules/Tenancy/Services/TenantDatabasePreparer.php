@@ -83,6 +83,7 @@ final class TenantDatabasePreparer
         'config/permissions/tenant.php',
         'config/permissions/generated/tenant.php',
         'config/modules.php',
+        'config/cms.php',
     ];
 
     /**

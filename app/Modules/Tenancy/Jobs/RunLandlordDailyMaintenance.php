@@ -8,6 +8,7 @@ use App\Modules\Affiliates\Models\AffiliateClick;
 use App\Modules\Affiliates\Models\AffiliateReferral;
 use App\Modules\Affiliates\Services\AffiliateAttributionService;
 use App\Modules\Billing\Models\PaymentTransaction;
+use App\Modules\Cms\Services\ContactSubmissionService;
 use App\Modules\Plans\Models\TenantFeature;
 use App\Modules\Plans\Models\TenantLimitOverride;
 use App\Modules\Settings\Services\PlatformSettingsService;
@@ -79,6 +80,8 @@ final class RunLandlordDailyMaintenance implements ShouldBeUnique, ShouldQueue
             ->where('created_at', '<', now()->subMonths((int) config('affiliates.click_retention_months', 13)))
             ->whereNotIn('id', AffiliateReferral::query()->whereNotNull('affiliate_click_id')->select('affiliate_click_id'))
             ->whereNotIn('id', TenantRegistration::query()->whereNotNull('affiliate_click_id')->select('affiliate_click_id'))));
+
+        $this->run('contact_submissions', static fn () => app(ContactSubmissionService::class)->purgeExpired());
 
         $this->run('usage_snapshots', fn () => $this->chunkedDelete(TenantUsageSnapshot::query()->where('date', '<', now()->subDays(400)->toDateString())));
 

@@ -13,7 +13,14 @@ use App\Modules\Billing\Models\PaymentTransaction;
 use App\Modules\Billing\Models\PlatformCoupon;
 use App\Modules\Billing\Models\PlatformPaymentGateway;
 use App\Modules\Billing\Models\Subscription;
+use App\Modules\Cms\Models\CmsBanner;
+use App\Modules\Cms\Models\CmsBlogPost;
+use App\Modules\Cms\Models\CmsPage;
+use App\Modules\Cms\Models\CmsTestimonial;
+use App\Modules\Cms\Models\ContactSubmission;
 use App\Modules\Customers\Models\Customer;
+use App\Modules\Customers\Models\CustomerGroup;
+use App\Modules\CustomFields\Models\CustomFieldDefinition;
 use App\Modules\Exports\Models\DataExport;
 use App\Modules\Legal\Models\LegalDocument;
 use App\Modules\Marketplace\Models\Seller;
@@ -81,13 +88,22 @@ final class MorphMap
         'role' => Role::class,
         'permission' => Permission::class,
 
+        // Both contexts (CMS, §24.1)
+        'cms_page' => CmsPage::class,
+        'cms_blog_post' => CmsBlogPost::class,
+        'cms_banner' => CmsBanner::class,
+        'cms_testimonial' => CmsTestimonial::class,
+        'contact_submission' => ContactSubmission::class,
+
         // Tenant
         'user' => User::class,
         'customer' => Customer::class,
+        'customer_group' => CustomerGroup::class,
         'seller' => Seller::class,
         'driver' => Driver::class,
         'storefront_setting' => StorefrontSetting::class,
         'data_export' => DataExport::class,
+        'custom_field_definition' => CustomFieldDefinition::class,
         'tenant_payment_setting' => TenantPaymentSetting::class,
         'sms_gateway_setting' => SmsGatewaySetting::class,
         'whatsapp_setting' => WhatsAppSetting::class,

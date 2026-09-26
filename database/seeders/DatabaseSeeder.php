@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Database\Seeders;
 
 use Database\Seeders\Landlord\InitialPlatformAdminSeeder;
+use Database\Seeders\Landlord\LandlordCmsSeeder;
 use Database\Seeders\Landlord\LegalDocumentSeeder;
 use Database\Seeders\Landlord\NotificationTemplateSeeder;
 use Database\Seeders\Landlord\PlanCatalogueSeeder;
@@ -28,6 +29,7 @@ final class DatabaseSeeder extends Seeder
             PlanCatalogueSeeder::class,
             NotificationTemplateSeeder::class,
             LegalDocumentSeeder::class,
+            LandlordCmsSeeder::class,
             InitialPlatformAdminSeeder::class,
         ]);
     }

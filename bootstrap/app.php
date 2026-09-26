@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Modules\Seo\Http\Controllers\SitemapController;
 use App\Shared\Exceptions\ExceptionRenderer;
 use App\Shared\Http\Middleware\Landlord\AuthenticateEdgeRequest;
 use App\Shared\Http\Middleware\Landlord\EnsureLandlordDomain;
@@ -54,6 +55,13 @@ return Application::configure(basePath: dirname(__DIR__))
                     require base_path('routes/api.php');
                     require base_path('routes/tenant-webhooks.php');
                 });
+
+            // The landlord website's sitemap, outside /api (spec §24.10).
+            Route::domain('{landlord_domain}')
+                ->where(['landlord_domain' => $centralPattern])
+                ->middleware(['landlord.domain', 'throttle:public'])
+                ->get('sitemap.xml', SitemapController::class)
+                ->name('landlord.sitemap');
 
             /*
              * Tenant routes (spec §70.2): every other host. The tenant is

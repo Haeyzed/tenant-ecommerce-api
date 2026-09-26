@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Modules\Seo\Http\Controllers\SitemapController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -15,6 +16,9 @@ use Illuminate\Support\Facades\Route;
 | tenant.admin), which fixes its middleware stack (spec §70.3).
 |
 */
+
+// The storefront sitemap, outside /api (spec §30.2).
+Route::middleware('tenant.public')->get('sitemap.xml', SitemapController::class)->name('tenant.sitemap');
 
 Route::prefix('api')->group(function (): void {
     foreach (glob(__DIR__.'/tenant/*.php') ?: [] as $file) {

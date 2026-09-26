@@ -16,6 +16,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Validator;
 
@@ -23,6 +24,11 @@ beforeEach(function (): void {
     Notification::fake();
     $this->tenant = $this->createTenant('a', ['timezone' => 'Africa/Lagos']);
     $this->subscribe($this->tenant, 'basic');
+});
+
+// Daily maintenance builds the sitemap on the tenant's real disk.
+afterEach(function (): void {
+    File::delete(base_path('storage/tenants/test-tenant-a/app/sitemap.xml'));
 });
 
 it('dispatches daily maintenance only to tenants whose local time is 01:00', function (): void {

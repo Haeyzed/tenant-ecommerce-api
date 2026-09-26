@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Modules\Auth\Http\Controllers\Tenant\CustomerAuthController;
 use App\Modules\Auth\Http\Controllers\Tenant\StaffAuthController;
 use Illuminate\Support\Facades\Route;
 
@@ -25,4 +26,23 @@ Route::middleware('tenant.public')->prefix('admin/auth')->name('tenant.auth.staf
         Route::get('me', [StaffAuthController::class, 'me'])->name('me');
         Route::patch('preferences', [StaffAuthController::class, 'updatePreferences'])->name('preferences');
     });
+});
+
+/*
+| Customer authentication (spec §10.5). register and login read
+| X-Guest-Token (guest.token) to merge the guest cart.
+*/
+
+Route::middleware('tenant.public')->prefix('auth')->name('tenant.auth.customer.')->group(function (): void {
+    Route::middleware('throttle:auth-sensitive')->group(function (): void {
+        Route::post('register', [CustomerAuthController::class, 'register'])->middleware('guest.token')->name('register');
+        Route::post('login', [CustomerAuthController::class, 'login'])->middleware('guest.token')->name('login');
+        Route::post('email/verify', [CustomerAuthController::class, 'verifyEmail'])->name('email.verify');
+        Route::post('password/forgot', [CustomerAuthController::class, 'forgotPassword'])->name('password.forgot');
+        Route::post('password/reset', [CustomerAuthController::class, 'resetPassword'])->name('password.reset');
+        Route::post('email/resend', [CustomerAuthController::class, 'resendVerificationEmail'])->middleware('auth.as:customer')->name('email.resend');
+        Route::patch('password', [CustomerAuthController::class, 'changePassword'])->middleware('auth.as:customer')->name('password.change');
+    });
+
+    Route::post('logout', [CustomerAuthController::class, 'logout'])->middleware(['auth.as:customer', 'throttle:api'])->name('logout');
 });

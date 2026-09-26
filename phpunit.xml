@@ -27,6 +27,9 @@
         <env name="APP_ENV" value="testing"/>
         <!-- Test-only key: the suite never depends on a developer's .env secret. -->
         <env name="APP_KEY" value="base64:A4JnFf+M7XgiHLGt/QNibIujf7aIHSL0BEGDI3Wjmcw="/>
+        <env name="PLATFORM_WEBSITE_URL" value="http://localhost:3002" force="true"/>
+        <env name="AFFILIATE_PORTAL_URL" value="http://localhost:3001" force="true"/>
+        <env name="PLATFORM_ADMIN_URL" value="http://localhost:3000" force="true"/>
         <env name="APP_URL" value="http://platform.test"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>
         <env name="BCRYPT_ROUNDS" value="4"/>

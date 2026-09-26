@@ -123,7 +123,7 @@ final class ModuleNoticeService
     private function validate(array $data, ?ModuleNotice $existing = null): array
     {
         $validated = validator($data, [
-            'module_key' => ['required', 'string', Rule::in(array_keys($this->registry->all()))],
+            'module_key' => ['required', 'string', Rule::in([ModuleNotice::CORE, ...array_keys($this->registry->all())])],
             'tenant_id' => ['nullable', 'string', Rule::exists('landlord.tenants', 'id')],
             'type' => ['required', Rule::in(ModuleNotice::TYPES)],
             'behavior' => ['nullable', Rule::in(ModuleNotice::BEHAVIORS)],
@@ -153,14 +153,15 @@ final class ModuleNoticeService
         $variables = [
             'notice_title' => $notice->title,
             'notice_message' => $notice->message,
-            'module_name' => $this->registry->get($notice->module_key)->name,
+            'module_name' => $notice->module_key === ModuleNotice::CORE ? 'Store core' : $this->registry->get($notice->module_key)->name,
             'starts_at' => $notice->starts_at->toDayDateTimeString(),
             'ends_at' => $notice->ends_at?->toDayDateTimeString() ?? 'further notice',
         ];
 
         $query->chunkById(200, function ($tenants) use ($notice, $variables): void {
             foreach ($tenants as $tenant) {
-                if ($this->features->tenantCanAccess($tenant, $notice->module_key)) {
+                // Core commerce is available to every tenant.
+                if ($notice->module_key === ModuleNotice::CORE || $this->features->tenantCanAccess($tenant, $notice->module_key)) {
                     $this->notifications->dispatch('module_notice.published', $tenant, $variables + ['owner_name' => $tenant->owner_name]);
                 }
             }

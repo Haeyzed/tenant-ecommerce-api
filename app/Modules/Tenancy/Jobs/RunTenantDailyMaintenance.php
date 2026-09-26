@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Jobs;
 
+use App\Modules\Cms\Services\ContactSubmissionService;
+use App\Modules\Cms\Support\CmsSitemapSource;
 use App\Modules\Exports\Services\DataExportService;
+use App\Modules\Seo\Support\SitemapBuilder;
 use App\Modules\Tenancy\Enums\TenantStatus;
 use App\Modules\Tenancy\Models\Tenant;
 use App\Modules\Tenancy\Services\TenantUsageReporter;
@@ -18,6 +21,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Spatie\Activitylog\Models\Activity;
 use Throwable;
 
@@ -65,6 +69,17 @@ final class RunTenantDailyMaintenance implements ShouldBeUnique, ShouldQueue
 
         $tenant->run(function () use ($exports, $usage, $tenant): void {
             $this->task('usage_snapshot', static fn () => $usage->report($tenant));
+            $this->task('contact_submissions', static fn () => app(ContactSubmissionService::class)->purgeExpired());
+
+            // Rebuild the sitemap only when content changed since the last build (§30.2).
+            $this->task('sitemap', static function () use ($tenant): void {
+                $disk = Storage::disk('local');
+                $builtAt = $disk->exists(SitemapBuilder::TENANT_FILE) ? $disk->lastModified(SitemapBuilder::TENANT_FILE) : null;
+
+                if (CmsSitemapSource::changedSince($builtAt)) {
+                    app(SitemapBuilder::class)->buildForTenant($tenant);
+                }
+            });
             $this->task('export_files', static fn () => $exports->expireFiles());
 
             $this->task('idempotency_keys', fn () => $this->chunkedDelete('idempotency_keys', IdempotencyKey::query()->where('expires_at', '<', now())->toBase()));

@@ -68,6 +68,19 @@ final readonly class TenantManagementService
         ];
     }
 
+    /**
+     * The owner's name and email are the store's billing contact (§12.3);
+     * kept in step with the owner's staff account.
+     */
+    public function updateOwnerContact(Tenant $tenant, string $name, string $email): Tenant
+    {
+        $tenant->forceFill(['owner_name' => $name, 'email' => strtolower($email)])->save();
+
+        ActivityRecorder::landlord('tenants', 'Tenant owner contact updated', $tenant, ['owner_name' => $name, 'email' => strtolower($email)]);
+
+        return $tenant;
+    }
+
     public function suspendTenant(Tenant $tenant, ?string $reason, PlatformUser $by): Tenant
     {
         $this->assertStatus($tenant, [TenantStatus::Active], TenantStatus::Suspended);

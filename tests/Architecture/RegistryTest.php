@@ -69,7 +69,9 @@ it('uses only registry keys in feature middleware', function (): void {
 
     foreach (app('router')->getRoutes() as $route) {
         foreach ($route->gatherMiddleware() as $middleware) {
-            if (is_string($middleware) && preg_match('/^(feature|module\.notice):([a-z_]+)/', $middleware, $m) && ! $registry->has($m[2])) {
+            // module.notice:core marks core commerce, which is not a registry module.
+            if (is_string($middleware) && preg_match('/^(feature|module\.notice):([a-z_]+)/', $middleware, $m) && ! $registry->has($m[2])
+                && ! ($m[1] === 'module.notice' && $m[2] === 'core')) {
                 $unknown[] = $route->uri().': '.$m[2];
             }
         }
