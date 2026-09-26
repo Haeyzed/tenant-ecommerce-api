@@ -84,6 +84,13 @@ class Product extends Model implements AuditableContract, HasMedia
 
     protected $connection = 'tenant';
 
+    /**
+     * The column defaults that code reads before a refresh.
+     *
+     * @var array<string, mixed>
+     */
+    protected $attributes = ['product_type' => self::SIMPLE, 'moderation_status' => 'not_required'];
+
     protected $fillable = [
         'product_type', 'name', 'slug', 'sku', 'barcode', 'description', 'price', 'compare_at_price', 'cost_price', 'tax_class',
         'brand_id', 'unit_id', 'hsn_code', 'expiry_date', 'has_warehouse_pricing', 'is_active', 'meta_title', 'meta_description', 'meta_keywords',

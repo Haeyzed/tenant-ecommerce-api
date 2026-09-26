@@ -81,7 +81,10 @@ final class AppServiceProvider extends ServiceProvider
         RateLimiter::for('public', fn (Request $request): Limit => Limit::perMinute(60)->by('ip:'.$request->ip()));
 
         RateLimiter::for('auth-sensitive', function (Request $request): Limit {
-            $identifier = strtolower((string) ($request->input('email') ?? $request->input('phone') ?? ''));
+            // A phone counts by its digits, so formatting cannot dodge the limit.
+            $identifier = $request->filled('email')
+                ? strtolower((string) $request->input('email'))
+                : (string) preg_replace('/\D+/', '', (string) $request->input('phone', ''));
 
             return Limit::perMinute(5)->by('auth:'.$request->ip().'|'.$identifier);
         });

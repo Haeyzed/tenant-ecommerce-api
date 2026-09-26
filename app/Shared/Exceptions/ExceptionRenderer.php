@@ -88,12 +88,14 @@ final class ExceptionRenderer
     }
 
     /**
-     * @param  array<string, string>  $headers
+     * Throttle headers carry integers (Retry-After, X-RateLimit-*).
+     *
+     * @param  array<string, string|int|list<string>>  $headers
      */
     private static function withHeaders(JsonResponse $response, array $headers): JsonResponse
     {
         foreach ($headers as $name => $value) {
-            $response->headers->set($name, $value);
+            $response->headers->set($name, is_array($value) ? $value : (string) $value);
         }
 
         return $response;

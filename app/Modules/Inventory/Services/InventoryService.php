@@ -270,6 +270,38 @@ final readonly class InventoryService
     }
 
     /**
+     * One stock operation over every line of an order, in a single locked
+     * pass (§32.6 lock ordering): bundles expand to their children, digital
+     * and service lines skip inventory.
+     *
+     * @param  list<array{warehouse: Warehouse, product: Product, variant: ProductVariant|null, quantity: string}>  $lines
+     * @param  string  $operation  reserve | release | deduct (from the reservation) | deduct_direct | restock
+     */
+    public function applyOrderLines(array $lines, string $operation, Model $reference, ?string $reason = null): void
+    {
+        [$deltas, $type] = match ($operation) {
+            'reserve' => [static fn (string $q): array => ['0', $q], 'reserve'],
+            'release' => [static fn (string $q): array => ['0', Quantity::neg($q)], 'release'],
+            'deduct' => [static fn (string $q): array => [Quantity::neg($q), Quantity::neg($q)], 'deduct'],
+            'deduct_direct' => [static fn (string $q): array => [Quantity::neg($q), '0'], 'deduct'],
+            'restock' => [static fn (string $q): array => [$q, '0'], 'restock_cancel'],
+            default => throw new InvalidArgumentException("Unknown stock operation [{$operation}]."),
+        };
+
+        $changes = [];
+
+        foreach ($lines as $line) {
+            foreach ($this->expand($line['warehouse'], $line['product'], $line['variant'], $line['quantity'], $deltas, $type) as $change) {
+                $changes[] = $reason === null ? $change : new StockChange(
+                    $change->warehouse, $change->product, $change->variant, $change->quantityDelta, $change->reservedDelta, $change->movementType, $reason,
+                );
+            }
+        }
+
+        $this->apply($changes, $reference);
+    }
+
+    /**
      * Applies stock changes atomically: all rows are locked in lock order
      * first, each change is checked against the running balance, and one
      * ledger row is written per change.

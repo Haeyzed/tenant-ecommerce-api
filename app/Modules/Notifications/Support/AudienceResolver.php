@@ -169,9 +169,10 @@ final class AudienceResolver
         if ($guestContact) {
             // Raw attributes: strict mode forbids reading absent columns.
             $attributes = $record->getAttributes();
+            // Orders keep the guest's contact as customer_email / customer_phone.
             $routes = array_filter([
-                'mail' => $attributes['guest_email'] ?? null,
-                'sms' => $attributes['guest_phone'] ?? null,
+                'mail' => $attributes['guest_email'] ?? $attributes['customer_email'] ?? null,
+                'sms' => $attributes['guest_phone'] ?? $attributes['customer_phone'] ?? null,
             ]);
 
             if ($routes !== []) {

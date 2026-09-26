@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Jobs;
 
+use App\Modules\Cart\Services\CartService;
 use App\Modules\Catalog\Services\ProductViewService;
 use App\Modules\Cms\Services\ContactSubmissionService;
 use App\Modules\Cms\Support\CmsSitemapSource;
 use App\Modules\Exports\Services\DataExportService;
 use App\Modules\Inventory\Support\StockAlerts;
+use App\Modules\Payments\Services\OrderPaymentService;
 use App\Modules\Seo\Support\SitemapBuilder;
 use App\Modules\Tenancy\Enums\TenantStatus;
 use App\Modules\Tenancy\Models\Tenant;
@@ -74,6 +76,8 @@ final class RunTenantDailyMaintenance implements ShouldBeUnique, ShouldQueue
             $this->task('contact_submissions', static fn () => app(ContactSubmissionService::class)->purgeExpired());
             $this->task('product_views', static fn () => app(ProductViewService::class)->purgeOld());
             $this->task('expiring_products', static fn () => app(StockAlerts::class)->checkExpiringProducts());
+            $this->task('guest_carts', static fn () => app(CartService::class)->purgeIdleGuestCarts());
+            $this->task('unresolved_refunds', static fn () => app(OrderPaymentService::class)->flagUnresolvedRefunds());
 
             // Rebuild the sitemap only when content changed since the last build (§30.2).
             $this->task('sitemap', static function () use ($tenant): void {

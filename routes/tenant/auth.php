@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Modules\Auth\Http\Controllers\Tenant\CustomerAuthController;
+use App\Modules\Auth\Http\Controllers\Tenant\DriverAuthController;
 use App\Modules\Auth\Http\Controllers\Tenant\StaffAuthController;
 use Illuminate\Support\Facades\Route;
 
@@ -45,4 +46,19 @@ Route::middleware('tenant.public')->prefix('auth')->name('tenant.auth.customer.'
     });
 
     Route::post('logout', [CustomerAuthController::class, 'logout'])->middleware(['auth.as:customer', 'throttle:api'])->name('logout');
+});
+
+/*
+| Driver authentication (spec §10.5): phone and PIN; an SMS code sets the
+| PIN on first login and resets it. Core commerce.
+*/
+
+Route::middleware('tenant.public')->prefix('driver/auth')->name('tenant.auth.driver.')->group(function (): void {
+    Route::middleware('throttle:auth-sensitive')->group(function (): void {
+        Route::post('request-otp', [DriverAuthController::class, 'requestOtp'])->name('request-otp');
+        Route::post('verify-otp', [DriverAuthController::class, 'verifyOtp'])->name('verify-otp');
+        Route::post('login', [DriverAuthController::class, 'login'])->name('login');
+    });
+
+    Route::post('logout', [DriverAuthController::class, 'logout'])->middleware(['auth.as:driver', 'throttle:api'])->name('logout');
 });

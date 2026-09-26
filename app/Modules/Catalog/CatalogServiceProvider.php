@@ -12,6 +12,7 @@ use App\Modules\Catalog\Services\ProductService;
 use App\Modules\Catalog\Services\ProductViewService;
 use App\Modules\Catalog\Support\ProductAvailability;
 use App\Modules\Catalog\Support\ProductPricing;
+use App\Modules\Catalog\Support\ProductPromotions;
 use App\Modules\Catalog\Support\ProductSorts;
 use App\Modules\Cms\Support\CmsLinkResolver;
 use App\Modules\CustomFields\Support\CustomFieldEntityRegistry;
@@ -33,6 +34,7 @@ final class CatalogServiceProvider extends ServiceProvider
     {
         $this->app->singleton(ProductAvailability::class);
         $this->app->singleton(ProductPricing::class);
+        $this->app->singleton(ProductPromotions::class);
 
         $this->app->singleton(ProductSorts::class, function (): ProductSorts {
             $sorts = new ProductSorts;

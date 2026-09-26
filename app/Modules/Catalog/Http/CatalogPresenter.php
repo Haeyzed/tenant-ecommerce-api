@@ -17,6 +17,7 @@ use App\Modules\Catalog\Services\ProductBadgeService;
 use App\Modules\Catalog\Services\ProductService;
 use App\Modules\Catalog\Support\ProductAvailability;
 use App\Modules\Catalog\Support\ProductPricing;
+use App\Modules\Catalog\Support\ProductPromotions;
 use App\Modules\CustomFields\Services\CustomFieldService;
 use App\Modules\Settings\Services\TenantSettingsService;
 use Illuminate\Support\Collection;
@@ -32,6 +33,7 @@ final readonly class CatalogPresenter
     public function __construct(
         private ProductPricing $pricing,
         private ProductAvailability $availability,
+        private ProductPromotions $promotions,
         private ProductBadgeService $badges,
         private CustomFieldService $customFields,
         private TenantSettingsService $settings,
@@ -48,6 +50,7 @@ final readonly class CatalogPresenter
     {
         $products = new Collection(is_array($products) ? $products : iterator_to_array($products));
         $stock = $this->availability->forProducts($products);
+        $promotions = $this->promotions->forProducts($products);
 
         return $products->map(fn (Product $p): array => [
             'id' => $p->id,
@@ -62,6 +65,7 @@ final readonly class CatalogPresenter
             'rating_average' => (string) $p->rating_average,
             'rating_count' => $p->rating_count,
             'badges' => $this->badges->getBadgesForProduct($p)->pluck('type')->values()->all(),
+            'promotion' => $promotions[$p->id] ?? null,
         ])->values()->all();
     }
 

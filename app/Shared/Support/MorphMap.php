@@ -37,6 +37,8 @@ use App\Modules\Marketplace\Models\Seller;
 use App\Modules\Messaging\Models\SmsGatewaySetting;
 use App\Modules\Messaging\Models\WhatsAppSetting;
 use App\Modules\ModuleNotices\Models\ModuleNotice;
+use App\Modules\Orders\Models\Order;
+use App\Modules\Payments\Models\OrderPayment;
 use App\Modules\Payments\Models\TenantPaymentSetting;
 use App\Modules\Plans\Models\Plan;
 use App\Modules\Plans\Models\PlanPrice;
@@ -45,10 +47,18 @@ use App\Modules\Plans\Models\TenantLimitOverride;
 use App\Modules\Plans\Models\TenantModule;
 use App\Modules\PlatformSupport\Models\PlatformSupportConversation;
 use App\Modules\PlatformSupport\Models\PlatformSupportMessageAttachment;
+use App\Modules\Promotions\Models\Coupon;
+use App\Modules\Promotions\Models\FlashSale;
+use App\Modules\Promotions\Models\Promotion;
 use App\Modules\Settings\Models\PlatformSetting;
 use App\Modules\Settings\Models\StorefrontSetting;
 use App\Modules\Settings\Models\TenantPlatformSetting;
+use App\Modules\Shipping\Models\DeliveryAssignment;
 use App\Modules\Shipping\Models\Driver;
+use App\Modules\Shipping\Models\Shipment;
+use App\Modules\Shipping\Models\ShippingMethod;
+use App\Modules\Shipping\Models\ShippingZone;
+use App\Modules\Tax\Models\TaxRate;
 use App\Modules\Tenancy\Models\DatabaseServer;
 use App\Modules\Tenancy\Models\Domain;
 use App\Modules\Tenancy\Models\Tenant;
@@ -121,6 +131,16 @@ final class MorphMap
         'warehouse_product_price' => WarehouseProductPrice::class,
         'seller' => Seller::class,
         'driver' => Driver::class,
+        'shipping_zone' => ShippingZone::class,
+        'shipping_method' => ShippingMethod::class,
+        'tax_rate' => TaxRate::class,
+        'promotion' => Promotion::class,
+        'coupon' => Coupon::class,
+        'flash_sale' => FlashSale::class,
+        'order' => Order::class,
+        'order_payment' => OrderPayment::class,
+        'shipment' => Shipment::class,
+        'delivery_assignment' => DeliveryAssignment::class,
         'storefront_setting' => StorefrontSetting::class,
         'data_export' => DataExport::class,
         'custom_field_definition' => CustomFieldDefinition::class,

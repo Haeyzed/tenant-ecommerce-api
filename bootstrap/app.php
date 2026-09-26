@@ -19,6 +19,7 @@ use App\Shared\Http\Middleware\Tenant\EnsureFeatureEnabled;
 use App\Shared\Http\Middleware\Tenant\EnsurePlatformNotInMaintenance;
 use App\Shared\Http\Middleware\Tenant\EnsureTenantIsActive;
 use App\Shared\Http\Middleware\Tenant\EnsureWithinUsageLimit;
+use App\Shared\Http\Middleware\Tenant\InitializeTenancyFromWebhookPath;
 use App\Shared\Http\Middleware\Tenant\ResolveGuestToken;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -30,7 +31,6 @@ use Illuminate\Routing\Middleware\ValidateSignature;
 use Illuminate\Support\Facades\Route;
 use Spatie\Permission\Middleware\PermissionMiddleware;
 use Stancl\Tenancy\Middleware\InitializeTenancyByDomain;
-use Stancl\Tenancy\Middleware\InitializeTenancyByPath;
 use Stancl\Tenancy\Middleware\PreventAccessFromCentralDomains;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -179,14 +179,14 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->group('tenant.webhooks', [
             'request.context',
-            InitializeTenancyByPath::class,
+            InitializeTenancyFromWebhookPath::class,
         ]);
 
         $middleware->priority([
             SetRequestContext::class,
             PreventAccessFromCentralDomains::class,
             InitializeTenancyByDomain::class,
-            InitializeTenancyByPath::class,
+            InitializeTenancyFromWebhookPath::class,
             EnsurePlatformNotInMaintenance::class,
             EnsureTenantIsActive::class,
             AuthenticateActor::class,

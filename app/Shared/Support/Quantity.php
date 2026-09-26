@@ -47,6 +47,11 @@ final class Quantity
         return self::cmp($a, $b) <= 0 ? $a : $b;
     }
 
+    public static function max(string $a, string $b): string
+    {
+        return self::cmp($a, $b) >= 0 ? $a : $b;
+    }
+
     public static function isPositive(string $quantity): bool
     {
         return self::cmp($quantity, '0') > 0;
