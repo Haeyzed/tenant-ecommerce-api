@@ -7,6 +7,8 @@ use App\Modules\Catalog\CatalogServiceProvider;
 use App\Modules\Inventory\InventoryServiceProvider;
 use App\Modules\Orders\OrdersServiceProvider;
 use App\Modules\Promotions\PromotionsServiceProvider;
+use App\Modules\Returns\ReturnsServiceProvider;
+use App\Modules\Reviews\ReviewsServiceProvider;
 use App\Providers\AppServiceProvider;
 use App\Providers\ModuleServiceProvider;
 use App\Providers\TenancyServiceProvider;
@@ -20,4 +22,6 @@ return [
     PromotionsServiceProvider::class,
     CartServiceProvider::class,
     OrdersServiceProvider::class,
+    ReturnsServiceProvider::class,
+    ReviewsServiceProvider::class,
 ];

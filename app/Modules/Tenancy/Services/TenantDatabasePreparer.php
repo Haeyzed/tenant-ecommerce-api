@@ -84,6 +84,7 @@ final class TenantDatabasePreparer
         'config/permissions/generated/tenant.php',
         'config/modules.php',
         'config/cms.php',
+        'app/Modules/Access/Services/TenantDefaultsSyncService.php',
     ];
 
     /**

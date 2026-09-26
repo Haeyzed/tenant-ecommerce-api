@@ -12,6 +12,7 @@ use Database\Seeders\Tenant\CatalogDefaultsSeeder;
 use Database\Seeders\Tenant\CmsDefaultsSeeder;
 use Database\Seeders\Tenant\CustomerDefaultsSeeder;
 use Database\Seeders\Tenant\NotificationTemplateSeeder;
+use Database\Seeders\Tenant\ReturnDefaultsSeeder;
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Database\Seeder;
 use RuntimeException;
@@ -34,6 +35,7 @@ final class TenantDefaultsSyncService
         CmsDefaultsSeeder::class,
         CustomerDefaultsSeeder::class,
         CatalogDefaultsSeeder::class,
+        ReturnDefaultsSeeder::class,
     ];
 
     public function __construct(

@@ -34,6 +34,7 @@ use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
  * @property string|null $change_given
  * @property string $currency_code
  * @property int|null $refund_of_order_payment_id
+ * @property int|null $order_return_id
  * @property int|null $recorded_by_user_id
  * @property Carbon|null $paid_at
  * @property string|null $notes
@@ -74,6 +75,7 @@ class OrderPayment extends Model implements AuditableContract
         'change_given' => 'decimal:4',
         'exchange_rate_used' => 'decimal:8',
         'refund_of_order_payment_id' => 'integer',
+        'order_return_id' => 'integer',
         'recorded_by_user_id' => 'integer',
         'paid_at' => 'datetime',
         'meta' => 'array',

@@ -53,6 +53,7 @@ use App\Modules\Promotions\Models\Promotion;
 use App\Modules\Settings\Models\PlatformSetting;
 use App\Modules\Settings\Models\StorefrontSetting;
 use App\Modules\Settings\Models\TenantPlatformSetting;
+use App\Modules\Returns\Models\OrderReturn;
 use App\Modules\Shipping\Models\DeliveryAssignment;
 use App\Modules\Shipping\Models\Driver;
 use App\Modules\Shipping\Models\Shipment;
@@ -140,6 +141,7 @@ final class MorphMap
         'order' => Order::class,
         'order_payment' => OrderPayment::class,
         'shipment' => Shipment::class,
+        'order_return' => OrderReturn::class,
         'delivery_assignment' => DeliveryAssignment::class,
         'storefront_setting' => StorefrontSetting::class,
         'data_export' => DataExport::class,

@@ -6,7 +6,9 @@ namespace App\Modules\Orders\Services;
 
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\ProductVariant;
+use App\Modules\Catalog\Services\DigitalDownloadService;
 use App\Modules\Customers\Models\Customer;
+use App\Modules\Documents\Services\InvoiceNumberService;
 use App\Modules\Inventory\Exceptions\InsufficientStockException;
 use App\Modules\Inventory\Models\Warehouse;
 use App\Modules\Inventory\Services\InventoryService;
@@ -22,6 +24,7 @@ use App\Modules\Settings\Services\TenantSettingsService;
 use App\Modules\Tenancy\Models\Tenant;
 use App\Modules\Users\Models\User;
 use App\Shared\Exceptions\ApiException;
+use App\Shared\Support\FrontendUrl;
 use App\Shared\Support\Money;
 use App\Shared\Support\UsageCounterRegistry;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -52,6 +55,8 @@ final readonly class OrderService
         private WarehouseService $warehouses,
         private PlanLimitService $limits,
         private UsageCounterRegistry $counters,
+        private InvoiceNumberService $invoiceNumbers,
+        private DigitalDownloadService $downloads,
     ) {}
 
     /**
@@ -125,6 +130,7 @@ final readonly class OrderService
                 'billing_address' => $data['billing_address'] ?? ($data['shipping_address'] ?? null),
                 'payment_gateway' => $data['payment_gateway'] ?? null,
                 'created_by_user_id' => $data['created_by_user_id'] ?? null,
+                'replaces_order_return_id' => $data['replaces_order_return_id'] ?? null,
                 'idempotency_key' => $data['idempotency_key'] ?? null,
                 'customer_note' => $data['customer_note'] ?? null,
                 'placed_at' => now(),
@@ -197,13 +203,18 @@ final readonly class OrderService
             $this->redemptions->commit($locked);
 
             $physical = $locked->items->contains(static fn (OrderItem $item): bool => $item->isPhysical());
-            $locked->forceFill(['confirmed_at' => now(), 'payment_expires_at' => null]);
+            $locked->forceFill([
+                'confirmed_at' => now(),
+                'payment_expires_at' => null,
+                'invoice_number' => $locked->invoice_number ?? $this->invoiceNumbers->next($locked),
+            ]);
 
             if (! $physical && in_array($locked->status, [Order::PENDING, Order::PROCESSING], true)) {
                 $locked->forceFill(['status' => Order::DELIVERED, 'completed_at' => $locked->completed_at ?? now()]);
             }
 
             $locked->save();
+            $this->downloads->grantForOrder($locked);
             $order->setRawAttributes($locked->getAttributes(), true);
 
             return true;
@@ -215,8 +226,27 @@ final readonly class OrderService
                 'order_number' => $order->order_number,
                 'store_name' => (string) $this->settings->get('store_name', ''),
                 'order_total' => Money::format((string) $order->total, $order->currency_code),
+                'downloads_note' => $this->downloadsNote($order),
             ]);
         }
+    }
+
+    /**
+     * §28.4: a confirmed order with digital lines links to the downloads
+     * list. The guest token is never put in a message body (notification
+     * logs keep bodies); the storefront holds it already.
+     */
+    private function downloadsNote(Order $order): string
+    {
+        $tenant = tenant();
+
+        if (! $tenant instanceof Tenant) {
+            return '';
+        }
+
+        $digital = $order->items()->whereHas('product', static fn (Builder $q): Builder => $q->withTrashed()->where('product_type', Product::DIGITAL))->exists();
+
+        return $digital ? "\n\nYour downloads are ready: ".FrontendUrl::storefront($tenant, '/account/downloads') : '';
     }
 
     /**
@@ -254,6 +284,10 @@ final readonly class OrderService
 
             if ($status === 'refunded' && $locked->status !== Order::CANCELLED) {
                 $changes['status'] = Order::REFUNDED;
+            }
+
+            if ($status === 'refunded') {
+                $this->downloads->revokeForOrder($locked);
             }
 
             if (Money::cmp($netPaid, (string) $locked->total) > 0 && $locked->payment_status !== $status) {
@@ -384,6 +418,7 @@ final readonly class OrderService
             }
 
             $this->flashSales->release($locked);
+            $this->downloads->revokeForOrder($locked);
 
             $locked->forceFill([
                 'status' => Order::CANCELLED,

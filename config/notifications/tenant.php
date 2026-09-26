@@ -42,7 +42,7 @@ return [
         true),
     'order.confirmed' => $n(['customer'], $customerSms,
         'Order {{order_number}} confirmed',
-        "Hello {{customer_name}},\n\nThank you for your order {{order_number}} at {{store_name}}. Total: {{order_total}}.\n\nWe will let you know when it ships.",
+        "Hello {{customer_name}},\n\nThank you for your order {{order_number}} at {{store_name}}. Total: {{order_total}}.\n\nWe will let you know when it ships.{{downloads_note}}",
         true),
     'order.payment_failed' => $n(['customer'], $customer,
         'Payment for order {{order_number}} failed',

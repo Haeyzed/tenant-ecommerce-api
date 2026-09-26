@@ -11,6 +11,8 @@ use App\Modules\Payments\Jobs\CheckRefundOutcome;
 use App\Modules\Payments\Jobs\VerifyOrderPayment;
 use App\Modules\Payments\Models\OrderPayment;
 use App\Modules\Payments\Models\TenantPaymentSetting;
+use App\Modules\Returns\Models\OrderReturn;
+use App\Modules\Returns\Services\ReturnService;
 use App\Modules\Tenancy\Models\Tenant;
 use App\Modules\Users\Models\User;
 use App\Shared\Exceptions\ApiException;
@@ -275,7 +277,7 @@ final readonly class OrderPaymentService
      * lock on the original row, then call the provider outside the
      * transaction. Manual methods complete at once (ledger only).
      */
-    public function refund(OrderPayment $payment, string $amount, string $reason, ?User $by = null, ?string $idempotencyKey = null): OrderPayment
+    public function refund(OrderPayment $payment, string $amount, string $reason, ?User $by = null, ?string $idempotencyKey = null, ?OrderReturn $return = null): OrderPayment
     {
         $amount = Money::normalize($amount);
 
@@ -288,7 +290,7 @@ final readonly class OrderPaymentService
         }
 
         /** @var OrderPayment $refund */
-        $refund = DB::connection('tenant')->transaction(function () use ($payment, $amount, $reason, $by, $idempotencyKey): OrderPayment {
+        $refund = DB::connection('tenant')->transaction(function () use ($payment, $amount, $reason, $by, $idempotencyKey, $return): OrderPayment {
             /** @var OrderPayment $original */
             $original = OrderPayment::query()->whereKey($payment->id)->lockForUpdate()->firstOrFail();
 
@@ -318,6 +320,7 @@ final readonly class OrderPaymentService
                 'amount_paid' => Money::sub('0', $amount),
                 'currency_code' => $original->currency_code,
                 'refund_of_order_payment_id' => $original->id,
+                'order_return_id' => $return?->id,
                 'recorded_by_user_id' => $by?->id,
                 'paid_at' => $gateway ? null : now(),
                 'notes' => mb_substr($reason, 0, 1000),
@@ -375,7 +378,7 @@ final readonly class OrderPaymentService
      *
      * @return list<OrderPayment>
      */
-    public function refundOrder(Order $order, ?string $amount, string $reason, ?User $by = null, ?string $idempotencyKey = null): array
+    public function refundOrder(Order $order, ?string $amount, string $reason, ?User $by = null, ?string $idempotencyKey = null, ?OrderReturn $return = null): array
     {
         $remaining = Money::normalize($amount ?? $this->netPaid($order));
 
@@ -399,7 +402,7 @@ final readonly class OrderPaymentService
             }
 
             $part = Money::min($capacity, $remaining);
-            $refunds[] = $this->refund($payment, $part, $reason, $by, $idempotencyKey === null ? null : $idempotencyKey.':'.$payment->id);
+            $refunds[] = $this->refund($payment, $part, $reason, $by, $idempotencyKey === null ? null : $idempotencyKey.':'.$payment->id, $return);
             $remaining = Money::sub($remaining, $part);
         }
 
@@ -624,6 +627,13 @@ final readonly class OrderPaymentService
 
     private function notifyRefunded(OrderPayment $refund): void
     {
+        // A return's refund settles the return, which notifies (§40.4 step 4).
+        if ($refund->order_return_id !== null) {
+            app(ReturnService::class)->refundSettled((int) $refund->order_return_id);
+
+            return;
+        }
+
         $order = $refund->order;
         $this->notifications->dispatch('order.refunded', $order, [
             'customer_name' => (string) ($order->customer_name ?? ''),
