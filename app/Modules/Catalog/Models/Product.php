@@ -86,7 +86,7 @@ class Product extends Model implements AuditableContract, HasMedia
 
     protected $fillable = [
         'product_type', 'name', 'slug', 'sku', 'barcode', 'description', 'price', 'compare_at_price', 'cost_price', 'tax_class',
-        'brand_id', 'unit_id', 'hsn_code', 'expiry_date', 'is_active', 'meta_title', 'meta_description', 'meta_keywords',
+        'brand_id', 'unit_id', 'hsn_code', 'expiry_date', 'has_warehouse_pricing', 'is_active', 'meta_title', 'meta_description', 'meta_keywords',
         'is_bookable', 'duration_minutes', 'is_subscribable', 'subscription_discount_percent', 'social_commerce_excluded_channels',
     ];
 

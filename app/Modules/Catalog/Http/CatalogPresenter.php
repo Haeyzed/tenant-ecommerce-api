@@ -140,6 +140,7 @@ final readonly class CatalogPresenter
             'unit_id' => $product->unit_id,
             'hsn_code' => $product->hsn_code,
             'expiry_date' => $product->expiry_date?->toDateString(),
+            'has_warehouse_pricing' => (bool) $product->has_warehouse_pricing,
             'meta_title' => $product->meta_title,
             'meta_description' => $product->meta_description,
             'meta_keywords' => $product->meta_keywords,

@@ -426,7 +426,7 @@ final readonly class ProductService
     public function searchAndFilter(array $filters, ?string $sort, int $perPage, array $baseConstraints = []): LengthAwarePaginator
     {
         $filters = [...$filters, ...$baseConstraints];
-        $query = Product::query()->visible()->select('products.*')->with(['brand:id,name,slug', 'media']);
+        $query = Product::query()->visible()->select('products.*')->with(['brand:id,name,slug', 'media', 'badges']);
 
         if (filled($filters['search'] ?? null)) {
             $this->applySearch($query, (string) $filters['search']);
@@ -642,6 +642,7 @@ final readonly class ProductService
             'hsn_code' => ['sometimes', 'nullable', 'string', 'max:16'],
             'expiry_date' => ['sometimes', 'nullable', 'date_format:Y-m-d'],
             'is_active' => ['sometimes', 'boolean'],
+            'has_warehouse_pricing' => ['sometimes', 'boolean'],
             'meta_title' => ['sometimes', 'nullable', 'string', 'max:200'],
             'meta_description' => ['sometimes', 'nullable', 'string', 'max:320'],
             'meta_keywords' => ['sometimes', 'nullable', 'string', 'max:255'],

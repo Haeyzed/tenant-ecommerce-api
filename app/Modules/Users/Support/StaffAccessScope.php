@@ -16,9 +16,9 @@ use Illuminate\Database\Eloquent\Builder;
  *
  * - own: records the user created (the caller names the column).
  * - warehouse: records tied to the user's assigned warehouses. The
- *   Inventory module registers the assignment resolver when warehouses are
- *   built (§32.3); until then a narrowed user has no warehouses and sees no
- *   warehouse-scoped records (fail closed).
+ *   Inventory module registers the assignment resolver (§32.3); without it
+ *   a narrowed user has no warehouses and sees no warehouse-scoped records
+ *   (fail closed).
  */
 final class StaffAccessScope
 {

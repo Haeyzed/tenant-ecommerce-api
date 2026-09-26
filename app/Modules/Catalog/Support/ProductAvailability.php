@@ -13,9 +13,8 @@ use Illuminate\Support\Collection;
  * Storefront availability ("in_stock", spec §31.1, §31.2). Digital and
  * service products are always in stock. Physical products are in stock
  * only when inventory says so: the Inventory module registers the resolver
- * and the query constraint when warehouses are built (§32). Until then no
- * stock exists anywhere, so physical products are reported out of stock,
- * which is the truth.
+ * and the query constraint (InventoryServiceProvider). Without them no
+ * stock exists anywhere, so physical products report out of stock.
  */
 final class ProductAvailability
 {

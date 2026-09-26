@@ -93,15 +93,17 @@ it('manages pages and sections within the tenant scope', function (): void {
     $this->tenantJson('DELETE', "/api/admin/cms/pages/{$id}", [], $this->auth)->assertOk();
 });
 
-it('resolves menus, omitting unpublished targets and unavailable link types', function (): void {
+it('resolves menus, rejecting missing targets and omitting unpublished ones', function (): void {
     tenancy()->initialize($this->tenant);
     $home = CmsPage::query()->where('system_key', 'home')->value('id');
     $terms = CmsPage::query()->where('system_key', 'terms')->value('id');
     $menu = $this->tenantJson('GET', '/api/admin/cms/menus', [], $this->auth)->json('data.0.id');
 
     $this->tenantJson('PUT', "/api/admin/cms/menus/{$menu}/items", ['items' => [
-        ['label' => 'Shoes', 'link_type' => 'category', 'linkable_id' => 1],
-    ]], $this->auth)->assertStatus(422)->assertJsonPath('meta.error_code', 'link_type_not_available');
+        ['label' => 'Shoes', 'link_type' => 'category', 'linkable_id' => 999999],
+    ]], $this->auth)->assertStatus(422)->assertJsonValidationErrors('items.0.linkable_id');
+
+    $shoes = $this->tenantJson('POST', '/api/admin/categories', ['name' => 'Shoes'], $this->auth)->assertCreated()->json('data.id');
 
     $this->tenantJson('PUT', "/api/admin/cms/menus/{$menu}/items", ['items' => [
         ['label' => 'Home', 'link_type' => 'page', 'linkable_id' => $home, 'children' => [
@@ -109,13 +111,19 @@ it('resolves menus, omitting unpublished targets and unavailable link types', fu
             ['label' => 'Blog', 'link_type' => 'blog'],
         ]],
         ['label' => 'Help', 'link_type' => 'url', 'url' => 'mailto:help@a.test'],
+        ['label' => 'Shoes', 'link_type' => 'category', 'linkable_id' => $shoes],
     ]], $this->auth)->assertOk();
 
     $key = $this->tenantJson('GET', '/api/admin/cms/menus', [], $this->auth)->json('data.0.key');
     $this->tenantJson('GET', "/api/cms/menus/{$key}")->assertOk()
         ->assertJsonPath('data.items.0.url', '/')
         ->assertJsonPath('data.items.0.children', [['label' => 'Blog', 'url' => '/blog', 'link_type' => 'blog', 'open_in_new_tab' => false, 'children' => []]])
-        ->assertJsonPath('data.items.1.url', 'mailto:help@a.test');
+        ->assertJsonPath('data.items.1.url', 'mailto:help@a.test')
+        ->assertJsonPath('data.items.2.url', '/categories/shoes');
+
+    // A deactivated category drops out of the public menu.
+    $this->tenantJson('PATCH', "/api/admin/categories/{$shoes}", ['is_active' => false], $this->auth)->assertOk();
+    $this->tenantJson('GET', "/api/cms/menus/{$key}")->assertOk()->assertJsonCount(2, 'data.items');
 });
 
 it('shows live announcements in the storefront config and gates content marketing', function (): void {

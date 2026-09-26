@@ -96,8 +96,10 @@ final class GenerateExport implements ShouldBeUnique, ShouldQueue
 
             fclose($handle);
 
+            // Types may hold ":" (a module prefix), which is not portable in
+            // file names (an NTFS stream separator).
             $export->addMedia((string) $path)
-                ->usingFileName($export->export_type.'-'.$export->id.'.'.$export->format)
+                ->usingFileName(preg_replace('/[^A-Za-z0-9_-]+/', '-', $export->export_type).'-'.$export->id.'.'.$export->format)
                 ->toMediaCollection('file');
         } catch (Throwable $e) {
             if (is_resource($handle)) {

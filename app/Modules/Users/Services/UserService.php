@@ -6,6 +6,7 @@ namespace App\Modules\Users\Services;
 
 use App\Modules\Access\Services\PermissionSyncService;
 use App\Modules\Access\Services\RoleService;
+use App\Modules\Inventory\Services\WarehouseService;
 use App\Modules\Notifications\Services\NotificationDispatchService;
 use App\Modules\Settings\Services\TenantSettingsService;
 use App\Modules\Tenancy\Models\Tenant;
@@ -36,6 +37,7 @@ final readonly class UserService
         private NotificationDispatchService $notifications,
         private TenantManagementService $tenants,
         private TenantSettingsService $settings,
+        private WarehouseService $warehouses,
     ) {}
 
     /**
@@ -184,6 +186,29 @@ final readonly class UserService
         ActivityRecorder::tenant('users', "Roles of {$user->email} updated", $user, ['roles' => $roles], $by);
 
         return $user->load('roles:id,name');
+    }
+
+    /**
+     * The warehouses of staff_data_access_scope = warehouse (§32.3).
+     *
+     * @param  list<int>  $warehouseIds
+     * @return list<int>
+     */
+    public function syncWarehouses(User $user, array $warehouseIds, User $by): array
+    {
+        $this->warehouses->syncUsers($user, $warehouseIds);
+        $ids = $this->warehouses->userWarehouseIds($user);
+        ActivityRecorder::tenant('users', "Warehouses of {$user->email} updated", $user, ['warehouse_ids' => $ids], $by);
+
+        return $ids;
+    }
+
+    /**
+     * @return list<int>
+     */
+    public function warehouseIds(User $user): array
+    {
+        return $this->warehouses->userWarehouseIds($user);
     }
 
     public function assignRole(User $user, string $role, User $by): User

@@ -13,6 +13,12 @@ use App\Modules\Billing\Models\PaymentTransaction;
 use App\Modules\Billing\Models\PlatformCoupon;
 use App\Modules\Billing\Models\PlatformPaymentGateway;
 use App\Modules\Billing\Models\Subscription;
+use App\Modules\Catalog\Models\Brand;
+use App\Modules\Catalog\Models\Category;
+use App\Modules\Catalog\Models\DigitalProductFile;
+use App\Modules\Catalog\Models\Product;
+use App\Modules\Catalog\Models\ProductQuestion;
+use App\Modules\Catalog\Models\ProductVariant;
 use App\Modules\Cms\Models\CmsBanner;
 use App\Modules\Cms\Models\CmsBlogPost;
 use App\Modules\Cms\Models\CmsPage;
@@ -22,6 +28,10 @@ use App\Modules\Customers\Models\Customer;
 use App\Modules\Customers\Models\CustomerGroup;
 use App\Modules\CustomFields\Models\CustomFieldDefinition;
 use App\Modules\Exports\Models\DataExport;
+use App\Modules\Inventory\Models\StockAdjustment;
+use App\Modules\Inventory\Models\StockTransfer;
+use App\Modules\Inventory\Models\Warehouse;
+use App\Modules\Inventory\Models\WarehouseProductPrice;
 use App\Modules\Legal\Models\LegalDocument;
 use App\Modules\Marketplace\Models\Seller;
 use App\Modules\Messaging\Models\SmsGatewaySetting;
@@ -99,6 +109,16 @@ final class MorphMap
         'user' => User::class,
         'customer' => Customer::class,
         'customer_group' => CustomerGroup::class,
+        'product' => Product::class,
+        'product_variant' => ProductVariant::class,
+        'category' => Category::class,
+        'brand' => Brand::class,
+        'digital_product_file' => DigitalProductFile::class,
+        'product_question' => ProductQuestion::class,
+        'warehouse' => Warehouse::class,
+        'stock_transfer' => StockTransfer::class,
+        'stock_adjustment' => StockAdjustment::class,
+        'warehouse_product_price' => WarehouseProductPrice::class,
         'seller' => Seller::class,
         'driver' => Driver::class,
         'storefront_setting' => StorefrontSetting::class,

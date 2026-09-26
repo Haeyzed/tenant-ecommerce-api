@@ -106,7 +106,7 @@ final readonly class ProductQuestionService
         return ProductQuestion::query()
             ->where('product_id', $product->id)
             ->where('is_approved', true)
-            ->with(['answers' => static fn ($q) => $q->where('is_approved', true)])
+            ->with(['customer:id,name,anonymized_at', 'answers' => static fn ($q) => $q->where('is_approved', true)])
             ->orderByDesc('asked_at')
             ->paginate($perPage);
     }
@@ -120,7 +120,7 @@ final readonly class ProductQuestionService
         validator($filters, ['status' => ['sometimes', Rule::in(['pending', 'approved', 'unanswered'])]])->validate();
 
         return ProductQuestion::query()
-            ->with(['product:id,name', 'customer:id,name', 'answers'])
+            ->with(['product:id,name', 'customer:id,name,anonymized_at', 'answers'])
             ->when(($filters['status'] ?? null) === 'pending', static fn ($q) => $q->where(static fn ($w) => $w->where('is_approved', false)
                 ->orWhereHas('answers', static fn ($a) => $a->where('is_approved', false))))
             ->when(($filters['status'] ?? null) === 'approved', static fn ($q) => $q->where('is_approved', true))

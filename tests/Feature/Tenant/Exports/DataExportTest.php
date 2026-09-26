@@ -11,6 +11,7 @@ use App\Modules\Notifications\Services\NotificationDispatchService;
 use App\Modules\Users\Models\User;
 use App\Shared\Exceptions\ApiException;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Notification;
 
 beforeEach(function (): void {
@@ -32,6 +33,15 @@ beforeEach(function (): void {
     $this->owner = User::query()->create(['name' => '=HYPERLINK("x")', 'email' => 'owner@a.test', 'password' => 'Secret123', 'is_active' => true]);
     $this->owner->assignRole('owner');
     $this->auth = ['Authorization' => 'Bearer '.$this->owner->createToken('t', ['staff'])->plainTextToken];
+});
+
+// Generated files land on the test tenant's real disk (the tenancy filesystem
+// bootstrapper re-roots disks, so Storage::fake cannot isolate them).
+afterEach(function (): void {
+    foreach (glob(base_path('storage/tenants/test-tenant-a/app/*/test-staff-*.*')) ?: [] as $file) {
+        File::delete($file);
+        @rmdir(dirname($file));
+    }
 });
 
 it('queues an export once for identical requests', function (): void {
@@ -68,7 +78,7 @@ it('generates a CSV with formula cells neutralised, then notifies and serves it'
 
     Notification::assertSentTo($this->owner, TemplatedNotification::class, fn ($n): bool => $n->key === 'export.ready');
 
-    $this->tenantJson('GET', "/api/admin/exports/{$export->id}/download", [], $this->auth)->assertOk()->assertDownload("test:staff-{$export->id}.csv");
+    $this->tenantJson('GET', "/api/admin/exports/{$export->id}/download", [], $this->auth)->assertOk()->assertDownload("test-staff-{$export->id}.csv");
 });
 
 it('expires files after seven days', function (): void {

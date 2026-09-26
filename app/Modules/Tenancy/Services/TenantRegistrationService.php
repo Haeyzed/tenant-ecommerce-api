@@ -11,6 +11,7 @@ use App\Modules\Billing\Models\Subscription;
 use App\Modules\Billing\Services\PlatformCouponService;
 use App\Modules\Billing\Services\PlatformPaymentGatewayService;
 use App\Modules\Billing\Services\SubscriptionService;
+use App\Modules\Inventory\Services\WarehouseService;
 use App\Modules\Legal\Models\LegalAcceptance;
 use App\Modules\Legal\Services\LegalDocumentService;
 use App\Modules\Notifications\Services\NotificationDispatchService;
@@ -377,6 +378,9 @@ final readonly class TenantRegistrationService
             $settings->set('store_contact_email', $tenant->email);
             $settings->set('default_currency', $tenant->default_currency);
             $settings->set('timezone', $tenant->timezone);
+
+            // 4: the default warehouse (checkout needs a fulfilment warehouse, §9.5).
+            app(WarehouseService::class)->ensureDefault();
 
             // 5: the owner, created once; the stored hash is cleared after.
             if ($registration !== null && ! User::query()->where('email', $tenant->email)->exists()) {

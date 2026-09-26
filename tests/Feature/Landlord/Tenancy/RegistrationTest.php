@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Modules\Inventory\Models\Warehouse;
 use App\Modules\Legal\Models\LegalAcceptance;
 use App\Modules\Legal\Models\LegalDocument;
 use App\Modules\Legal\Services\LegalDocumentService;
@@ -174,7 +175,8 @@ it('provisions a real tenant database end to end and lets the owner sign in', fu
             ->assertOk()->assertJsonPath('data.user.name', 'Ada Obi');
 
         tenancy()->initialize($tenant);
-        expect(app(TenantSettingsService::class)->get('store_name'))->toBe('Ada Stores');
+        expect(app(TenantSettingsService::class)->get('store_name'))->toBe('Ada Stores')
+            ->and(Warehouse::query()->pluck('code')->all())->toBe(['MAIN']);
     } finally {
         if (tenancy()->initialized) {
             tenancy()->end();

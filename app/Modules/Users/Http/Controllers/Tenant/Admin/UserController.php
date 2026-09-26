@@ -80,6 +80,13 @@ final class UserController extends Controller
         return APIResponse::success($this->present($this->users->syncDirectPermissions($user, $permissions, $this->actor($request)), true), 'Direct permissions updated');
     }
 
+    public function syncWarehouses(Request $request, User $user): JsonResponse
+    {
+        $ids = $request->validate(['warehouse_ids' => ['present', 'array', 'max:500'], 'warehouse_ids.*' => ['integer']])['warehouse_ids'];
+
+        return APIResponse::success(['warehouse_ids' => $this->users->syncWarehouses($user, $ids, $this->actor($request))], 'Warehouses updated');
+    }
+
     /**
      * {user} is the new owner; the caller must be the current owner and
      * confirm with their password.
@@ -106,6 +113,7 @@ final class UserController extends Controller
             'roles' => $user->relationLoaded('roles') ? $user->roles->pluck('name')->values()->all() : $user->getRoleNames()->values()->all(),
             'direct_permissions' => $withPermissions ? $user->getDirectPermissions()->pluck('name')->sort()->values()->all() : null,
             'effective_permissions' => $withPermissions ? $this->users->getEffectivePermissions($user) : null,
+            'warehouse_ids' => $withPermissions ? $this->users->warehouseIds($user) : null,
             'last_login_at' => $user->last_login_at?->toIso8601String(),
         ];
     }

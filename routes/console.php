@@ -66,6 +66,14 @@ Schedule::job(new GenerateAffiliatePayouts)
     ->withoutOverlapping()
     ->name('affiliates:generate-payouts');
 
+// Read-only ledger check (§32.8, §77.6); drift is logged and alerted on.
+Schedule::command('inventory:verify')
+    ->weeklyOn(0, '04:30')
+    ->timezone('UTC')
+    ->onOneServer()
+    ->withoutOverlapping()
+    ->name('inventory:verify');
+
 Schedule::job(new DispatchTenantDailyMaintenance)
     ->hourly()
     ->onOneServer()

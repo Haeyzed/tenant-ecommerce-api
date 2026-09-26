@@ -6,8 +6,7 @@ use App\Modules\Users\Http\Controllers\Tenant\Admin\UserController;
 use Illuminate\Support\Facades\Route;
 
 /*
-| Staff users (spec §25.4). Always available. PUT users/{user}/warehouses
-| is added with warehouses (§32.3).
+| Staff users (spec §25.4). Always available.
 */
 
 Route::middleware('tenant.admin')->prefix('admin')->name('tenant.users.')->group(function (): void {
@@ -20,5 +19,6 @@ Route::middleware('tenant.admin')->prefix('admin')->name('tenant.users.')->group
     Route::post('users/{user}/reactivate', [UserController::class, 'reactivate'])->whereNumber('user')->middleware('usage.limit:max_users')->name('reactivate');
     Route::put('users/{user}/roles', [UserController::class, 'syncRoles'])->whereNumber('user')->name('roles');
     Route::put('users/{user}/permissions', [UserController::class, 'syncPermissions'])->whereNumber('user')->name('permissions');
+    Route::put('users/{user}/warehouses', [UserController::class, 'syncWarehouses'])->whereNumber('user')->name('warehouses');
     Route::post('users/{user}/transfer-ownership', [UserController::class, 'transferOwnership'])->whereNumber('user')->name('transfer-ownership');
 });

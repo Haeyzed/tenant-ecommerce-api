@@ -8,6 +8,7 @@ use App\Modules\Plans\Enums\ModuleState;
 use App\Modules\Plans\Services\FeatureAccessService;
 use App\Modules\Plans\Support\ModuleRegistry;
 use App\Modules\Tenancy\Models\Tenant;
+use Database\Seeders\Tenant\CatalogDefaultsSeeder;
 use Database\Seeders\Tenant\CmsDefaultsSeeder;
 use Database\Seeders\Tenant\CustomerDefaultsSeeder;
 use Database\Seeders\Tenant\NotificationTemplateSeeder;
@@ -32,6 +33,7 @@ final class TenantDefaultsSyncService
         NotificationTemplateSeeder::class,
         CmsDefaultsSeeder::class,
         CustomerDefaultsSeeder::class,
+        CatalogDefaultsSeeder::class,
     ];
 
     public function __construct(

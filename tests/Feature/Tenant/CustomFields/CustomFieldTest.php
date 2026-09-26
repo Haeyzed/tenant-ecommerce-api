@@ -16,7 +16,7 @@ beforeEach(function (): void {
     $this->tenant = $this->createTenant('a');
     $this->subscribe($this->tenant, 'basic');
 
-    // No commerce entity exists yet; staff users stand in as a core entity.
+    // Staff users stand in as a further core entity, and supplier as a module one.
     $registry = app(CustomFieldEntityRegistry::class);
     $registry->register('staff_user', User::class, 'users');
     $registry->register('supplier', User::class, 'suppliers', 'purchasing');
@@ -45,6 +45,8 @@ it('creates definitions with immutable key and type and lists only offered entit
     // The purchasing module is not on the basic plan: its entity is not offered.
     $this->tenantJson('GET', '/api/admin/custom-fields/entities', [], $this->auth)->assertOk()->assertJsonPath('data', [
         ['entity_type' => 'customer', 'owner_module' => null, 'state' => 'core'],
+        ['entity_type' => 'product', 'owner_module' => null, 'state' => 'core'],
+        ['entity_type' => 'product_variant', 'owner_module' => null, 'state' => 'core'],
         ['entity_type' => 'staff_user', 'owner_module' => null, 'state' => 'core'],
     ]);
     $this->tenantJson('POST', '/api/admin/custom-fields', field(['entity_type' => 'supplier']), $this->auth)

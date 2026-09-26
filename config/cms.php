@@ -81,6 +81,9 @@ return [
         'page' => '/pages/{slug}',
         'blog' => '/blog',
         'blog_post' => '/blog/{slug}',
+        'product' => '/products/{slug}',
+        'category' => '/categories/{slug}',
+        'brand' => '/brands/{slug}',
     ],
 
     'contact_retention_months' => 24,
