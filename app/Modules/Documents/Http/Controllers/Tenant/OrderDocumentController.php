@@ -18,7 +18,9 @@ use Symfony\Component\HttpFoundation\Response;
  */
 final class OrderDocumentController extends Controller
 {
-    public function invoice(Request $request, Order $order, InvoiceTemplateService $invoices): Response
+    public function __construct(private readonly InvoiceTemplateService $invoices) {}
+
+    public function invoice(Request $request, Order $order): Response
     {
         OrderAccess::assertCanView($request, $order);
 
@@ -26,6 +28,6 @@ final class OrderDocumentController extends Controller
             throw ApiException::unprocessable('invoice_not_ready', 'The invoice is available once the order is confirmed.');
         }
 
-        return $invoices->renderInvoice($order)->toResponse();
+        return $this->invoices->renderInvoice($order)->toResponse();
     }
 }

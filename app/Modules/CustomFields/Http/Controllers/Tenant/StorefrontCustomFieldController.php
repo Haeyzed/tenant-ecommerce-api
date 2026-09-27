@@ -24,7 +24,7 @@ final class StorefrontCustomFieldController extends Controller
 
     public function index(Request $request, CustomFieldService $values, CustomFieldEntityRegistry $registry): JsonResponse
     {
-        $type = $request->validate(['entity_type' => ['required', Rule::in(self::PUBLIC_ENTITIES)]])['entity_type'];
+        $type = $request->validate(['entity_type' => ['required', Rule::in(StorefrontCustomFieldController::PUBLIC_ENTITIES)]])['entity_type'];
 
         /** @var Tenant $tenant */
         $tenant = tenant();

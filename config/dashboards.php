@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Modules\Accounting\Metrics\AccountingMetrics;
 use App\Modules\Affiliates\Metrics\AffiliateMetricsService;
 use App\Modules\Billing\Metrics\PaymentMetrics;
 use App\Modules\Billing\Metrics\PlanMetrics;
@@ -10,6 +11,7 @@ use App\Modules\Billing\Metrics\SubscriptionMetrics;
 use App\Modules\Catalog\Metrics\CatalogMetrics;
 use App\Modules\Customers\Metrics\CustomerMetrics;
 use App\Modules\Dashboard\Metrics\OperationsMetrics;
+use App\Modules\Expenses\Metrics\ExpenseMetrics;
 use App\Modules\Inventory\Metrics\InventoryMetrics;
 use App\Modules\Orders\Metrics\OrderMetrics;
 use App\Modules\Orders\Metrics\SalesMetrics;
@@ -183,6 +185,20 @@ return [
             'permission' => 'returns.view',
             'parts' => [[ReturnMetrics::class, 'returns']],
             'alerts' => [[ReturnMetrics::class, 'alerts']],
+        ],
+        'accounting' => [
+            'label' => 'Accounting',
+            'feature' => 'accounting',
+            'permission' => 'accounting.reports.profit-and-loss',
+            'parts' => [[AccountingMetrics::class, 'accounting']],
+            'alerts' => [[AccountingMetrics::class, 'alerts']],
+        ],
+        'expenses' => [
+            'label' => 'Expenses',
+            'feature' => 'expenses',
+            'permission' => 'expenses.view',
+            'parts' => [[ExpenseMetrics::class, 'expenses']],
+            'alerts' => [],
         ],
     ],
 

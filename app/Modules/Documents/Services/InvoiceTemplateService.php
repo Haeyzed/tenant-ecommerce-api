@@ -29,7 +29,7 @@ use Throwable;
 final readonly class InvoiceTemplateService
 {
     /** tenant_settings.date_format tokens → PHP date format. */
-    private const array DATE_FORMATS = [
+    public const array DATE_FORMATS = [
         'DD/MM/YYYY' => 'd/m/Y', 'MM/DD/YYYY' => 'm/d/Y', 'YYYY-MM-DD' => 'Y-m-d', 'DD MMM YYYY' => 'd M Y', 'MMM DD, YYYY' => 'M d, Y',
     ];
 
@@ -52,7 +52,7 @@ final readonly class InvoiceTemplateService
     /**
      * @return array<string, list<mixed>>
      */
-    public function rules(bool $creating): array
+    public static function rules(bool $creating): array
     {
         $required = $creating ? 'required' : 'sometimes';
 
@@ -71,7 +71,7 @@ final readonly class InvoiceTemplateService
             'logo_height' => ['sometimes', 'nullable', 'numeric', 'min:1', 'max:1000'],
             'logo_width' => ['sometimes', 'nullable', 'numeric', 'min:1', 'max:1000'],
             'primary_color' => ['sometimes', 'nullable', 'regex:/^#[0-9A-Fa-f]{6}$/'],
-            'date_format' => ['sometimes', 'nullable', Rule::in(array_keys(self::DATE_FORMATS))],
+            'date_format' => ['sometimes', 'nullable', Rule::in(array_keys(InvoiceTemplateService::DATE_FORMATS))],
             ...array_fill_keys(InvoiceTemplate::FLAGS, ['sometimes', 'boolean']),
         ];
     }

@@ -29,14 +29,14 @@ final class InvoiceTemplateController extends Controller
 
     public function store(Request $request): JsonResponse
     {
-        $template = $this->templates->createTemplate($request->validate($this->templates->rules(true)));
+        $template = $this->templates->createTemplate($request->validate(InvoiceTemplateService::rules(true)));
 
         return APIResponse::created($this->presenter->template($template->refresh()), 'Template created');
     }
 
     public function update(Request $request, InvoiceTemplate $template): JsonResponse
     {
-        $template = $this->templates->updateTemplate($template, $request->validate($this->templates->rules(false)));
+        $template = $this->templates->updateTemplate($template, $request->validate(InvoiceTemplateService::rules(false)));
 
         return APIResponse::success($this->presenter->template($template), 'Template updated');
     }

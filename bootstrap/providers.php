@@ -10,6 +10,7 @@ use App\Modules\Orders\OrdersServiceProvider;
 use App\Modules\Promotions\PromotionsServiceProvider;
 use App\Modules\Returns\ReturnsServiceProvider;
 use App\Modules\Reviews\ReviewsServiceProvider;
+use App\Providers\ApiDocsServiceProvider;
 use App\Providers\AppServiceProvider;
 use App\Providers\ModuleServiceProvider;
 use App\Providers\TenancyServiceProvider;
@@ -26,4 +27,5 @@ return [
     ReturnsServiceProvider::class,
     ReviewsServiceProvider::class,
     DocumentsServiceProvider::class,
+    ApiDocsServiceProvider::class,
 ];

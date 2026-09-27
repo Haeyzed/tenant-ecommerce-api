@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace App\Shared\Support;
 
 use App\Modules\Access\Models\PlatformUser;
+use App\Modules\Accounting\Models\Account;
+use App\Modules\Accounting\Models\AccountingPostingRequest;
+use App\Modules\Accounting\Models\JournalEntry;
 use App\Modules\Affiliates\Models\Affiliate;
 use App\Modules\Affiliates\Models\AffiliateCommission;
 use App\Modules\Affiliates\Models\AffiliatePayout;
@@ -28,6 +31,8 @@ use App\Modules\Customers\Models\Customer;
 use App\Modules\Customers\Models\CustomerGroup;
 use App\Modules\CustomFields\Models\CustomFieldDefinition;
 use App\Modules\Documents\Models\InvoiceTemplate;
+use App\Modules\Expenses\Models\Expense;
+use App\Modules\Expenses\Models\IncomeEntry;
 use App\Modules\Exports\Models\DataExport;
 use App\Modules\Inventory\Models\StockAdjustment;
 use App\Modules\Inventory\Models\StockTransfer;
@@ -145,6 +150,11 @@ final class MorphMap
         'order_return' => OrderReturn::class,
         'delivery_assignment' => DeliveryAssignment::class,
         'invoice_template' => InvoiceTemplate::class,
+        'account' => Account::class,
+        'journal_entry' => JournalEntry::class,
+        'accounting_posting_request' => AccountingPostingRequest::class,
+        'expense' => Expense::class,
+        'income_entry' => IncomeEntry::class,
         'storefront_setting' => StorefrontSetting::class,
         'data_export' => DataExport::class,
         'custom_field_definition' => CustomFieldDefinition::class,

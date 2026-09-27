@@ -100,7 +100,9 @@ final readonly class AccountingOutbox
             return $record->is_test;
         }
 
-        $order = $record->getAttribute('order_id') === null ? null : Order::withTrashed()->find($record->getAttribute('order_id'));
+        // Records tied to an order (payments, returns) inherit its test flag.
+        $orderId = $record->getAttributes()['order_id'] ?? null;
+        $order = $orderId === null ? null : Order::withTrashed()->find($orderId);
 
         return $order?->is_test ?? false;
     }

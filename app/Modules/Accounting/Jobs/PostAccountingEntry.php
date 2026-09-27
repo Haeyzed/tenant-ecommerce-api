@@ -30,7 +30,8 @@ final class PostAccountingEntry implements ShouldQueue
         public readonly string $tenantId,
         public readonly int $requestId,
     ) {
-        $this->onQueue('tenant-default');
+        // Money work never waits behind bulk work (§77.3).
+        $this->onQueue('tenant-critical');
     }
 
     public function handle(): void

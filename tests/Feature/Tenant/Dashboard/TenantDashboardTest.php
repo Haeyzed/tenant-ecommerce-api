@@ -143,8 +143,10 @@ it('lists and serves only the sections a user may see, within their warehouses',
     $accountantAuth = ['Authorization' => 'Bearer '.$accountant->createToken('t', ['staff'])->plainTextToken];
 
     $all = array_column($this->tenantJson('GET', '/api/admin/dashboard', [], $this->staff)->assertOk()->json('data.sections'), 'key');
-    expect($all)->toBe(['overview', 'sales', 'orders', 'customers', 'catalogue', 'inventory', 'promotions', 'payments', 'returns'])
-        ->and(array_column($this->tenantJson('GET', '/api/admin/dashboard', [], $accountantAuth)->assertOk()->json('data.sections'), 'key'))->toBe(['payments', 'returns']);
+    // Basic includes `expenses` (auto-enabled); `accounting` is not on the plan.
+    expect($all)->toBe(['overview', 'sales', 'orders', 'customers', 'catalogue', 'inventory', 'promotions', 'payments', 'returns', 'expenses'])
+        ->and(array_column($this->tenantJson('GET', '/api/admin/dashboard', [], $accountantAuth)->assertOk()->json('data.sections'), 'key'))->toBe(['payments', 'returns', 'expenses']);
+    $this->tenantJson('GET', '/api/admin/dashboard/accounting', [], $this->staff)->assertForbidden();
 
     $this->tenantJson('GET', '/api/admin/dashboard/sales', [], $accountantAuth)->assertForbidden();
     $this->tenantJson('GET', '/api/admin/dashboard/nope', [], $this->staff)->assertNotFound()->assertJsonPath('meta.error_code', 'dashboard_section_not_found');

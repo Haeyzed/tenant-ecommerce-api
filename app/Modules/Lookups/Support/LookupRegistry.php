@@ -5,6 +5,10 @@ declare(strict_types=1);
 namespace App\Modules\Lookups\Support;
 
 use App\Modules\Access\Services\RoleService;
+use App\Modules\Accounting\Models\Account;
+use App\Modules\Accounting\Models\AccountCategory;
+use App\Modules\Accounting\Models\FiscalPeriod;
+use App\Modules\Accounting\Models\FiscalYear;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\ProductOption;
 use App\Modules\Dashboard\Services\Tenant\TenantDashboardService;
@@ -54,6 +58,23 @@ final readonly class LookupRegistry
         private ModuleRegistry $modules,
         private PlatformSettingsService $platformSettings,
     ) {}
+
+    /**
+     * Lookups of optional modules carry their module's feature (§45):
+     * key => feature, for the tenant admin group.
+     */
+    private const array FEATURES = [
+        'chart-of-accounts' => 'accounting',
+        'account-categories' => 'accounting',
+        'account-types' => 'accounting',
+        'fiscal-years' => 'accounting',
+        'fiscal-periods' => 'accounting',
+    ];
+
+    public function feature(string $context, string $key): ?string
+    {
+        return $context === self::TENANT_ADMIN ? (self::FEATURES[$key] ?? null) : null;
+    }
 
     public function has(string $context, string $key): bool
     {
@@ -225,6 +246,23 @@ final readonly class LookupRegistry
                         'tax_class' => $t->tax_class, 'rate_percentage' => bcadd((string) $t->rate_percentage, '0', 4), 'is_active' => (bool) $t->is_active,
                     ]])->all(),
                 'order-payment-methods' => static fn (): array => self::enum(OrderPayment::MANUAL_METHODS),
+                'chart-of-accounts' => static fn (Request $r): array => Account::query()->with('category:id,account_type')->where('is_active', true)
+                    ->when(in_array($r->query('account_type'), AccountCategory::TYPES, true),
+                        static fn ($q) => $q->whereHas('category', static fn ($c) => $c->where('account_type', $r->query('account_type'))))
+                    ->orderBy('code')->get()
+                    ->map(static fn (Account $a): array => ['value' => $a->id, 'label' => $a->code.' '.$a->name, 'meta' => [
+                        'code' => $a->code, 'account_type' => $a->category->account_type, 'parent_account_id' => $a->parent_account_id, 'system_key' => $a->system_key,
+                    ]])->all(),
+                'account-categories' => static fn (): array => AccountCategory::query()->orderBy('sort_order')->orderBy('name')->get()
+                    ->map(static fn (AccountCategory $c): array => ['value' => $c->id, 'label' => $c->name, 'meta' => ['group' => $c->account_type]])
+                    ->all(),
+                'account-types' => static fn (): array => self::enum(AccountCategory::TYPES),
+                'fiscal-years' => static fn (): array => FiscalYear::query()->orderByDesc('starts_on')->get()
+                    ->map(static fn (FiscalYear $y): array => ['value' => $y->id, 'label' => $y->name, 'meta' => ['status' => $y->status, 'starts_on' => $y->starts_on->toDateString(), 'ends_on' => $y->ends_on->toDateString()]])
+                    ->all(),
+                'fiscal-periods' => fn (Request $r): array => FiscalPeriod::query()->where('fiscal_year_id', $this->requiredId($r, 'fiscal_year_id'))->orderBy('starts_on')->get()
+                    ->map(static fn (FiscalPeriod $p): array => ['value' => $p->id, 'label' => $p->name, 'meta' => ['status' => $p->status, 'starts_on' => $p->starts_on->toDateString(), 'ends_on' => $p->ends_on->toDateString()]])
+                    ->all(),
                 'dashboard-sections' => static fn (Request $r): array => $r->user() instanceof User
                     ? array_map(static fn (array $s): array => ['value' => $s['key'], 'label' => $s['label']], app(TenantDashboardService::class)->sections($r->user()))
                     : [],

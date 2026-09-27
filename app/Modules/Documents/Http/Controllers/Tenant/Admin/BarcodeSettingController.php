@@ -34,14 +34,14 @@ final class BarcodeSettingController extends Controller
 
     public function store(Request $request): JsonResponse
     {
-        $setting = $this->settings->createSetting($request->validate($this->settings->rules(true)));
+        $setting = $this->settings->createSetting($request->validate(BarcodeSettingsService::rules(true)));
 
         return APIResponse::created($this->presenter->barcodeSetting($setting->refresh()), 'Layout created');
     }
 
     public function update(Request $request, BarcodeSetting $setting): JsonResponse
     {
-        return APIResponse::success($this->presenter->barcodeSetting($this->settings->updateSetting($setting, $request->validate($this->settings->rules(false)))), 'Layout updated');
+        return APIResponse::success($this->presenter->barcodeSetting($this->settings->updateSetting($setting, $request->validate(BarcodeSettingsService::rules(false)))), 'Layout updated');
     }
 
     public function destroy(BarcodeSetting $setting): JsonResponse
@@ -58,7 +58,7 @@ final class BarcodeSettingController extends Controller
 
     public function generate(Request $request, WarehouseService $warehouses): Response
     {
-        $validated = $request->validate($this->settings->labelRules());
+        $validated = $request->validate(BarcodeSettingsService::labelRules());
 
         if (isset($validated['warehouse_id'])) {
             /** @var User $actor */

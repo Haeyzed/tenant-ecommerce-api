@@ -38,9 +38,9 @@ final class PrintBarcodeController extends Controller
         return APIResponse::success($this->labels->searchProducts((string) $validated['q'], $this->warehouse($request, $validated['warehouse_id'] ?? null)));
     }
 
-    public function generate(Request $request, BarcodeSettingsService $settings): Response
+    public function generate(Request $request): Response
     {
-        $validated = $request->validate($settings->labelRules());
+        $validated = $request->validate(BarcodeSettingsService::labelRules());
         $this->warehouse($request, $validated['warehouse_id'] ?? null);
         $setting = isset($validated['barcode_setting_id']) ? BarcodeSetting::query()->findOrFail((int) $validated['barcode_setting_id']) : null;
 

@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Modules\Catalog\Metrics\CatalogMetrics;
 use App\Modules\Customers\Metrics\CustomerMetrics;
 use App\Modules\Dashboard\Services\Tenant\TenantDashboardService;
+use App\Modules\Expenses\Metrics\ExpenseMetrics;
 use App\Modules\Inventory\Metrics\InventoryMetrics;
 use App\Modules\Orders\Metrics\OrderMetrics;
 use App\Modules\Payments\Metrics\PaymentMetrics;
@@ -48,10 +49,15 @@ final class ResourceMetricsController extends Controller
         'reviews' => [ReviewMetrics::class, 'contextual'],
     ];
 
+    /** Strips of optional modules; each module registers its route behind its feature. */
+    private const array MODULE_STRIPS = [
+        'expenses' => [ExpenseMetrics::class, 'contextual'],
+    ];
+
     public function metrics(MetricsRangeRequest $request, TenantDashboardService $dashboard, Container $container): JsonResponse
     {
         $resource = (string) $request->route()?->defaults['metrics_resource'];
-        [$class, $method] = self::STRIPS[$resource];
+        [$class, $method] = self::STRIPS[$resource] ?? self::MODULE_STRIPS[$resource];
         $provider = $container->make($class);
         $parameters = [];
 

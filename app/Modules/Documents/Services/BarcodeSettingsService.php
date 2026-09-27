@@ -44,7 +44,7 @@ final readonly class BarcodeSettingsService
     /**
      * @return array<string, list<mixed>>
      */
-    public function rules(bool $creating): array
+    public static function rules(bool $creating): array
     {
         $required = $creating ? 'required' : 'sometimes';
         $inches = [$required, 'numeric', 'min:0', 'max:60'];
@@ -69,7 +69,7 @@ final readonly class BarcodeSettingsService
     /**
      * @return array<string, list<mixed>>
      */
-    public function labelRules(): array
+    public static function labelRules(): array
     {
         return [
             'items' => ['required', 'array', 'min:1', 'max:200'],
