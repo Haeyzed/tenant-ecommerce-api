@@ -32,7 +32,7 @@ final class StockAdjustmentController extends Controller
     public function index(Request $request): JsonResponse
     {
         $filters = $request->validate([
-            'status' => ['sometimes', Rule::in([StockAdjustment::DRAFT, StockAdjustment::SUBMITTED])],
+            'status' => ['sometimes', Rule::in(StockAdjustment::STATUSES)],
             'warehouse_id' => ['sometimes', 'integer'],
             'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'],
         ]);

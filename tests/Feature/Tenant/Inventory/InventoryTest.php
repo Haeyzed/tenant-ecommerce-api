@@ -296,6 +296,43 @@ it('alerts on low and out-of-stock crossings and lists stock levels', function (
     Notification::assertSentTo($this->owner, TemplatedNotification::class, fn ($n): bool => $n->key === 'inventory.out_of_stock');
 });
 
+it('uses the variant threshold, then the product one, then the store setting', function (): void {
+    Event::fake([StockReplenished::class]);
+    $inventory = app(InventoryService::class);
+
+    // Store default 5; the laptop is low at 20, the screws never.
+    $laptop = inventoryProduct(['name' => 'Laptop', 'sku' => 'LAP-1', 'low_stock_threshold' => 20]);
+    $screws = inventoryProduct(['name' => 'Screws', 'sku' => 'SCR-1', 'low_stock_threshold' => 0]);
+    $mug = inventoryProduct(['name' => 'Mug', 'sku' => 'MUG-2']);
+
+    $inventory->adjustStock($this->main, $laptop, null, '30', 'adjustment_in');
+    $inventory->adjustStock($this->main, $screws, null, '3', 'adjustment_in');
+    $inventory->adjustStock($this->main, $mug, null, '8', 'adjustment_in');
+
+    $inventory->adjustStock($this->main, $laptop, null, '-12', 'adjustment_out'); // 18 ≤ 20: low
+    Notification::assertSentTo($this->owner, TemplatedNotification::class, fn ($n): bool => $n->key === 'inventory.low_stock');
+
+    $this->tenantJson('GET', '/api/admin/inventory/low-stock', [], $this->auth)->assertOk()
+        ->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.sku', 'LAP-1')
+        ->assertJsonPath('data.0.low_stock_threshold', 20);
+    expect($inventory->stockCounts())->toBe(['low' => 1, 'out' => 0]);
+
+    // A variant's own threshold wins over its product's.
+    $shirt = inventoryProduct(['name' => 'Shirt', 'product_type' => 'variable', 'low_stock_threshold' => 2]);
+    $small = $shirt->variants()->create(['sku' => 'SH-S', 'price' => '10', 'is_active' => true, 'low_stock_threshold' => 10]);
+    $large = $shirt->variants()->create(['sku' => 'SH-L', 'price' => '10', 'is_active' => true]);
+    $inventory->adjustStock($this->main, $shirt, $small, '6', 'adjustment_in');
+    $inventory->adjustStock($this->main, $shirt, $large, '6', 'adjustment_in');
+
+    $low = collect($this->tenantJson('GET', '/api/admin/inventory/low-stock', [], $this->auth)->assertOk()->json('data'))->pluck('sku')->all();
+    expect($low)->toEqualCanonicalizing(['LAP-1', 'SH-S']);
+
+    $this->tenantJson('PATCH', "/api/admin/products/{$mug->id}", ['low_stock_threshold' => 8], $this->auth)
+        ->assertOk()->assertJsonPath('data.low_stock_threshold', 8);
+    expect($inventory->stockCounts()['low'])->toBe(3);
+});
+
 it('narrows warehouse-scoped staff to their assigned warehouses', function (): void {
     PlanLimit::query()->where('limit_key', 'max_warehouses')->update(['limit_value' => 3]);
     app(PlanLimitService::class)->flush($this->tenant);

@@ -192,12 +192,14 @@ final readonly class InventoryMetrics
                 'name' => $r->product_name,
                 'sku' => $r->sku,
                 'available' => bcadd((string) $r->available, '0', 3),
+                'low_stock_threshold' => (int) $r->low_stock_threshold,
             ])->all();
 
         return new TableBlock('low_stock', 'Low stock', [
             ['key' => 'name', 'label' => 'Product', 'format' => 'text'],
             ['key' => 'sku', 'label' => 'SKU', 'format' => 'text'],
             ['key' => 'available', 'label' => 'Available', 'format' => 'quantity'],
+            ['key' => 'low_stock_threshold', 'label' => 'Threshold', 'format' => 'count'],
         ], $rows, '/admin/inventory/low-stock');
     }
 

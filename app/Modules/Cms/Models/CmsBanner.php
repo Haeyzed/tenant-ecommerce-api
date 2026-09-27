@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Cms\Models;
 
+use App\Shared\Media\MediaDisks;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Spatie\MediaLibrary\HasMedia;
@@ -53,7 +54,7 @@ class CmsBanner extends CmsModel implements HasMedia
 
     public function registerMediaCollections(): void
     {
-        $this->addMediaCollection('image')->singleFile()->useDisk('public');
+        $this->addMediaCollection('image')->singleFile()->useDisk(MediaDisks::PUBLIC);
     }
 
     /**

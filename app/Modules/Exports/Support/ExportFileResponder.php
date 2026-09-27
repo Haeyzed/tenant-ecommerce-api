@@ -6,6 +6,7 @@ namespace App\Modules\Exports\Support;
 
 use App\Modules\Exports\Models\DataExport;
 use App\Shared\Exceptions\ApiException;
+use App\Shared\Media\MediaDisks;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\Response;
 use Throwable;
@@ -26,7 +27,7 @@ final class ExportFileResponder
         $media = $export->getFirstMedia('file') ?? throw new ApiException('export_unavailable', 'This export file is no longer available.', 410);
         $disk = Storage::disk($media->disk);
 
-        if ($media->disk !== 'local' && $disk->providesTemporaryUrls()) {
+        if (! MediaDisks::isLocal($media->disk) && $disk->providesTemporaryUrls()) {
             try {
                 return redirect()->away($media->getTemporaryUrl(now()->addMinutes(5)));
             } catch (Throwable) {

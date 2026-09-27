@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Accounting\Models;
 
 use App\Modules\Users\Models\User;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -29,7 +30,7 @@ use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
  * @property int|null $reverses_journal_entry_id
  * @property Carbon|null $reversed_at
  * @property int|null $created_by_user_id
- * @property-read \Illuminate\Database\Eloquent\Collection<int, JournalEntryLine> $lines
+ * @property-read Collection<int, JournalEntryLine> $lines
  * @property-read FiscalPeriod $period
  */
 class JournalEntry extends Model implements AuditableContract

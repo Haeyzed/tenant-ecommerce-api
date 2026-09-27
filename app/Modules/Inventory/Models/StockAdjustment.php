@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Inventory\Models;
 
 use App\Modules\Users\Models\User;
+use App\Shared\Media\MediaDisks;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -38,6 +39,14 @@ class StockAdjustment extends Model implements AuditableContract, HasMedia
 
     public const string SUBMITTED = 'submitted';
 
+    /** Held unapplied by an approval workflow (§60.1). */
+    public const string PENDING_APPROVAL = 'pending_approval';
+
+    /** Rejected through an approval workflow; never applied. */
+    public const string REJECTED = 'rejected';
+
+    public const array STATUSES = [self::DRAFT, self::PENDING_APPROVAL, self::SUBMITTED, self::REJECTED];
+
     protected $connection = 'tenant';
 
     protected $fillable = ['notes'];
@@ -51,7 +60,7 @@ class StockAdjustment extends Model implements AuditableContract, HasMedia
 
     public function registerMediaCollections(): void
     {
-        $this->addMediaCollection('attachment')->singleFile()->useDisk('local');
+        $this->addMediaCollection('attachment')->singleFile()->useDisk(MediaDisks::PRIVATE);
     }
 
     /**

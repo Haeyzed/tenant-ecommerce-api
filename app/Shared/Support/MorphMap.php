@@ -12,6 +12,8 @@ use App\Modules\Affiliates\Models\Affiliate;
 use App\Modules\Affiliates\Models\AffiliateCommission;
 use App\Modules\Affiliates\Models\AffiliatePayout;
 use App\Modules\Affiliates\Models\AffiliateReferral;
+use App\Modules\Approvals\Models\ApprovalRequest;
+use App\Modules\Approvals\Models\ApprovalWorkflow;
 use App\Modules\Billing\Models\PaymentTransaction;
 use App\Modules\Billing\Models\PlatformCoupon;
 use App\Modules\Billing\Models\PlatformPaymentGateway;
@@ -27,6 +29,8 @@ use App\Modules\Cms\Models\CmsBlogPost;
 use App\Modules\Cms\Models\CmsPage;
 use App\Modules\Cms\Models\CmsTestimonial;
 use App\Modules\Cms\Models\ContactSubmission;
+use App\Modules\Currency\Models\ProductPrice;
+use App\Modules\Currency\Models\TenantCurrency;
 use App\Modules\Customers\Models\Customer;
 use App\Modules\Customers\Models\CustomerGroup;
 use App\Modules\CustomFields\Models\CustomFieldDefinition;
@@ -57,6 +61,7 @@ use App\Modules\Promotions\Models\Coupon;
 use App\Modules\Promotions\Models\FlashSale;
 use App\Modules\Promotions\Models\Promotion;
 use App\Modules\Returns\Models\OrderReturn;
+use App\Modules\Reviews\Models\ProductReview;
 use App\Modules\Settings\Models\PlatformSetting;
 use App\Modules\Settings\Models\StorefrontSetting;
 use App\Modules\Settings\Models\TenantPlatformSetting;
@@ -132,10 +137,15 @@ final class MorphMap
         'brand' => Brand::class,
         'digital_product_file' => DigitalProductFile::class,
         'product_question' => ProductQuestion::class,
+        'product_review' => ProductReview::class,
+        'approval_workflow' => ApprovalWorkflow::class,
+        'approval_request' => ApprovalRequest::class,
         'warehouse' => Warehouse::class,
         'stock_transfer' => StockTransfer::class,
         'stock_adjustment' => StockAdjustment::class,
         'warehouse_product_price' => WarehouseProductPrice::class,
+        'tenant_currency' => TenantCurrency::class,
+        'product_price' => ProductPrice::class,
         'seller' => Seller::class,
         'driver' => Driver::class,
         'shipping_zone' => ShippingZone::class,

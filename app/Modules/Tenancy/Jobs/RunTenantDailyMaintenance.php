@@ -9,6 +9,9 @@ use App\Modules\Cart\Services\CartService;
 use App\Modules\Catalog\Services\ProductViewService;
 use App\Modules\Cms\Services\ContactSubmissionService;
 use App\Modules\Cms\Support\CmsSitemapSource;
+use App\Modules\Currency\Jobs\RefreshExchangeRates;
+use App\Modules\Currency\Services\CurrencyService;
+use App\Modules\Currency\Support\ExchangeRateProvider;
 use App\Modules\Exports\Services\DataExportService;
 use App\Modules\Inventory\Support\StockAlerts;
 use App\Modules\Orders\Services\OrderService;
@@ -82,6 +85,11 @@ final class RunTenantDailyMaintenance implements ShouldBeUnique, ShouldQueue
             $this->task('unresolved_refunds', static fn () => app(OrderPaymentService::class)->flagUnresolvedRefunds());
             $this->task('anonymised_orders', static fn () => app(OrderService::class)->anonymizeSettledOrders());
             $this->task('accounting_outbox', static fn () => app(AccountingService::class)->redispatchStale());
+            $this->task('exchange_rates', static function (): void {
+                if (app(CurrencyService::class)->enabled() && app(ExchangeRateProvider::class)->configured()) {
+                    RefreshExchangeRates::dispatch();
+                }
+            });
 
             // Rebuild the sitemap only when content changed since the last build (§30.2).
             $this->task('sitemap', static function () use ($tenant): void {

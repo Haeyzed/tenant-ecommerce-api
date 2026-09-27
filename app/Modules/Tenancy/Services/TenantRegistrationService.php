@@ -11,6 +11,7 @@ use App\Modules\Billing\Models\Subscription;
 use App\Modules\Billing\Services\PlatformCouponService;
 use App\Modules\Billing\Services\PlatformPaymentGatewayService;
 use App\Modules\Billing\Services\SubscriptionService;
+use App\Modules\Currency\Services\CurrencyService;
 use App\Modules\Inventory\Services\WarehouseService;
 use App\Modules\Legal\Models\LegalAcceptance;
 use App\Modules\Legal\Services\LegalDocumentService;
@@ -381,6 +382,8 @@ final readonly class TenantRegistrationService
 
             // 4: the default warehouse (checkout needs a fulfilment warehouse, §9.5).
             app(WarehouseService::class)->ensureDefault();
+            // and the base currency row (§48.1), whatever the plan.
+            app(CurrencyService::class)->ensureBase();
 
             // 5: the owner, created once; the stored hash is cleared after.
             if ($registration !== null && ! User::query()->where('email', $tenant->email)->exists()) {

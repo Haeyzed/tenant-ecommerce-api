@@ -34,7 +34,7 @@ beforeEach(function (): void {
     $this->tenant = $this->createTenant('a');
     $this->service = app(SubscriptionService::class);
     $this->price = fn (string $slug, string $interval = 'monthly'): PlanPrice => PlanPrice::query()
-        ->whereHas('plan', fn ($q) => $q->where('slug', $slug))->where('billing_interval', $interval)->where('is_active', true)->firstOrFail();
+        ->whereHas('plan', fn ($q) => $q->where('slug', $slug))->where('currency_code', 'USD')->where('billing_interval', $interval)->where('is_active', true)->firstOrFail();
 
     Http::fake([
         'api.paystack.co/transaction/initialize' => Http::response(['status' => true, 'data' => ['authorization_url' => 'https://checkout.paystack.test/abc', 'access_code' => 'abc']]),

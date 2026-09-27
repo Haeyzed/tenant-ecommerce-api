@@ -8,6 +8,7 @@ use App\Modules\Auth\Support\DisplayPreferences;
 use App\Modules\Cms\Http\CmsPresenter;
 use App\Modules\Cms\Models\CmsBanner;
 use App\Modules\Cms\Services\CmsBannerService;
+use App\Modules\Currency\Services\CurrencyService;
 use App\Modules\Plans\Services\FeatureAccessService;
 use App\Modules\Tenancy\Models\Tenant;
 use Illuminate\Support\Facades\Cache;
@@ -37,6 +38,7 @@ final readonly class StorefrontConfigService
         private FeatureAccessService $features,
         private DisplayPreferences $display,
         private CmsBannerService $banners,
+        private CurrencyService $currencies,
     ) {}
 
     /**
@@ -81,6 +83,8 @@ final readonly class StorefrontConfigService
             ],
             'formatting' => [
                 'default_currency' => $settings->get('default_currency'),
+                // Sold now, base first (§48): pass one as ?currency= and to PATCH /api/cart/currency.
+                'currencies' => $this->currencies->storefrontCurrencies(),
                 'default_currency_position' => $settings->get('default_currency_position'),
                 'decimal_digits' => $settings->get('decimal_digits'),
                 'locale' => $settings->get('locale'),

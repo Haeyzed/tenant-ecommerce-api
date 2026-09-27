@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Support;
 
 use App\Modules\Tenancy\Models\Tenant;
+use App\Shared\Media\MediaDisks;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use RuntimeException;
@@ -62,6 +63,23 @@ final class TenantExporter
 
             foreach ($files->allFiles() as $path) {
                 $zip->addFile($files->path($path), 'files/'.$path);
+            }
+
+            // Media disks may be object storage: copied through a stream to
+            // a scratch file (ZipArchive reads added files when it closes).
+            foreach (MediaDisks::ALL as $name) {
+                $media = Storage::disk($name);
+
+                foreach ($media->allFiles() as $path) {
+                    $file = tempnam(sys_get_temp_dir(), 'tex');
+                    $scratch[] = $file;
+                    $out = fopen($file, 'wb');
+                    $in = $media->readStream($path);
+                    stream_copy_to_stream($in, $out);
+                    fclose($in);
+                    fclose($out);
+                    $zip->addFile($file, 'media/'.$name.'/'.$path);
+                }
             }
         });
 

@@ -14,6 +14,7 @@ use App\Modules\Tenancy\Models\Tenant;
 use App\Modules\Tenancy\Models\TenantUsageSnapshot;
 use App\Modules\Tenancy\Support\TenantExporter;
 use App\Shared\Activity\ActivityRecorder;
+use App\Shared\Media\MediaDisks;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -21,6 +22,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * Irreversible removal of a closed tenant past purge_after (spec §6.7).
@@ -60,6 +62,19 @@ final class PurgeTenant implements ShouldBeUnique, ShouldQueue
 
         if ($tenant->provisioned_at !== null) {
             $backup = $exporter->export($tenant, 'purged-backups');
+
+            // The tenant's prefix on each media disk: local folders or S3 keys alike.
+            $tenant->run(static function (): void {
+                foreach (MediaDisks::ALL as $name) {
+                    $disk = Storage::disk($name);
+
+                    foreach ($disk->directories() as $directory) {
+                        $disk->deleteDirectory($directory);
+                    }
+
+                    $disk->delete($disk->files());
+                }
+            });
 
             $database = $tenant->database()->getName();
             $manager = $tenant->database()->manager();

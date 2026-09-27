@@ -126,6 +126,38 @@ final readonly class SubscriptionService
     }
 
     /**
+     * The currency the tenant must keep being billed in: once a subscription
+     * has been paid (a saved authorization or a successful charge), its
+     * saved card, prorations and MRR history are in that currency. Before
+     * that, null: prices resolve to the tenant's currency, then USD.
+     */
+    public function lockedCurrency(Tenant $tenant): ?string
+    {
+        $subscription = $this->getCurrentSubscription($tenant);
+
+        if ($subscription === null) {
+            return null;
+        }
+
+        $paid = $subscription->authorization_reference !== null || PaymentTransaction::query()
+            ->where('subscription_id', $subscription->id)
+            ->where('type', PaymentTransaction::CHARGE)
+            ->where('status', PaymentTransaction::SUCCESSFUL)
+            ->exists();
+
+        return $paid ? $subscription->currency_code : null;
+    }
+
+    /**
+     * The one price resolution for tenant billing: listing, checkout,
+     * coupon preview, plan-change preview and swap all use it.
+     */
+    public function priceFor(Tenant $tenant, Plan $plan, string $interval): PlanPrice
+    {
+        return $this->plans->getPriceForTenant($plan, $tenant, $interval, $this->lockedCurrency($tenant));
+    }
+
+    /**
      * Starts a checkout for a plan: pays an incomplete or past-due
      * subscription, converts a trial, or resubscribes after cancellation.
      *
@@ -133,7 +165,7 @@ final readonly class SubscriptionService
      */
     public function subscribeTenantToPlan(Tenant $tenant, Plan $plan, string $interval, string $gateway, ?string $couponCode = null): array
     {
-        $price = $this->plans->getPriceForTenant($plan, $tenant, $interval);
+        $price = $this->priceFor($tenant, $plan, $interval);
 
         $available = $this->gateways->availableFor($tenant, $price->currency_code)->pluck('provider')->all();
 
@@ -464,7 +496,7 @@ final readonly class SubscriptionService
     {
         $subscription = $this->requireChangeable($tenant);
         $interval ??= $subscription->billing_interval;
-        $newPrice = $this->plans->getPriceForTenant($newPlan, $tenant, $interval);
+        $newPrice = $this->priceFor($tenant, $newPlan, $interval);
         $direction = $this->direction($subscription, $newPrice);
 
         $newFeatures = $newPlan->features()->pluck('feature_key')->all();
@@ -523,7 +555,7 @@ final readonly class SubscriptionService
     {
         $subscription = $this->requireChangeable($tenant);
         $interval ??= $subscription->billing_interval;
-        $newPrice = $this->plans->getPriceForTenant($newPlan, $tenant, $interval);
+        $newPrice = $this->priceFor($tenant, $newPlan, $interval);
 
         if ($newPrice->id === $subscription->plan_price_id) {
             throw ApiException::unprocessable('plan_unchanged', 'The subscription is already on this plan and interval.');
@@ -1108,8 +1140,29 @@ final readonly class SubscriptionService
             return 'interval_change';
         }
 
-        $current = Money::div((string) $subscription->planPrice->amount, (string) $subscription->intervalMonths());
-        $next = Money::div((string) $newPrice->amount, $newPrice->billing_interval === 'yearly' ? '12' : '1');
+        // An unpaid subscription may move to another currency (lockedCurrency):
+        // compare the current plan's price in the new currency, or the plan
+        // order when it has none. Amounts in two currencies never compare.
+        $currentPrice = $subscription->planPrice;
+
+        if ($currentPrice->currency_code !== $newPrice->currency_code) {
+            $currentPrice = PlanPrice::query()
+                ->where('plan_id', $subscription->plan_id)
+                ->where('currency_code', $newPrice->currency_code)
+                ->where('billing_interval', $currentPrice->billing_interval)
+                ->where('is_active', true)
+                ->first();
+
+            if ($currentPrice === null) {
+                $order = static fn (int $planId): array => [(int) Plan::query()->whereKey($planId)->value('sort_order'), $planId];
+
+                return $order($newPrice->plan_id) > $order($subscription->plan_id) ? 'upgrade' : 'downgrade';
+            }
+        }
+
+        $months = static fn (PlanPrice $price): string => $price->billing_interval === 'yearly' ? '12' : '1';
+        $current = Money::div((string) $currentPrice->amount, $months($currentPrice));
+        $next = Money::div((string) $newPrice->amount, $months($newPrice));
 
         return Money::cmp($next, $current) > 0 ? 'upgrade' : 'downgrade';
     }

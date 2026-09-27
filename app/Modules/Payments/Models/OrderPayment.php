@@ -73,7 +73,7 @@ class OrderPayment extends Model implements AuditableContract
         'amount_received' => 'decimal:4',
         'amount_paid' => 'decimal:4',
         'change_given' => 'decimal:4',
-        'exchange_rate_used' => 'decimal:8',
+        'exchange_rate_used' => 'decimal:12',
         'refund_of_order_payment_id' => 'integer',
         'order_return_id' => 'integer',
         'recorded_by_user_id' => 'integer',

@@ -6,12 +6,13 @@ namespace App\Modules\Messaging\Channels;
 
 use App\Modules\Messaging\Mail\TemplatedMail;
 use App\Modules\Messaging\Services\MailService;
+use App\Modules\Messaging\Support\MailBranding;
 use App\Modules\Notifications\Enums\NotificationScope;
 use App\Modules\Notifications\Notifications\TemplatedNotification;
 
 final readonly class TemplatedMailChannel
 {
-    public function __construct(private MailService $mail) {}
+    public function __construct(private MailService $mail, private MailBranding $branding) {}
 
     public function send(object $notifiable, TemplatedNotification $notification): void
     {
@@ -21,10 +22,17 @@ final readonly class TemplatedMailChannel
             return;
         }
 
+        $platform = $notification->scope === NotificationScope::Landlord;
+
         $this->mail->send(
-            new TemplatedMail((string) ($notification->subject ?? ''), $notification->body),
+            new TemplatedMail(
+                (string) ($notification->subject ?? ''),
+                $notification->body,
+                $notification->presentation,
+                $this->branding->for($platform),
+            ),
             $address,
-            platform: $notification->scope === NotificationScope::Landlord,
+            platform: $platform,
         );
     }
 }

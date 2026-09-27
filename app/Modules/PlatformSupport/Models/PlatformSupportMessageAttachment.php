@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\PlatformSupport\Models;
 
+use App\Shared\Media\MediaDisks;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Spatie\MediaLibrary\HasMedia;
@@ -26,7 +27,7 @@ class PlatformSupportMessageAttachment extends Model implements HasMedia
 
     public function registerMediaCollections(): void
     {
-        $this->addMediaCollection('attachment')->useDisk('local')->singleFile();
+        $this->addMediaCollection('attachment')->useDisk(MediaDisks::PRIVATE)->singleFile();
     }
 
     /**

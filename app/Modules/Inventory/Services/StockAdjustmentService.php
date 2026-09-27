@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Modules\Inventory\Services;
 
+use App\Contracts\Approvable;
 use App\Modules\Accounting\Support\AccountingOutbox;
+use App\Modules\Approvals\Support\ApprovalGate;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\ProductVariant;
 use App\Modules\Inventory\Models\Inventory;
@@ -19,6 +21,7 @@ use App\Shared\Media\UploadRules;
 use App\Shared\Support\Quantity;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
@@ -31,7 +34,7 @@ use Illuminate\Validation\Rule;
  * all-or-nothing through InventoryService, immutable afterwards. A mistake
  * is corrected with a new, opposite adjustment.
  */
-final readonly class StockAdjustmentService
+final readonly class StockAdjustmentService implements Approvable
 {
     private const int LOOKUP_LIMIT = 20;
 
@@ -39,6 +42,7 @@ final readonly class StockAdjustmentService
         private InventoryService $inventory,
         private WarehouseService $warehouses,
         private StorageQuota $quota,
+        private ApprovalGate $approvals,
     ) {}
 
     public function createAdjustment(Warehouse $warehouse, ?string $notes, ?UploadedFile $attachment, User $by): StockAdjustment
@@ -125,6 +129,10 @@ final readonly class StockAdjustmentService
         });
     }
 
+    /**
+     * Applies the batch, or holds it unapplied in pending_approval when an
+     * approval workflow matches (§60.1).
+     */
     public function submitAdjustment(StockAdjustment $adjustment): StockAdjustment
     {
         DB::connection('tenant')->transaction(function () use ($adjustment): void {
@@ -135,23 +143,69 @@ final readonly class StockAdjustmentService
                 throw ApiException::unprocessable('adjustment_empty', 'Add at least one line before submitting.');
             }
 
-            $this->inventory->apply($locked->items->map(static function (StockAdjustmentItem $item) use ($locked): StockChange {
-                $addition = $item->action === StockAdjustmentItem::ADDITION;
+            if ($this->approvals->hold('stock_adjustment', $locked) !== null) {
+                $locked->forceFill(['status' => StockAdjustment::PENDING_APPROVAL])->save();
 
-                return new StockChange(
-                    $locked->warehouse, $item->product, $item->variant,
-                    $addition ? (string) $item->quantity : Quantity::neg((string) $item->quantity), Quantity::normalize(0),
-                    $addition ? 'adjustment_in' : 'adjustment_out',
-                    $item->notes ?? $locked->notes,
-                    $item->unit_cost_snapshot !== null ? (string) $item->unit_cost_snapshot : null,
-                );
-            })->values()->all(), $locked);
+                return;
+            }
 
-            $locked->forceFill(['status' => StockAdjustment::SUBMITTED, 'submitted_at' => now()])->save();
-            app(AccountingOutbox::class)->record('postStockAdjustment', $locked, now(), 'stock_adjustment:'.$locked->id);
+            $this->applySubmitted($locked);
         });
 
         return $this->getAdjustment($adjustment->refresh());
+    }
+
+    // ---- Approval workflow (§60.1) ---------------------------------------
+
+    public function onApprovalGranted(Model $record): void
+    {
+        /** @var StockAdjustment $locked */
+        $locked = StockAdjustment::query()->lockForUpdate()->findOrFail($record->getKey());
+
+        if ($locked->status !== StockAdjustment::PENDING_APPROVAL) {
+            throw ApiException::invalidTransition($locked->status, StockAdjustment::SUBMITTED);
+        }
+
+        $locked->load(['warehouse', 'items.product', 'items.variant']);
+        $this->applySubmitted($locked);
+    }
+
+    public function onApprovalRejected(Model $record, ?string $note): void
+    {
+        StockAdjustment::query()->whereKey($record->getKey())->where('status', StockAdjustment::PENDING_APPROVAL)
+            ->update(['status' => StockAdjustment::REJECTED, 'updated_at' => now()]);
+    }
+
+    public function approvalSubject(Model $record): string
+    {
+        return 'stock adjustment #'.$record->getKey();
+    }
+
+    public function approvalFacts(Model $record): array
+    {
+        return [];
+    }
+
+    /**
+     * The stock change itself, all-or-nothing, then the accounting request.
+     * The caller holds the adjustment lock.
+     */
+    private function applySubmitted(StockAdjustment $locked): void
+    {
+        $this->inventory->apply($locked->items->map(static function (StockAdjustmentItem $item) use ($locked): StockChange {
+            $addition = $item->action === StockAdjustmentItem::ADDITION;
+
+            return new StockChange(
+                $locked->warehouse, $item->product, $item->variant,
+                $addition ? (string) $item->quantity : Quantity::neg((string) $item->quantity), Quantity::normalize(0),
+                $addition ? 'adjustment_in' : 'adjustment_out',
+                $item->notes ?? $locked->notes,
+                $item->unit_cost_snapshot !== null ? (string) $item->unit_cost_snapshot : null,
+            );
+        })->values()->all(), $locked);
+
+        $locked->forceFill(['status' => StockAdjustment::SUBMITTED, 'submitted_at' => now()])->save();
+        app(AccountingOutbox::class)->record('postStockAdjustment', $locked, now(), 'stock_adjustment:'.$locked->id);
     }
 
     public function getAdjustment(StockAdjustment $adjustment): StockAdjustment

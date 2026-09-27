@@ -11,6 +11,7 @@ use App\Modules\Tenancy\Models\Tenant;
 use Database\Seeders\Tenant\AccountingDefaultsSeeder;
 use Database\Seeders\Tenant\CatalogDefaultsSeeder;
 use Database\Seeders\Tenant\CmsDefaultsSeeder;
+use Database\Seeders\Tenant\CurrencyDefaultsSeeder;
 use Database\Seeders\Tenant\CustomerDefaultsSeeder;
 use Database\Seeders\Tenant\DocumentDefaultsSeeder;
 use Database\Seeders\Tenant\NotificationTemplateSeeder;
@@ -40,6 +41,7 @@ final class TenantDefaultsSyncService
         ReturnDefaultsSeeder::class,
         DocumentDefaultsSeeder::class,
         AccountingDefaultsSeeder::class,
+        CurrencyDefaultsSeeder::class,
     ];
 
     public function __construct(

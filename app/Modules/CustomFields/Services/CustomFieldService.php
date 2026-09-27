@@ -11,6 +11,7 @@ use App\Modules\CustomFields\Support\CustomFieldTypes;
 use App\Modules\Settings\Services\TenantSettingsService;
 use App\Modules\Tenancy\Models\Tenant;
 use App\Shared\Activity\ActivityRecorder;
+use App\Shared\Media\MediaDisks;
 use App\Shared\Media\StorageQuota;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
@@ -41,7 +42,7 @@ final class CustomFieldService
     public const string MEDIA_COLLECTION = 'custom_fields';
 
     /** Private disk: custom-field files are never publicly addressable. */
-    public const string DISK = 'local';
+    public const string DISK = MediaDisks::PRIVATE;
 
     private const int URL_MINUTES = 30;
 

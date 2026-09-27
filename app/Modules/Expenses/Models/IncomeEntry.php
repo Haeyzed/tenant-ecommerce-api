@@ -46,7 +46,7 @@ class IncomeEntry extends Model implements AuditableContract
     protected $casts = [
         'income_category_id' => 'integer',
         'amount' => 'decimal:4',
-        'exchange_rate_used' => 'decimal:8',
+        'exchange_rate_used' => 'decimal:12',
         'received_date' => 'date',
         'received_at' => 'datetime',
         'received_into_account_id' => 'integer',

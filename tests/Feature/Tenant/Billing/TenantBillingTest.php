@@ -3,7 +3,9 @@
 declare(strict_types=1);
 
 use App\Modules\Billing\Enums\SubscriptionStatus;
+use App\Modules\Billing\Models\PaymentTransaction;
 use App\Modules\Plans\Models\Plan;
+use App\Modules\Plans\Services\PlanService;
 use App\Modules\Users\Models\User;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Notification;
@@ -39,6 +41,50 @@ it('starts a checkout that pays the trial', function (): void {
         ->assertJsonPath('data.checkout_url', 'https://checkout.paystack.test/x')
         ->assertJsonPath('data.status', 'pending')
         ->assertJsonPath('data.subscription.plan.slug', 'standard');
+});
+
+it('lists and charges an unpaid subscription in the tenant currency once it has prices', function (): void {
+    $this->tenant->forceFill(['default_currency' => 'NGN'])->save();
+    $standard = Plan::query()->where('slug', 'standard')->firstOrFail();
+    $ngn = app(PlanService::class)->addPrice($standard, 'NGN', 'monthly', '55000.00');
+
+    // The trial is on Basic USD, never paid: Standard is listed, and charged, in NGN.
+    $this->tenantJson('GET', '/api/admin/billing/plans', [], $this->headers)
+        ->assertOk()
+        ->assertJsonPath('data.1.slug', 'standard')
+        ->assertJsonPath('data.1.prices.0.currency_code', 'NGN')
+        ->assertJsonPath('data.1.prices.0.id', $ngn->id);
+
+    // Basic has no NGN price, so the direction comes from the plan order, not USD vs NGN amounts.
+    $this->tenantJson('GET', '/api/admin/billing/subscription/plan-change-preview?plan_id='.$standard->id, [], $this->headers)
+        ->assertOk()->assertJsonPath('data.direction', 'upgrade');
+
+    $this->tenantJson('POST', '/api/admin/billing/subscription', [
+        'plan_id' => $standard->id, 'billing_interval' => 'monthly', 'gateway' => 'paystack',
+    ], $this->headers + ['Idempotency-Key' => 'checkout-ngn-01'])->assertCreated();
+
+    expect($this->subscription->refresh()->currency_code)->toBe('NGN')
+        ->and($this->subscription->plan_price_id)->toBe($ngn->id)
+        ->and(PaymentTransaction::query()->where('subscription_id', $this->subscription->id)->value('currency_code'))->toBe('NGN');
+});
+
+it('keeps a paid subscription in the currency it was paid in', function (): void {
+    $this->subscription->forceFill(['status' => SubscriptionStatus::Active, 'authorization_reference' => 'AUTH_saved', 'gateway' => 'paystack'])->save();
+    $this->tenant->forceFill(['default_currency' => 'NGN'])->save();
+    $standard = Plan::query()->where('slug', 'standard')->firstOrFail();
+    app(PlanService::class)->addPrice($standard, 'NGN', 'monthly', '55000.00');
+    $usd = $standard->prices()->where('currency_code', 'USD')->where('billing_interval', 'monthly')->where('is_active', true)->firstOrFail();
+
+    $this->tenantJson('GET', '/api/admin/billing/plans', [], $this->headers)
+        ->assertOk()
+        ->assertJsonPath('data.1.prices.0.currency_code', 'USD')
+        ->assertJsonMissingPath('data.1.prices.2');
+
+    $this->tenantJson('POST', '/api/admin/billing/subscription/swap-plan', ['plan_id' => $standard->id], $this->headers + ['Idempotency-Key' => 'swap-usd-01'])
+        ->assertOk();
+
+    expect($this->subscription->refresh()->scheduled_plan_price_id)->toBe($usd->id)
+        ->and($this->subscription->currency_code)->toBe('USD');
 });
 
 it('refuses providers that cannot charge the currency', function (): void {

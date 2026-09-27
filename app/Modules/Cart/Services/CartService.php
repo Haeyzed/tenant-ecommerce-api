@@ -10,6 +10,7 @@ use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\ProductVariant;
 use App\Modules\Checkout\Services\CheckoutService;
 use App\Modules\Checkout\Support\Quote;
+use App\Modules\Currency\Services\CurrencyService;
 use App\Modules\Customers\Models\Customer;
 use App\Modules\Inventory\Services\InventoryService;
 use App\Modules\Promotions\Models\Coupon;
@@ -33,6 +34,7 @@ final readonly class CartService
         private InventoryService $inventory,
         private CheckoutService $checkout,
         private PricingService $pricing,
+        private CurrencyService $currencies,
     ) {}
 
     /**
@@ -173,6 +175,18 @@ final readonly class CartService
     {
         $cart->forceFill(['coupon_id' => null, 'last_activity_at' => now()])->save();
         $cart->setRelation('coupon', null);
+    }
+
+    /**
+     * PATCH /api/cart/currency (§38.7): an offered currency only (active,
+     * with a rate); the basket is re-priced on the next quote.
+     */
+    public function setCurrency(Cart $cart, string $currency): void
+    {
+        $currency = strtoupper($currency);
+        $this->currencies->offeredRate($currency);
+
+        $cart->forceFill(['currency_code' => $currency, 'last_activity_at' => now()])->save();
     }
 
     /**

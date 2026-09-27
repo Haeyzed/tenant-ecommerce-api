@@ -67,6 +67,8 @@ final class InventoryPresenter
             'quantity' => bcadd((string) $row->quantity, '0', 3),
             'reserved_quantity' => bcadd((string) $row->reserved_quantity, '0', 3),
             'available' => bcadd((string) $row->available, '0', 3),
+            // Resolved: the variant's, else the product's, else the store setting.
+            'low_stock_threshold' => (int) $row->low_stock_threshold,
         ];
     }
 

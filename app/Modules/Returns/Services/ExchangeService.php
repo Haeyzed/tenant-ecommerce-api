@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Returns\Services;
 
 use App\Modules\Cart\Services\PricingService;
+use App\Modules\Currency\Services\CurrencyService;
 use App\Modules\Inventory\Services\InventoryService;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Services\OrderService;
@@ -49,6 +50,11 @@ final readonly class ExchangeService
 
             $original = $locked->order;
             $currency = $original->currency_code;
+            // The original order's captured rate, so the returned value and the
+            // replacement are in the same terms (even if the currency is no
+            // longer offered).
+            $toBase = $original->exchange_rate_used === null ? '1' : (string) $original->exchange_rate_used;
+            $rate = bccomp($toBase, '1', CurrencyService::SCALE) === 0 ? '1' : bcdiv('1', $toBase, CurrencyService::SCALE);
             $inclusive = (bool) $this->settings->get('prices_include_tax', false);
             $address = $original->shipping_address === null ? null : ['country_id' => $original->shipping_address['country_id'] ?? null, 'state_id' => $original->shipping_address['state_id'] ?? null];
             $lines = [];
@@ -61,7 +67,7 @@ final readonly class ExchangeService
                     throw ApiException::conflict('stock_conflict', 'A replacement item is no longer in stock.', ['product_id' => $product->id]);
                 }
 
-                $price = $this->pricing->resolveUnitPrice($product, $item->exchangeVariant, $warehouse, $currency);
+                $price = $this->pricing->resolveUnitPrice($product, $item->exchangeVariant, $warehouse, $currency, $rate);
                 $subtotal = Money::round(bcmul($price->unitPrice, (string) $item->quantity, 10), $currency);
                 $lines[] = ['product' => $product, 'variant' => $item->exchangeVariant, 'warehouse' => $warehouse, 'quantity' => (string) $item->quantity,
                     'unit_price' => $price->unitPrice, 'price_source' => $price->source, 'subtotal' => $subtotal];
@@ -94,6 +100,7 @@ final readonly class ExchangeService
                 'customer_phone' => $original->customer_phone,
                 'guest_token' => $original->guest_token,
                 'currency_code' => $currency,
+                'exchange_rate_used' => $toBase,
                 'prices_include_tax' => $inclusive,
                 'lines' => $lines,
                 'totals' => ['subtotal' => $subtotal, 'tax_amount' => $taxTotal, 'total' => $total],

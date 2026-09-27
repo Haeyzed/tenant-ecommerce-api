@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Cms\Models;
 
+use App\Shared\Media\MediaDisks;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Support\Carbon;
@@ -58,6 +59,6 @@ class CmsBlogPost extends CmsModel implements AuditableContract, HasMedia
 
     public function registerMediaCollections(): void
     {
-        $this->addMediaCollection('cover_image')->singleFile()->useDisk('public');
+        $this->addMediaCollection('cover_image')->singleFile()->useDisk(MediaDisks::PUBLIC);
     }
 }

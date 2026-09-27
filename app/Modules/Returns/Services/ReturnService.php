@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Modules\Returns\Services;
 
+use App\Contracts\Approvable;
 use App\Modules\Accounting\Support\AccountingOutbox;
+use App\Modules\Approvals\Support\ApprovalGate;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\ProductVariant;
 use App\Modules\Checkout\Services\CheckoutService;
@@ -28,6 +30,7 @@ use App\Shared\Support\Money;
 use App\Shared\Support\Quantity;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -40,7 +43,7 @@ use Illuminate\Validation\ValidationException;
  * (here) or exchange (ExchangeService), restock of resellable lines, close.
  * Money only moves through OrderPaymentService::refund().
  */
-final readonly class ReturnService
+final readonly class ReturnService implements Approvable
 {
     public const int MAX_PHOTOS = 5;
 
@@ -51,6 +54,7 @@ final readonly class ReturnService
         private TenantSettingsService $settings,
         private PlatformSettingsService $platformSettings,
         private StorageQuota $quota,
+        private ApprovalGate $approvals,
     ) {}
 
     /**
@@ -133,6 +137,9 @@ final readonly class ReturnService
                 $item->forceFill(['order_return_id' => $return->id, ...$row])->save();
             }
 
+            // A matching approval workflow holds the return in "requested" (§60.1).
+            $this->approvals->hold('return', $return);
+
             return $return;
         });
 
@@ -149,6 +156,8 @@ final readonly class ReturnService
 
     public function approveReturn(OrderReturn $return, ?bool $requiresPhysicalReturn = null): OrderReturn
     {
+        $this->approvals->assertNoPending($return);
+
         DB::connection('tenant')->transaction(function () use ($return, $requiresPhysicalReturn): void {
             $locked = $this->lock($return, [OrderReturn::REQUESTED], OrderReturn::APPROVED);
 
@@ -176,6 +185,7 @@ final readonly class ReturnService
     public function rejectReturn(OrderReturn $return, string $reason): OrderReturn
     {
         validator(['reason' => $reason], ['reason' => ['required', 'string', 'max:255']])->validate();
+        $this->approvals->assertNoPending($return);
 
         DB::connection('tenant')->transaction(function () use ($return, $reason): void {
             $locked = $this->lock($return, [OrderReturn::REQUESTED], OrderReturn::REJECTED);
@@ -186,6 +196,35 @@ final readonly class ReturnService
         $this->notifications->dispatch('return.rejected', $return->order, [...$this->variables($return), 'reason' => $reason]);
 
         return $return;
+    }
+
+    // ---- Approval workflow (§60.1) ---------------------------------------
+
+    public function onApprovalGranted(Model $record): void
+    {
+        /** @var OrderReturn $record */
+        $this->approveReturn($record);
+    }
+
+    public function onApprovalRejected(Model $record, ?string $note): void
+    {
+        /** @var OrderReturn $record */
+        $this->rejectReturn($record, mb_substr($note ?? 'Not approved', 0, 255));
+    }
+
+    public function approvalSubject(Model $record): string
+    {
+        /** @var OrderReturn $record */
+        return 'return '.$record->return_number;
+    }
+
+    /**
+     * min_amount is the requested refund value (§60.1).
+     */
+    public function approvalFacts(Model $record): array
+    {
+        /** @var OrderReturn $record */
+        return ['amount' => $this->returnedValue($record)];
     }
 
     /**

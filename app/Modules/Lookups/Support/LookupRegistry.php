@@ -9,6 +9,8 @@ use App\Modules\Accounting\Models\Account;
 use App\Modules\Accounting\Models\AccountCategory;
 use App\Modules\Accounting\Models\FiscalPeriod;
 use App\Modules\Accounting\Models\FiscalYear;
+use App\Modules\Approvals\Models\ApprovalRequest;
+use App\Modules\Approvals\Services\ApprovalWorkflowService;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\ProductOption;
 use App\Modules\Dashboard\Services\Tenant\TenantDashboardService;
@@ -69,6 +71,8 @@ final readonly class LookupRegistry
         'account-types' => 'accounting',
         'fiscal-years' => 'accounting',
         'fiscal-periods' => 'accounting',
+        'approval-workflow-modules' => 'approval_workflows',
+        'approval-request-statuses' => 'approval_workflows',
     ];
 
     public function feature(string $context, string $key): ?string
@@ -260,6 +264,12 @@ final readonly class LookupRegistry
                 'fiscal-years' => static fn (): array => FiscalYear::query()->orderByDesc('starts_on')->get()
                     ->map(static fn (FiscalYear $y): array => ['value' => $y->id, 'label' => $y->name, 'meta' => ['status' => $y->status, 'starts_on' => $y->starts_on->toDateString(), 'ends_on' => $y->ends_on->toDateString()]])
                     ->all(),
+                'approval-workflow-modules' => static fn (): array => array_map(
+                    static fn (string $key, array $d): array => ['value' => $key, 'label' => (string) $d['label'], 'meta' => ['conditions' => $d['conditions']]],
+                    array_keys(ApprovalWorkflowService::registry()),
+                    array_values(ApprovalWorkflowService::registry()),
+                ),
+                'approval-request-statuses' => static fn (): array => self::enum(ApprovalRequest::STATUSES),
                 'fiscal-periods' => fn (Request $r): array => FiscalPeriod::query()->where('fiscal_year_id', $this->requiredId($r, 'fiscal_year_id'))->orderBy('starts_on')->get()
                     ->map(static fn (FiscalPeriod $p): array => ['value' => $p->id, 'label' => $p->name, 'meta' => ['status' => $p->status, 'starts_on' => $p->starts_on->toDateString(), 'ends_on' => $p->ends_on->toDateString()]])
                     ->all(),

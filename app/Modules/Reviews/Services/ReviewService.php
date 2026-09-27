@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Reviews\Services;
 
+use App\Contracts\Approvable;
+use App\Modules\Approvals\Support\ApprovalGate;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Customers\Models\Customer;
 use App\Modules\Notifications\Services\NotificationDispatchService;
@@ -13,6 +15,7 @@ use App\Modules\Settings\Services\TenantSettingsService;
 use App\Shared\Exceptions\ApiException;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
@@ -21,11 +24,12 @@ use Illuminate\Validation\Rule;
  * submission replaces it); moderation and the verified-purchase rule are
  * tenant settings. rating_average and rating_count follow approved reviews.
  */
-final readonly class ReviewService
+final readonly class ReviewService implements Approvable
 {
     public function __construct(
         private TenantSettingsService $settings,
         private NotificationDispatchService $notifications,
+        private ApprovalGate $approvals,
     ) {}
 
     /**
@@ -65,10 +69,16 @@ final readonly class ReviewService
 
             $this->recalculateAggregates($product);
 
+            // A matching approval workflow replaces single-step moderation (§60.1).
+            if ($moderated) {
+                $this->approvals->hold('review', $review);
+            }
+
             return $review;
         });
 
-        if ($moderated) {
+        // Under a workflow the step's approvers are told instead.
+        if ($moderated && $this->approvals->pending($review) === null) {
             $this->notifications->dispatch('review.pending_moderation', null, ['product_name' => $product->name]);
         }
 
@@ -77,6 +87,7 @@ final readonly class ReviewService
 
     public function approveReview(ProductReview $review): ProductReview
     {
+        $this->approvals->assertNoPending($review);
         $this->moderate($review, ProductReview::APPROVED, null);
         $review->loadMissing('customer', 'product');
 
@@ -90,13 +101,42 @@ final readonly class ReviewService
     public function rejectReview(ProductReview $review, string $reason): ProductReview
     {
         validator(['reason' => $reason], ['reason' => ['required', 'string', 'max:255']])->validate();
+        $this->approvals->assertNoPending($review);
 
         return $this->moderate($review, ProductReview::REJECTED, $reason);
+    }
+
+    // ---- Approval workflow (§60.1) ---------------------------------------
+
+    public function onApprovalGranted(Model $record): void
+    {
+        /** @var ProductReview $record */
+        $this->approveReview($record);
+    }
+
+    public function onApprovalRejected(Model $record, ?string $note): void
+    {
+        /** @var ProductReview $record */
+        $this->rejectReview($record, mb_substr($note ?? 'Not approved', 0, 255));
+    }
+
+    public function approvalSubject(Model $record): string
+    {
+        /** @var ProductReview $record */
+        $record->loadMissing('product:id,name');
+
+        return 'review of '.($record->product->name ?? 'a product');
+    }
+
+    public function approvalFacts(Model $record): array
+    {
+        return [];
     }
 
     public function deleteReview(ProductReview $review): void
     {
         DB::connection('tenant')->transaction(function () use ($review): void {
+            $this->approvals->cancel($review);
             $review->delete();
             $this->recalculateAggregates($review->product);
         });

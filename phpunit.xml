@@ -49,6 +49,9 @@
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>
         <env name="FILESYSTEM_DISK" value="local"/>
+        <env name="MEDIA_DRIVER" value="local" force="true"/>
+        <env name="MEDIA_PUBLIC_ROOT" value="storage/framework/testing/media/public" force="true"/>
+        <env name="MEDIA_PRIVATE_ROOT" value="storage/framework/testing/media/private" force="true"/>
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>

@@ -11,6 +11,7 @@ use App\Modules\Customers\Models\Customer;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Models\OrderItem;
 use App\Shared\Exceptions\ApiException;
+use App\Shared\Media\MediaDisks;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -124,7 +125,7 @@ final class DigitalDownloadService
         $media = $grant->file->getFirstMedia('file') ?? throw new ApiException('download_unavailable', 'This file is no longer available.', 410);
         $disk = Storage::disk($media->disk);
 
-        if ($media->disk !== 'local' && $disk->providesTemporaryUrls()) {
+        if (! MediaDisks::isLocal($media->disk) && $disk->providesTemporaryUrls()) {
             try {
                 return redirect()->away($media->getTemporaryUrl(now()->addMinutes(5)));
             } catch (Throwable) {

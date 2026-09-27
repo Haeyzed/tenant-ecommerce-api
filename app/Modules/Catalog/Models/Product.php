@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Catalog\Models;
 
+use App\Shared\Media\MediaDisks;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -40,6 +41,7 @@ use Spatie\Sluggable\SlugOptions;
  * @property int|null $unit_id
  * @property string|null $hsn_code
  * @property Carbon|null $expiry_date
+ * @property int|null $low_stock_threshold null = the tenant setting; a variant's own value wins
  * @property bool $has_warehouse_pricing
  * @property bool $is_active
  * @property int $view_count
@@ -93,7 +95,7 @@ class Product extends Model implements AuditableContract, HasMedia
 
     protected $fillable = [
         'product_type', 'name', 'slug', 'sku', 'barcode', 'description', 'price', 'compare_at_price', 'cost_price', 'tax_class',
-        'brand_id', 'unit_id', 'hsn_code', 'expiry_date', 'has_warehouse_pricing', 'is_active', 'meta_title', 'meta_description', 'meta_keywords',
+        'brand_id', 'unit_id', 'hsn_code', 'expiry_date', 'low_stock_threshold', 'has_warehouse_pricing', 'is_active', 'meta_title', 'meta_description', 'meta_keywords',
         'is_bookable', 'duration_minutes', 'is_subscribable', 'subscription_discount_percent', 'social_commerce_excluded_channels',
     ];
 
@@ -112,6 +114,7 @@ class Product extends Model implements AuditableContract, HasMedia
         'seller_id' => 'integer',
         'unit_id' => 'integer',
         'expiry_date' => 'date',
+        'low_stock_threshold' => 'integer',
         'has_warehouse_pricing' => 'boolean',
         'is_active' => 'boolean',
         'view_count' => 'integer',
@@ -131,9 +134,9 @@ class Product extends Model implements AuditableContract, HasMedia
 
     public function registerMediaCollections(): void
     {
-        $this->addMediaCollection('gallery')->useDisk('public');
-        $this->addMediaCollection('featured')->singleFile()->useDisk('public');
-        $this->addMediaCollection('og_image')->singleFile()->useDisk('public');
+        $this->addMediaCollection('gallery')->useDisk(MediaDisks::PUBLIC);
+        $this->addMediaCollection('featured')->singleFile()->useDisk(MediaDisks::PUBLIC);
+        $this->addMediaCollection('og_image')->singleFile()->useDisk(MediaDisks::PUBLIC);
     }
 
     /**

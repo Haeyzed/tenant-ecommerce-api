@@ -32,6 +32,7 @@ final class TemplatedNotification extends Notification implements ShouldQueue
     /**
      * @param  list<string>  $channels
      * @param  array<string, mixed>  $data  non-sensitive context for the in-app inbox and push payload
+     * @param  array<string, string>  $presentation  email layout extras (NotificationPresentation::resolve)
      */
     public function __construct(
         public readonly string $key,
@@ -40,6 +41,7 @@ final class TemplatedNotification extends Notification implements ShouldQueue
         public readonly string $body,
         public readonly array $channels,
         public readonly array $data = [],
+        public readonly array $presentation = [],
     ) {
         $this->onQueue($scope->queue());
         $this->afterCommit();

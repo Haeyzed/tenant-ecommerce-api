@@ -11,6 +11,7 @@ use App\Modules\Cart\Support\PriceResult;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\ProductVariant;
 use App\Modules\Checkout\Support\Quote;
+use App\Modules\Currency\Services\CurrencyService;
 use App\Modules\Customers\Models\Address;
 use App\Modules\Inventory\Models\Warehouse;
 use App\Modules\Inventory\Services\InventoryService;
@@ -53,6 +54,7 @@ final readonly class CheckoutService
         private FlashSaleService $flashSales,
         private PromotionRedemptionService $redemptions,
         private PlatformSettingsService $platformSettings,
+        private CurrencyService $currencies,
     ) {}
 
     /**
@@ -225,6 +227,7 @@ final readonly class CheckoutService
                 'customer_email' => $order->customer_email,
                 'customer_phone' => $order->customer_phone,
                 'currency_code' => $quote->currency,
+                'exchange_rate' => $quote->exchangeRate,
                 'prices_include_tax' => $quote->pricesIncludeTax,
                 'lines' => array_values(array_map(static fn (array $l): array => [
                     'product' => $l['product'], 'variant' => $l['variant'], 'warehouse' => $l['warehouse'], 'quantity' => $l['quantity'],
@@ -253,7 +256,10 @@ final readonly class CheckoutService
     public function quote(Cart $cart, array $data = []): Quote
     {
         $cart->loadMissing(['items.product.unit', 'items.variant', 'coupon', 'customer']);
-        $currency = $cart->currency_code;
+        // A cart in a currency no longer offered (module off, currency
+        // retired, rate removed) is quoted in the base currency (§11.5).
+        $currency = $this->currencies->offered($cart->currency_code) ? strtoupper($cart->currency_code) : $this->currencies->baseCurrency();
+        $rate = (string) $this->currencies->rateFor($currency);
         $customer = $cart->customer;
         $address = $this->resolveAddress($cart, $data);
         $issues = [];
@@ -262,7 +268,7 @@ final readonly class CheckoutService
         $lines = [];
 
         foreach ($cart->items as $item) {
-            $lines[] = $this->priceLine($item, $currency);
+            $lines[] = $this->priceLine($item, $currency, $rate);
         }
 
         $sellable = array_filter($lines, static fn (array $l): bool => $l['status'] === Quote::OK);
@@ -278,7 +284,8 @@ final readonly class CheckoutService
             if ($method === null) {
                 $issues[] = ['code' => 'shipping_method_unavailable', 'message' => 'The shipping method is not available for this address.'];
             } else {
-                $shippingAmount = Money::round($this->shipping->calculateShippingCost($method, array_map(static fn (array $l): Product => $l['product'], $sellable)), $currency);
+                // Method costs are base-currency amounts (A-17).
+                $shippingAmount = $this->currencies->fromBase($this->shipping->calculateShippingCost($method, array_map(static fn (array $l): Product => $l['product'], $sellable)), $rate, $currency);
             }
         } elseif ($address !== null && ! $requiresShipping) {
             $shippingAmount = Money::normalize(0);
@@ -298,6 +305,7 @@ final readonly class CheckoutService
             channel: PricingContext::ONLINE,
             couponCode: $cart->coupon?->code,
             shippingAmount: $shippingAmount,
+            exchangeRate: $rate,
         ));
 
         foreach ($sellable as $position => $line) {
@@ -379,7 +387,7 @@ final readonly class CheckoutService
         ];
 
         return new Quote($currency, array_values($lines), $address, $requiresShipping, $method, $result, $cart->coupon?->code,
-            $inclusive, $totals, $issues, $this->hash($currency, $lines, $totals, $cart->coupon?->code, $method?->id, $address));
+            $inclusive, $totals, $issues, $this->hash($currency, $lines, $totals, $cart->coupon?->code, $method?->id, $address), $rate);
     }
 
     /**
@@ -451,7 +459,7 @@ final readonly class CheckoutService
     /**
      * @return array{item_id: int|null, product: Product, variant: ProductVariant|null, quantity: string, status: string, warehouse: Warehouse|null, price: PriceResult|null, line_subtotal: string, discount_amount: string, seller_funded_discount_amount: string, tax_rate_applied: string|null, tax_amount: string|null, tax_breakdown: array<string, string>|null, line_total: string|null}
      */
-    private function priceLine(CartItem $item, string $currency): array
+    private function priceLine(CartItem $item, string $currency, string $rate): array
     {
         $product = $item->product;
         $variant = $item->variant;
@@ -464,7 +472,7 @@ final readonly class CheckoutService
             $status = $warehouse === null ? Quote::OUT_OF_STOCK : Quote::OK;
         }
 
-        $price = $status === Quote::UNAVAILABLE ? null : $this->pricing->resolveUnitPrice($product, $variant, $warehouse, $currency);
+        $price = $status === Quote::UNAVAILABLE ? null : $this->pricing->resolveUnitPrice($product, $variant, $warehouse, $currency, $rate);
         $zero = Money::normalize(0);
 
         return [

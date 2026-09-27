@@ -208,11 +208,15 @@ final class PlanService
 
     /**
      * The tenant's currency and interval, then USD, else not purchasable
-     * (spec §11.6 price resolution).
+     * (spec §11.6 price resolution). A locked currency (a subscription that
+     * has been paid; SubscriptionService::lockedCurrency) allows only that
+     * currency.
      */
-    public function getPriceForTenant(Plan $plan, Tenant $tenant, string $interval): PlanPrice
+    public function getPriceForTenant(Plan $plan, Tenant $tenant, string $interval, ?string $lockedCurrency = null): PlanPrice
     {
-        $currencies = array_unique([strtoupper($tenant->default_currency), 'USD']);
+        $currencies = $lockedCurrency !== null
+            ? [strtoupper($lockedCurrency)]
+            : array_unique([strtoupper($tenant->default_currency), 'USD']);
 
         foreach ($currencies as $currency) {
             $price = PlanPrice::query()

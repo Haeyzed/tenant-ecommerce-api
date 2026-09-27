@@ -112,7 +112,7 @@ it('validates coupons publicly without an account', function (): void {
     app(PlatformCouponService::class)->create([
         'code' => 'WELCOME10', 'name' => 'Welcome', 'discount_type' => 'percentage', 'discount_value' => 10, 'duration' => 'repeating', 'duration_cycles' => 3,
     ], $this->admin);
-    $price = Plan::query()->where('slug', 'basic')->firstOrFail()->prices()->where('billing_interval', 'monthly')->firstOrFail();
+    $price = Plan::query()->where('slug', 'basic')->firstOrFail()->prices()->where('currency_code', 'USD')->where('billing_interval', 'monthly')->firstOrFail();
 
     $this->landlordJson('POST', '/api/platform-coupons/validate', ['code' => 'welcome10', 'plan_price_id' => $price->id])
         ->assertOk()->assertJsonPath('data.valid', true)->assertJsonPath('data.discount', '2.0000')->assertJsonPath('data.duration_cycles', 3);

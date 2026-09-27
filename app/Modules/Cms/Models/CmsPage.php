@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Cms\Models;
 
+use App\Shared\Media\MediaDisks;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 use OwenIt\Auditing\Auditable;
@@ -59,8 +60,8 @@ class CmsPage extends CmsModel implements AuditableContract, HasMedia
 
     public function registerMediaCollections(): void
     {
-        $this->addMediaCollection('og_image')->singleFile()->useDisk('public');
-        $this->addMediaCollection('section_media')->useDisk('public');
+        $this->addMediaCollection('og_image')->singleFile()->useDisk(MediaDisks::PUBLIC);
+        $this->addMediaCollection('section_media')->useDisk(MediaDisks::PUBLIC);
     }
 
     public function isPublished(): bool

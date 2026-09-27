@@ -10,6 +10,7 @@ use App\Modules\Notifications\Models\NotificationTemplate;
 use App\Modules\Notifications\Notifications\TemplatedNotification;
 use App\Modules\Notifications\Support\AudienceResolver;
 use App\Modules\Notifications\Support\NotificationCatalog;
+use App\Modules\Notifications\Support\NotificationPresentation;
 use App\Modules\Settings\Services\TenantSettingsService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Log;
@@ -67,6 +68,7 @@ final class NotificationDispatchService
         }
 
         $content = $this->templates->render($templateKey, $variables, $scope);
+        $presentation = NotificationPresentation::resolve($templateKey, $variables);
 
         foreach ($recipients as $recipient) {
             $recipientChannels = $candidates;
@@ -94,6 +96,7 @@ final class NotificationDispatchService
                 $content['body'],
                 $recipientChannels,
                 $data,
+                $presentation,
             ));
         }
     }

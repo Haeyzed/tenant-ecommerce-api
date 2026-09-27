@@ -6,6 +6,7 @@ namespace App\Modules\Returns\Models;
 
 use App\Modules\Customers\Models\Customer;
 use App\Modules\Orders\Models\Order;
+use App\Shared\Media\MediaDisks;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -80,7 +81,7 @@ class OrderReturn extends Model implements AuditableContract, HasMedia
 
     public function registerMediaCollections(): void
     {
-        $this->addMediaCollection('photos')->useDisk('local');
+        $this->addMediaCollection('photos')->useDisk(MediaDisks::PRIVATE);
     }
 
     /**

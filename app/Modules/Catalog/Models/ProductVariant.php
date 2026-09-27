@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Catalog\Models;
 
+use App\Shared\Media\MediaDisks;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -25,6 +26,7 @@ use Spatie\MediaLibrary\InteractsWithMedia;
  * @property string|null $compare_at_price
  * @property string|null $cost_price
  * @property bool $is_active
+ * @property int|null $low_stock_threshold null = the product's, then the tenant setting
  * @property-read Product $product
  */
 class ProductVariant extends Model implements AuditableContract, HasMedia
@@ -37,7 +39,7 @@ class ProductVariant extends Model implements AuditableContract, HasMedia
 
     protected $connection = 'tenant';
 
-    protected $fillable = ['sku', 'barcode', 'price', 'compare_at_price', 'cost_price', 'is_active'];
+    protected $fillable = ['sku', 'barcode', 'price', 'compare_at_price', 'cost_price', 'is_active', 'low_stock_threshold'];
 
     protected $casts = [
         'product_id' => 'integer',
@@ -45,11 +47,12 @@ class ProductVariant extends Model implements AuditableContract, HasMedia
         'compare_at_price' => 'decimal:4',
         'cost_price' => 'decimal:4',
         'is_active' => 'boolean',
+        'low_stock_threshold' => 'integer',
     ];
 
     public function registerMediaCollections(): void
     {
-        $this->addMediaCollection('image')->singleFile()->useDisk('public');
+        $this->addMediaCollection('image')->singleFile()->useDisk(MediaDisks::PUBLIC);
     }
 
     /**

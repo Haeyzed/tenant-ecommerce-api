@@ -11,6 +11,7 @@ use App\Modules\Promotions\Models\PromotionRedemption;
 use App\Modules\Promotions\Support\BuyerHistory;
 use App\Modules\Promotions\Support\PromotionCache;
 use App\Modules\Promotions\Support\PromotionResult;
+use App\Modules\Settings\Services\TenantSettingsService;
 use App\Shared\Exceptions\ApiException;
 use App\Shared\Support\Money;
 use Illuminate\Support\Collection;
@@ -30,7 +31,13 @@ final readonly class PromotionRedemptionService
         private PromotionEngine $engine,
         private BuyerHistory $history,
         private PromotionCache $cache,
+        private TenantSettingsService $settings,
     ) {}
+
+    private function baseCurrency(): string
+    {
+        return strtoupper((string) ($this->settings->get('default_currency') ?: 'USD'));
+    }
 
     /**
      * Re-checks every applied promotion under lock (409
@@ -91,8 +98,8 @@ final readonly class PromotionRedemptionService
                     'discount_type_snapshot' => $promotion->discount_type,
                     'discount_value_snapshot' => $promotion->discount_value,
                     'discount_amount' => $row['amount'],
-                    // Baskets are in the base currency until multi-currency (§48).
-                    'base_discount_amount' => Money::normalize($row['amount']),
+                    // §37.5: at the order's captured rate (1 order currency = x base).
+                    'base_discount_amount' => Money::round(bcmul((string) $row['amount'], (string) ($order->exchange_rate_used ?? '1'), 12), $this->baseCurrency()),
                     'seller_id' => $promotion->seller_id,
                     'status' => PromotionRedemption::RESERVED,
                 ])->save();

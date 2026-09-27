@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Modules\Tenancy\Models\Domain;
 use App\Modules\Tenancy\Models\Tenant;
+use App\Shared\Tenancy\MediaUrlTenancyBootstrapper;
 use App\Shared\Tenancy\PrefixedCacheTenancyBootstrapper;
 use Stancl\Tenancy\Bootstrappers\DatabaseTenancyBootstrapper;
 use Stancl\Tenancy\Bootstrappers\FilesystemTenancyBootstrapper;
@@ -49,6 +50,7 @@ return [
         DatabaseTenancyBootstrapper::class,
         PrefixedCacheTenancyBootstrapper::class,
         FilesystemTenancyBootstrapper::class,
+        MediaUrlTenancyBootstrapper::class,
         QueueTenancyBootstrapper::class,
         $redisPrefixed === [] ? null : RedisTenancyBootstrapper::class,
     ])),
@@ -72,9 +74,14 @@ return [
 
     'filesystem' => [
         'suffix_base' => 'tenants/',
+        // media-public / media-private take the default: their own root
+        // plus tenants/{id} (a key prefix on S3). `public` stays scoped
+        // for media rows written before the media disks existed.
         'disks' => [
             'local',
             'public',
+            'media-public',
+            'media-private',
         ],
         'root_override' => [
             'local' => '%storage_path%/app/',

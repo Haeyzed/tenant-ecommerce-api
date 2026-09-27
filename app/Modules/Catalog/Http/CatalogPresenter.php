@@ -18,8 +18,10 @@ use App\Modules\Catalog\Services\ProductService;
 use App\Modules\Catalog\Support\ProductAvailability;
 use App\Modules\Catalog\Support\ProductPricing;
 use App\Modules\Catalog\Support\ProductPromotions;
+use App\Modules\Currency\Services\CurrencyService;
 use App\Modules\CustomFields\Services\CustomFieldService;
 use App\Modules\Settings\Services\TenantSettingsService;
+use App\Shared\Support\Money;
 use Illuminate\Support\Collection;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
@@ -37,7 +39,56 @@ final readonly class CatalogPresenter
         private ProductBadgeService $badges,
         private CustomFieldService $customFields,
         private TenantSettingsService $settings,
+        private CurrencyService $currencies,
     ) {}
+
+    /**
+     * The shown price in the requested currency (§38.4 layers for display):
+     * the effective base price, or in another currency the store's explicit
+     * price (a variant row, then the product row) with a running sale
+     * converted when lower, else the base price converted at the rate and
+     * marked estimated.
+     *
+     * @param  array<string, array{price: string, compare_at_price: string|null}>  $explicit  CurrencyService::explicitPrices()
+     * @return array{price: string, compare_at_price: string|null, currency_code: string, is_estimated: bool}
+     */
+    private function displayPrice(Product $product, ?ProductVariant $variant, string $currency, string $rate, array $explicit): array
+    {
+        $effective = $this->pricing->effectivePrice($product, $variant);
+        $compare = $this->pricing->compareAtPrice($product, $variant);
+
+        if ($currency === $this->currencies->baseCurrency()) {
+            return ['price' => $effective, 'compare_at_price' => $compare, 'currency_code' => $currency, 'is_estimated' => false];
+        }
+
+        $row = ($variant !== null ? ($explicit[$product->id.':'.$variant->id] ?? null) : null) ?? $explicit[$product->id.':0'] ?? null;
+
+        if ($row === null) {
+            return [
+                'price' => $this->currencies->fromBase($effective, $rate, $currency),
+                'compare_at_price' => $compare === null ? null : $this->currencies->fromBase($compare, $rate, $currency),
+                'currency_code' => $currency,
+                'is_estimated' => true,
+            ];
+        }
+
+        $price = Money::round($row['price'], $currency);
+        $shownCompare = $row['compare_at_price'] === null ? null : Money::round($row['compare_at_price'], $currency);
+        $estimated = false;
+
+        // A running sale lowered the base price: converted, it wins only when lower.
+        if (Money::cmp($effective, $this->pricing->catalogPrice($product, $variant)) < 0) {
+            $sale = $this->currencies->fromBase($effective, $rate, $currency);
+
+            if (Money::cmp($sale, $price) < 0) {
+                $shownCompare = $shownCompare === null ? $price : Money::max($shownCompare, $price);
+                $price = $sale;
+                $estimated = true;
+            }
+        }
+
+        return ['price' => $price, 'compare_at_price' => $shownCompare, 'currency_code' => $currency, 'is_estimated' => $estimated];
+    }
 
     /**
      * Storefront cards for a list page, with availability resolved in one
@@ -46,19 +97,20 @@ final readonly class CatalogPresenter
      * @param  iterable<Product>  $products
      * @return list<array<string, mixed>>
      */
-    public function storefrontCards(iterable $products): array
+    public function storefrontCards(iterable $products, ?string $currency = null, string $rate = '1'): array
     {
         $products = new Collection(is_array($products) ? $products : iterator_to_array($products));
         $stock = $this->availability->forProducts($products);
         $promotions = $this->promotions->forProducts($products);
+        $currency = strtoupper($currency ?? $this->currencies->baseCurrency());
+        $explicit = $currency === $this->currencies->baseCurrency() ? [] : $this->currencies->explicitPrices($products->pluck('id')->all(), $currency);
 
         return $products->map(fn (Product $p): array => [
             'id' => $p->id,
             'name' => $p->name,
             'slug' => $p->slug,
             'product_type' => $p->product_type,
-            'price' => $this->pricing->effectivePrice($p),
-            'compare_at_price' => $this->pricing->compareAtPrice($p),
+            ...$this->displayPrice($p, null, $currency, $rate, $explicit),
             'in_stock' => $stock[$p->id] ?? false,
             'brand' => $p->brand === null ? null : ['id' => $p->brand->id, 'name' => $p->brand->name, 'slug' => $p->brand->slug],
             'image_url' => $this->imageUrl($p),
@@ -72,16 +124,18 @@ final readonly class CatalogPresenter
     /**
      * @return array<string, mixed>
      */
-    public function storefrontProduct(Product $product): array
+    public function storefrontProduct(Product $product, ?string $currency = null, string $rate = '1'): array
     {
         $product->loadMissing(['brand', 'unit', 'categories', 'tags', 'specifications', 'badges', 'media',
             'variants' => static fn ($q) => $q->where('is_active', true)->with(['optionValues.option', 'media']),
             'bundleItems.child', 'bundleItems.childVariant']);
 
         $variants = $product->variants;
+        $currency = strtoupper($currency ?? $this->currencies->baseCurrency());
+        $explicit = $currency === $this->currencies->baseCurrency() ? [] : $this->currencies->explicitPrices([$product->id], $currency);
 
         return [
-            ...$this->storefrontCards([$product])[0],
+            ...$this->storefrontCards([$product], $currency, $rate)[0],
             'description' => $product->description,
             'unit' => $product->unit === null ? ['name' => 'Piece', 'short_code' => 'pc', 'allows_decimal' => false]
                 : ['name' => $product->unit->name, 'short_code' => $product->unit->short_code, 'allows_decimal' => $product->unit->allows_decimal],
@@ -94,8 +148,7 @@ final readonly class CatalogPresenter
             'variants' => $variants->map(fn (ProductVariant $v): array => [
                 'id' => $v->id,
                 'sku' => $v->sku,
-                'price' => $this->pricing->effectivePrice($product, $v),
-                'compare_at_price' => $this->pricing->compareAtPrice($product, $v),
+                ...$this->displayPrice($product, $v, $currency, $rate, $explicit),
                 'option_value_ids' => $v->optionValues->pluck('id')->values()->all(),
                 'image_url' => $v->getFirstMediaUrl('image') ?: null,
             ])->values()->all(),
@@ -144,6 +197,7 @@ final readonly class CatalogPresenter
             'unit_id' => $product->unit_id,
             'hsn_code' => $product->hsn_code,
             'expiry_date' => $product->expiry_date?->toDateString(),
+            'low_stock_threshold' => $product->low_stock_threshold,
             'has_warehouse_pricing' => (bool) $product->has_warehouse_pricing,
             'meta_title' => $product->meta_title,
             'meta_description' => $product->meta_description,
@@ -178,6 +232,7 @@ final readonly class CatalogPresenter
             'compare_at_price' => $variant->compare_at_price !== null ? (string) $variant->compare_at_price : null,
             'cost_price' => $variant->cost_price !== null ? (string) $variant->cost_price : null,
             'is_active' => $variant->is_active,
+            'low_stock_threshold' => $variant->low_stock_threshold,
             'options' => $variant->optionValues->map(static fn (ProductOptionValue $v): array => ['option' => $v->option?->name, 'value_id' => $v->id, 'value' => $v->value])->values()->all(),
             'custom_fields' => $this->customFields->valuesFor($variant, ProductService::VARIANT_ENTITY, CustomFieldService::ADMIN),
         ];

@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace App\Support\ApiDocs;
 
 use Dedoc\Scramble\Support\Generator\TypeTransformer;
+use Dedoc\Scramble\Support\OperationExtensions\ParameterExtractor\ParameterExtractor;
 use Dedoc\Scramble\Support\OperationExtensions\RequestBodyExtension;
 use Dedoc\Scramble\Support\OperationExtensions\RulesExtractor\GeneratesParametersFromRules;
 use Dedoc\Scramble\Support\OperationExtensions\RulesExtractor\ParametersExtractionResult;
-use Dedoc\Scramble\Support\OperationExtensions\ParameterExtractor\ParameterExtractor;
 use Dedoc\Scramble\Support\RouteInfo;
 use PhpParser\Node;
 use PhpParser\NodeFinder;
@@ -187,13 +187,21 @@ final class ServiceValidationParametersExtractor implements ParameterExtractor
 
         $finder = new NodeFinder;
 
-        foreach ($finder->findInstanceOf($node, Node\Expr\FuncCall::class) as $call) {
-            if ($call->name instanceof Node\Name && $call->name->toString() === 'validator' && isset($call->args[1]) && $call->args[1] instanceof Node\Arg) {
-                $rules = $this->rulesFromExpr($class, $call->args[1]->value, $creating, $depth);
+        // validator($data, $rules) and Validator::make($data, $rules)
+        $validations = array_filter(
+            [...$finder->findInstanceOf($node, Node\Expr\FuncCall::class), ...$finder->findInstanceOf($node, Node\Expr\StaticCall::class)],
+            static fn (Node\Expr $call): bool => isset($call->args[1]) && $call->args[1] instanceof Node\Arg && (
+                ($call instanceof Node\Expr\FuncCall && $call->name instanceof Node\Name && $call->name->toString() === 'validator')
+                || ($call instanceof Node\Expr\StaticCall && $call->class instanceof Node\Name && str_ends_with($call->class->toString(), 'Validator')
+                    && $call->name instanceof Node\Identifier && $call->name->name === 'make')
+            ),
+        );
 
-                if ($rules !== []) {
-                    return $rules;
-                }
+        foreach ($validations as $call) {
+            $rules = $this->rulesFromExpr($class, $node, $call->args[1]->value, $creating, $depth);
+
+            if ($rules !== []) {
+                return $rules;
             }
         }
 
@@ -217,10 +225,18 @@ final class ServiceValidationParametersExtractor implements ParameterExtractor
     /**
      * @return array<string, list<string>>
      */
-    private function rulesFromExpr(string $class, Node\Expr $expr, bool $creating, int $depth): array
+    private function rulesFromExpr(string $class, Node\Stmt\ClassMethod $method, Node\Expr $expr, bool $creating, int $depth): array
     {
         if ($expr instanceof Node\Expr\Array_) {
             return $this->rulesArray($class, $expr, $creating);
+        }
+
+        // $rules = [...]; validator($data, $rules)
+        if ($expr instanceof Node\Expr\Variable && is_string($expr->name)) {
+            $assign = (new NodeFinder)->findFirst($method, static fn (Node $n): bool => $n instanceof Node\Expr\Assign
+                && $n->var instanceof Node\Expr\Variable && $n->var->name === $expr->name && $n->expr instanceof Node\Expr\Array_);
+
+            return $assign instanceof Node\Expr\Assign && $assign->expr instanceof Node\Expr\Array_ ? $this->rulesArray($class, $assign->expr, $creating) : [];
         }
 
         // validator($data, $this->rules(...)) or self::rules(...)

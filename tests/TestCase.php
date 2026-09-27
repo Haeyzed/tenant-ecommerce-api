@@ -8,6 +8,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\File;
 use Stancl\Tenancy\Events\TenancyBootstrapped;
 use Tests\Support\InteractsWithBilling;
 use Tests\Support\InteractsWithPlans;
@@ -51,6 +52,9 @@ abstract class TestCase extends BaseTestCase
         if (tenancy()->initialized) {
             tenancy()->end();
         }
+
+        // Media disks point here under phpunit.xml; nothing survives a test.
+        File::deleteDirectory(base_path('storage/framework/testing/media'));
 
         parent::tearDown();
     }

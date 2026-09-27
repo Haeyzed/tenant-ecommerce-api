@@ -47,7 +47,7 @@ function registrationPayload(array $overrides = []): array
         'password' => 'Secret123',
         'password_confirmation' => 'Secret123',
         'country_id' => 1,
-        'plan_price_id' => PlanPrice::query()->whereHas('plan', fn ($q) => $q->where('slug', 'basic'))->where('billing_interval', 'monthly')->value('id'),
+        'plan_price_id' => PlanPrice::query()->whereHas('plan', fn ($q) => $q->where('slug', 'basic'))->where('currency_code', 'USD')->where('billing_interval', 'monthly')->value('id'),
         'accepted_legal_document_ids' => test()->documents->pluck('id')->all(),
     ], $overrides);
 }
@@ -129,7 +129,7 @@ it('limits wrong codes and converts on the right one into a provisioning trial',
 
 it('asks for payment when the price has no trial', function (): void {
     Http::fake(['api.paystack.co/transaction/initialize' => Http::response(['status' => true, 'data' => ['authorization_url' => 'https://checkout.paystack.test/reg', 'access_code' => 'x']])]);
-    $price = PlanPrice::query()->whereHas('plan', fn ($q) => $q->where('slug', 'standard'))->where('billing_interval', 'monthly')->value('id');
+    $price = PlanPrice::query()->whereHas('plan', fn ($q) => $q->where('slug', 'standard'))->where('currency_code', 'USD')->where('billing_interval', 'monthly')->value('id');
 
     $id = $this->landlordJson('POST', '/api/register', registrationPayload(['plan_price_id' => $price]))->json('data.registration_id');
 
@@ -141,7 +141,7 @@ it('asks for payment when the price has no trial', function (): void {
 });
 
 it('closes tenants that never paid, releasing nothing but landlord rows', function (): void {
-    $price = PlanPrice::query()->whereHas('plan', fn ($q) => $q->where('slug', 'standard'))->where('billing_interval', 'monthly')->value('id');
+    $price = PlanPrice::query()->whereHas('plan', fn ($q) => $q->where('slug', 'standard'))->where('currency_code', 'USD')->where('billing_interval', 'monthly')->value('id');
     Http::fake(['*' => Http::response(['status' => true, 'data' => ['authorization_url' => 'https://x.test', 'access_code' => 'x']])]);
     $id = $this->landlordJson('POST', '/api/register', registrationPayload(['plan_price_id' => $price]))->json('data.registration_id');
     $this->landlordJson('POST', '/api/register/verify', ['registration_id' => $id, 'code' => sentCode()])->assertOk();

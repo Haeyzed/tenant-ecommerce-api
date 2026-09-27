@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Expenses\Models;
 
 use App\Modules\Users\Models\User;
+use App\Shared\Media\MediaDisks;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
@@ -51,7 +52,7 @@ class Expense extends Model implements AuditableContract, HasMedia
         'biller_id' => 'integer',
         'supplier_id' => 'integer',
         'amount' => 'decimal:4',
-        'exchange_rate_used' => 'decimal:8',
+        'exchange_rate_used' => 'decimal:12',
         'expense_date' => 'date',
         'paid_at' => 'datetime',
         'paid_from_account_id' => 'integer',
@@ -60,7 +61,7 @@ class Expense extends Model implements AuditableContract, HasMedia
 
     public function registerMediaCollections(): void
     {
-        $this->addMediaCollection('receipt')->singleFile()->useDisk('local');
+        $this->addMediaCollection('receipt')->singleFile()->useDisk(MediaDisks::PRIVATE);
     }
 
     /**

@@ -29,7 +29,8 @@ trait InteractsWithPlans
         }
 
         $plan = Plan::query()->where('slug', $planSlug)->firstOrFail();
-        $price = $plan->prices()->where('billing_interval', 'monthly')->where('is_active', true)->firstOrFail();
+        $currency = strtoupper((string) ($attributes['currency_code'] ?? 'USD'));
+        $price = $plan->prices()->where('currency_code', $currency)->where('billing_interval', 'monthly')->where('is_active', true)->firstOrFail();
 
         /** @var Subscription $subscription */
         $subscription = Subscription::query()->create(array_merge([

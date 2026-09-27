@@ -36,6 +36,13 @@ use InvalidArgumentException;
  */
 final readonly class InventoryService
 {
+    /**
+     * An item's low-stock threshold in the stock-level query: the variant's,
+     * then the product's, then the tenant setting (the ? binding). The same
+     * order as StockAlerts::threshold().
+     */
+    private const string THRESHOLD_SQL = 'COALESCE(v.low_stock_threshold, p.low_stock_threshold, ?)';
+
     public function __construct(
         private StockAlerts $alerts,
         private TenantSettingsService $settings,
@@ -195,12 +202,15 @@ final readonly class InventoryService
      */
     public function getLowStockProducts(Warehouse|array|null $warehouse = null, array $filters = []): LengthAwarePaginator
     {
-        $threshold = (int) $this->settings->get('low_stock_threshold', 5);
-
         return $this->stockLevels($warehouse, $filters)
             ->whereRaw('(COALESCE(s.quantity, 0) - COALESCE(s.reserved, 0)) > 0')
-            ->whereRaw('(COALESCE(s.quantity, 0) - COALESCE(s.reserved, 0)) <= ?', [$threshold])
+            ->whereRaw('(COALESCE(s.quantity, 0) - COALESCE(s.reserved, 0)) <= '.self::THRESHOLD_SQL, [$this->defaultLowStockThreshold()])
             ->paginate((int) ($filters['per_page'] ?? 25));
+    }
+
+    private function defaultLowStockThreshold(): int
+    {
+        return (int) $this->settings->get('low_stock_threshold', 5);
     }
 
     /**
@@ -595,9 +605,8 @@ final readonly class InventoryService
      */
     public function stockCounts(?array $warehouseIds = null): array
     {
-        $threshold = (int) $this->settings->get('low_stock_threshold', 5);
         $row = DB::connection('tenant')->query()->fromSub($this->stockLevels($warehouseIds, [])->reorder(), 'levels')
-            ->selectRaw('SUM(CASE WHEN available > 0 AND available <= ? THEN 1 ELSE 0 END) as low', [$threshold])
+            ->selectRaw('SUM(CASE WHEN available > 0 AND available <= low_stock_threshold THEN 1 ELSE 0 END) as low')
             ->selectRaw('SUM(CASE WHEN available <= 0 THEN 1 ELSE 0 END) as out_of_stock')
             ->first();
 
@@ -635,7 +644,8 @@ final readonly class InventoryService
                 ->orWhere('v.sku', $search)))
             ->selectRaw('p.id as product_id, p.name as product_name, v.id as product_variant_id, COALESCE(v.sku, p.sku) as sku,'
                 .' COALESCE(s.quantity, 0) as quantity, COALESCE(s.reserved, 0) as reserved_quantity,'
-                .' (COALESCE(s.quantity, 0) - COALESCE(s.reserved, 0)) as available')
+                .' (COALESCE(s.quantity, 0) - COALESCE(s.reserved, 0)) as available,'
+                .' '.self::THRESHOLD_SQL.' as low_stock_threshold', [$this->defaultLowStockThreshold()])
             ->orderByRaw('(COALESCE(s.quantity, 0) - COALESCE(s.reserved, 0)) asc')
             ->orderBy('p.id')
             ->orderBy('v.id');

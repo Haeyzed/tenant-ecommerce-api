@@ -111,7 +111,7 @@ class Order extends Model implements AuditableContract
         'gift_card_amount_applied' => 'decimal:4',
         'total' => 'decimal:4',
         'base_currency_amount' => 'decimal:4',
-        'exchange_rate_used' => 'decimal:8',
+        'exchange_rate_used' => 'decimal:12',
         'shipping_method_id' => 'integer',
         'shipping_address' => 'array',
         'billing_address' => 'array',

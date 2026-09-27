@@ -42,6 +42,8 @@ final readonly class Quote
         public array $totals,
         public array $issues,
         public string $hash,
+        // 1 base = exchangeRate basket currency; '1' in the base currency.
+        public string $exchangeRate = '1',
     ) {}
 
     public function isComplete(): bool
@@ -66,6 +68,7 @@ final readonly class Quote
                 'unit_price' => $l['price']?->unitPrice,
                 'compare_at_price' => $l['price']?->compareAtPrice,
                 'price_source' => $l['price']?->source,
+                'is_estimated' => $l['price']?->isEstimated ?? false,
                 'line_subtotal' => $l['line_subtotal'],
                 'discount_amount' => $l['discount_amount'],
                 'tax_rate_applied' => $l['tax_rate_applied'],

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Cms\Models;
 
+use App\Shared\Media\MediaDisks;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 
@@ -31,6 +32,6 @@ class CmsTestimonial extends CmsModel implements HasMedia
 
     public function registerMediaCollections(): void
     {
-        $this->addMediaCollection('photo')->singleFile()->useDisk('public');
+        $this->addMediaCollection('photo')->singleFile()->useDisk(MediaDisks::PUBLIC);
     }
 }

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Catalog\Services;
 
+use App\Contracts\Approvable;
+use App\Modules\Approvals\Support\ApprovalGate;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\ProductAnswer;
 use App\Modules\Catalog\Models\ProductQuestion;
@@ -18,11 +20,12 @@ use Illuminate\Validation\Rule;
  * Pre-purchase questions and answers (spec §29.7). Without moderation both
  * are approved on creation.
  */
-final readonly class ProductQuestionService
+final readonly class ProductQuestionService implements Approvable
 {
     public function __construct(
         private TenantSettingsService $settings,
         private NotificationDispatchService $notifications,
+        private ApprovalGate $approvals,
     ) {}
 
     public function askQuestion(Customer $customer, Product $product, string $question): ProductQuestion
@@ -40,7 +43,8 @@ final readonly class ProductQuestionService
             'asked_at' => now(),
         ]);
 
-        if ($moderated) {
+        // A matching approval workflow replaces single-step moderation (§60.1).
+        if ($moderated && $this->approvals->hold('product_question', $created) === null) {
             // Audience "admin": the store's owners and admins.
             $this->notifications->dispatch('question.pending_moderation', $created, [
                 'product_name' => $product->name,
@@ -76,6 +80,7 @@ final readonly class ProductQuestionService
 
     public function approveQuestion(ProductQuestion $question): ProductQuestion
     {
+        $this->approvals->assertNoPending($question);
         $question->forceFill(['is_approved' => true])->save();
 
         return $question;
@@ -93,7 +98,37 @@ final readonly class ProductQuestionService
 
     public function deleteQuestion(ProductQuestion $question): void
     {
+        $this->approvals->cancel($question);
         $question->delete();
+    }
+
+    // ---- Approval workflow (§60.1) ---------------------------------------
+
+    public function onApprovalGranted(Model $record): void
+    {
+        /** @var ProductQuestion $record */
+        $record->forceFill(['is_approved' => true])->save();
+    }
+
+    /**
+     * Questions have no rejected state: a rejected question is removed.
+     */
+    public function onApprovalRejected(Model $record, ?string $note): void
+    {
+        $record->delete();
+    }
+
+    public function approvalSubject(Model $record): string
+    {
+        /** @var ProductQuestion $record */
+        $record->loadMissing('product:id,name');
+
+        return 'question on '.($record->product->name ?? 'a product');
+    }
+
+    public function approvalFacts(Model $record): array
+    {
+        return [];
     }
 
     /**

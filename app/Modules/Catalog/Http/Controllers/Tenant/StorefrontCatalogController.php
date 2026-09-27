@@ -18,6 +18,7 @@ use App\Modules\Catalog\Services\ProductQuestionService;
 use App\Modules\Catalog\Services\ProductService;
 use App\Modules\Catalog\Services\ProductViewService;
 use App\Modules\Catalog\Support\ProductSorts;
+use App\Modules\Currency\Services\CurrencyService;
 use App\Modules\Customers\Models\Customer;
 use App\Shared\Http\APIResponse;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -38,6 +39,7 @@ final class StorefrontCatalogController extends Controller
         private readonly ProductService $products,
         private readonly CatalogPresenter $presenter,
         private readonly ProductSorts $sorts,
+        private readonly CurrencyService $currencies,
     ) {}
 
     public function products(Request $request): JsonResponse
@@ -52,17 +54,19 @@ final class StorefrontCatalogController extends Controller
     {
         $model = $this->visibleProduct($request->query('slug') !== null ? (string) $request->query('slug') : $product);
 
+        [$currency, $rate] = $this->currency($request);
         $customer = Auth::guard('customer')->user();
         $views->recordView($model, $customer instanceof Customer ? $customer : null);
 
-        return APIResponse::success($this->presenter->storefrontProduct($model));
+        return APIResponse::success($this->presenter->storefrontProduct($model, $currency, $rate));
     }
 
     public function related(Request $request, string $product, ProductContentService $content): JsonResponse
     {
         $type = $request->validate(['type' => ['sometimes', Rule::in(ProductRelation::TYPES)]])['type'] ?? 'related';
+        [$currency, $rate] = $this->currency($request);
 
-        return APIResponse::success($this->presenter->storefrontCards($content->getRelated($this->visibleProduct($product), $type)));
+        return APIResponse::success($this->presenter->storefrontCards($content->getRelated($this->visibleProduct($product), $type), $currency, $rate));
     }
 
     public function questions(string $product, ProductQuestionService $questions): JsonResponse
@@ -143,11 +147,34 @@ final class StorefrontCatalogController extends Controller
             $validated['in_stock'] = $request->boolean('in_stock');
         }
 
+        [$currency, $rate] = $this->currency($request);
+
+        // Price bounds in another currency filter on the base price at the
+        // reference rate (explicit market prices are not indexed).
+        foreach (['min_price', 'max_price'] as $bound) {
+            if (isset($validated[$bound]) && $rate !== '1') {
+                $validated[$bound] = bcdiv((string) $validated[$bound], $rate, 4);
+            }
+        }
+
         /** @var LengthAwarePaginator<int, Product> $page */
         $page = $this->products->searchAndFilter($validated, $validated['sort'] ?? null, (int) ($validated['per_page'] ?? 24), $base);
-        $cards = $this->presenter->storefrontCards($page->getCollection());
+        $cards = $this->presenter->storefrontCards($page->getCollection(), $currency, $rate);
 
         return APIResponse::success($page->setCollection(collect($cards)));
+    }
+
+    /**
+     * ?currency= (§48.2): an offered currency and its rate; the base
+     * currency when absent; 422 currency_not_supported otherwise.
+     *
+     * @return array{0: string, 1: string}
+     */
+    private function currency(Request $request): array
+    {
+        $code = strtoupper((string) ($request->validate(['currency' => ['sometimes', 'string', 'size:3']])['currency'] ?? $this->currencies->baseCurrency()));
+
+        return [$code, $this->currencies->offeredRate($code)];
     }
 
     private function visibleProduct(string $idOrSlug): Product

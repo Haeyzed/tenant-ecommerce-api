@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Shipping\Models;
 
+use App\Shared\Media\MediaDisks;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
@@ -56,7 +57,7 @@ class DeliveryAssignment extends Model implements AuditableContract, HasMedia
 
     public function registerMediaCollections(): void
     {
-        $this->addMediaCollection('proof_of_delivery')->singleFile()->useDisk('local');
+        $this->addMediaCollection('proof_of_delivery')->singleFile()->useDisk(MediaDisks::PRIVATE);
     }
 
     /**

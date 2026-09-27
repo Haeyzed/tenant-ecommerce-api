@@ -7,6 +7,7 @@ namespace App\Modules\Catalog\Services;
 use App\Modules\Catalog\Jobs\RecordProductView;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Customers\Models\Customer;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -56,7 +57,7 @@ final readonly class ProductViewService
     /**
      * Views per product in the window, for joins and sorting.
      */
-    public static function trendingCounts(int $days = self::TRENDING_DAYS): \Illuminate\Database\Query\Builder
+    public static function trendingCounts(int $days = self::TRENDING_DAYS): Builder
     {
         return DB::connection('tenant')->table('product_views')
             ->where('viewed_at', '>=', now()->subDays($days))

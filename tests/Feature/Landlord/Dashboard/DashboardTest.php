@@ -41,7 +41,7 @@ beforeEach(function (): void {
  */
 function dashboardSubscription(string $tenantId, Plan $plan, array $attributes = []): Subscription
 {
-    $price = $plan->prices()->where('billing_interval', 'monthly')->firstOrFail();
+    $price = $plan->prices()->where('currency_code', 'USD')->where('billing_interval', 'monthly')->firstOrFail();
 
     /** @var Subscription */
     return Subscription::query()->create(array_merge([

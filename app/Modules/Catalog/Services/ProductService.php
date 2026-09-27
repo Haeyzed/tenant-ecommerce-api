@@ -641,6 +641,8 @@ final readonly class ProductService
             'unit_id' => ['sometimes', 'nullable', 'integer', Rule::exists('tenant.units_of_measure', 'id')],
             'hsn_code' => ['sometimes', 'nullable', 'string', 'max:16'],
             'expiry_date' => ['sometimes', 'nullable', 'date_format:Y-m-d'],
+            // Stock-holding types only; null inherits the tenant setting.
+            'low_stock_threshold' => [in_array($type, [Product::SIMPLE, Product::VARIABLE], true) ? 'sometimes' : 'prohibited', 'nullable', 'integer', 'min:0', 'max:1000000'],
             'is_active' => ['sometimes', 'boolean'],
             'has_warehouse_pricing' => ['sometimes', 'boolean'],
             'meta_title' => ['sometimes', 'nullable', 'string', 'max:200'],
@@ -691,6 +693,8 @@ final readonly class ProductService
             'compare_at_price' => ['sometimes', 'nullable', 'numeric', 'min:0', 'decimal:0,4'],
             'cost_price' => ['sometimes', 'nullable', 'numeric', 'min:0', 'decimal:0,4'],
             'is_active' => ['sometimes', 'boolean'],
+            // Null inherits the product's threshold, then the tenant setting.
+            'low_stock_threshold' => ['sometimes', 'nullable', 'integer', 'min:0', 'max:1000000'],
             'option_value_ids' => [$creating ? 'required' : 'sometimes', 'array', 'min:1'],
             'option_value_ids.*' => ['integer'],
             'custom_fields' => ['sometimes', 'array'],

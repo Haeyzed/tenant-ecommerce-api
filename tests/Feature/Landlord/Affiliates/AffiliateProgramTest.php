@@ -73,7 +73,7 @@ function affiliateRegistration(array $overrides = []): array
         'password' => 'Secret123',
         'password_confirmation' => 'Secret123',
         'country_id' => 1,
-        'plan_price_id' => PlanPrice::query()->whereHas('plan', fn ($q) => $q->where('slug', 'basic'))->where('billing_interval', 'monthly')->value('id'),
+        'plan_price_id' => PlanPrice::query()->whereHas('plan', fn ($q) => $q->where('slug', 'basic'))->where('currency_code', 'USD')->where('billing_interval', 'monthly')->value('id'),
         'accepted_legal_document_ids' => test()->terms->pluck('id')->all(),
     ], $overrides);
 }

@@ -36,22 +36,28 @@ final class BillingController extends Controller
     ) {}
 
     /**
-     * Active public plans priced in the tenant's billing currency, with the
-     * providers able to charge each price.
+     * Active public plans with the prices checkout would charge (the same
+     * resolution as SubscriptionService::priceFor) and the providers able
+     * to charge each price.
      */
     public function plans(): JsonResponse
     {
         $tenant = $this->tenant();
-        $currency = $this->subscriptions->getCurrentSubscription($tenant)?->currency_code ?? $tenant->default_currency;
-        $plans = $this->plans->listPublicPlans($currency);
+        $locked = $this->subscriptions->lockedCurrency($tenant);
+        $plans = $this->plans->listPublicPlans($locked ?? $tenant->default_currency);
 
-        $plans = $plans->map(function (array $plan) use ($tenant): array {
+        $plans = $plans->map(function (array $plan) use ($tenant, $locked): array {
+            // Once paid, only prices in the subscription's currency can be bought.
+            if ($locked !== null) {
+                $plan['prices'] = array_values(array_filter($plan['prices'], static fn (array $price): bool => $price['currency_code'] === $locked));
+            }
+
             foreach ($plan['prices'] as $i => $price) {
                 $plan['prices'][$i]['gateways'] = $this->gateways->availableFor($tenant, $price['currency_code'])->pluck('provider')->values()->all();
             }
 
             return $plan;
-        });
+        })->filter(static fn (array $plan): bool => $plan['prices'] !== []);
 
         return APIResponse::success($plans->values());
     }
@@ -101,7 +107,7 @@ final class BillingController extends Controller
         ]);
 
         $tenant = $this->tenant();
-        $price = $this->plans->getPriceForTenant($this->publicPlan((int) $validated['plan_id']), $tenant, $validated['billing_interval']);
+        $price = $this->subscriptions->priceFor($tenant, $this->publicPlan((int) $validated['plan_id']), $validated['billing_interval']);
         $result = $this->coupons->validate($validated['coupon_code'], $price, $tenant, $tenant->email);
 
         return APIResponse::success([

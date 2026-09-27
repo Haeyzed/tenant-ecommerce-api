@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Exports\Models;
 
+use App\Shared\Media\MediaDisks;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Carbon;
@@ -56,7 +57,7 @@ class DataExport extends Model implements HasMedia
     public function registerMediaCollections(): void
     {
         // Private disk: never served from a public URL (§75 rule 10).
-        $this->addMediaCollection('file')->useDisk('local')->singleFile();
+        $this->addMediaCollection('file')->useDisk(MediaDisks::PRIVATE)->singleFile();
     }
 
     /**

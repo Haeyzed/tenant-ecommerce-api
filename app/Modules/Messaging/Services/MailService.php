@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Messaging\Services;
 
 use App\Modules\Messaging\Mail\TemplatedMail;
+use App\Modules\Messaging\Support\MailBranding;
 use App\Modules\Settings\Services\TenantSettingsService;
 use Illuminate\Contracts\Mail\Mailer;
 use Illuminate\Mail\Mailable;
@@ -69,7 +70,8 @@ final class MailService
         $to ??= (string) $this->settings->get('store_contact_email');
 
         try {
-            $mail = new TemplatedMail('Test email', 'Your custom email settings work. Messages from your store will be sent with them.');
+            $mail = new TemplatedMail('Test email', 'Your custom email settings work. Messages from your store will be sent with them.',
+                ['tone' => 'success', 'eyebrow' => 'Email settings'], app(MailBranding::class)->for(platform: false));
             $mail->from((string) $config['from_address'], (string) ($config['from_name'] ?? $this->settings->get('store_name')));
 
             Mail::build(self::transportConfig($config))->to($to)->send($mail);

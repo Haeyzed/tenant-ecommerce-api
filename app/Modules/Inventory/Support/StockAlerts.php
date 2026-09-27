@@ -25,9 +25,34 @@ final readonly class StockAlerts
         private TenantSettingsService $settings,
     ) {}
 
+    /**
+     * The variant's threshold, then the product's, then the tenant setting
+     * (the same order as the stock-level query in InventoryService).
+     */
+    public function threshold(Product $product, ?ProductVariant $variant): int
+    {
+        return ($variant !== null ? self::own($variant) : null)
+            ?? self::own($product)
+            ?? (int) $this->settings->get('low_stock_threshold', 5);
+    }
+
+    /**
+     * Callers pass models loaded in many ways; one loaded without the
+     * column is read once rather than failing under strict mode.
+     */
+    private static function own(Product|ProductVariant $model): ?int
+    {
+        $attributes = $model->getAttributes();
+        $value = array_key_exists('low_stock_threshold', $attributes)
+            ? $attributes['low_stock_threshold']
+            : $model->newQuery()->withTrashed()->whereKey($model->getKey())->value('low_stock_threshold');
+
+        return $value === null ? null : (int) $value;
+    }
+
     public function evaluate(Product $product, ?ProductVariant $variant, string $before, string $after): void
     {
-        $threshold = Quantity::normalize((int) $this->settings->get('low_stock_threshold', 5));
+        $threshold = Quantity::normalize($this->threshold($product, $variant));
         $variables = [
             'product_name' => $variant === null ? $product->name : $product->name.' ('.$variant->sku.')',
             'sku' => (string) ($variant?->sku ?? $product->sku ?? '-'),

@@ -8,6 +8,7 @@ use App\Modules\Accounting\Support\AccountingOutbox;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\ProductVariant;
 use App\Modules\Catalog\Services\DigitalDownloadService;
+use App\Modules\Currency\Services\CurrencyService;
 use App\Modules\Customers\Models\Customer;
 use App\Modules\Documents\Services\InvoiceNumberService;
 use App\Modules\Inventory\Exceptions\InsufficientStockException;
@@ -85,6 +86,24 @@ final readonly class OrderService
     }
 
     /**
+     * exchange_rate_used of a new order: given as such (an exchange keeps
+     * its original order's), else the inverse of the quote's basket rate
+     * (1 base = exchange_rate order currency), else 1 (base currency).
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private static function toBaseRate(array $data): string
+    {
+        if (isset($data['exchange_rate_used'])) {
+            return bcadd((string) $data['exchange_rate_used'], '0', CurrencyService::SCALE);
+        }
+
+        $rate = (string) ($data['exchange_rate'] ?? '1');
+
+        return bccomp($rate, '1', CurrencyService::SCALE) === 0 ? bcadd('1', '0', CurrencyService::SCALE) : CurrencyService::toBaseRate($rate);
+    }
+
+    /**
      * The only order-creation primitive (§39.5): snapshots every line and
      * total, and reserves stock at the line warehouses in one pass.
      *
@@ -127,8 +146,10 @@ final readonly class OrderService
                 'shipping_tax_amount' => $totals['shipping_tax_amount'] ?? '0',
                 'tax_amount' => $totals['tax_amount'] ?? '0',
                 'total' => $totals['total'],
-                'base_currency_amount' => $totals['total'],
-                'exchange_rate_used' => '1',
+                // §48.2: captured once, never recomputed. exchange_rate_used is
+                // 1 order currency = x base; a quote's rate is 1 base = x order.
+                'exchange_rate_used' => $toBase = self::toBaseRate($data),
+                'base_currency_amount' => Money::round(bcmul((string) $totals['total'], $toBase, CurrencyService::SCALE), strtoupper((string) ($this->settings->get('default_currency') ?: 'USD'))),
                 'shipping_method_id' => $data['shipping_method_id'] ?? null,
                 'shipping_address' => $data['shipping_address'] ?? null,
                 'billing_address' => $data['billing_address'] ?? ($data['shipping_address'] ?? null),
