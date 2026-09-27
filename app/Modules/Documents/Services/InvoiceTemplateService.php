@@ -197,7 +197,7 @@ final readonly class InvoiceTemplateService
                 'subtotal' => $money($order->subtotal),
                 'discount' => Money::isPositive((string) $order->discount_amount) ? $money($order->discount_amount) : null,
                 'shipping' => $money(Money::sub((string) $order->shipping_amount, (string) $order->shipping_discount_amount)),
-                'tax' => $money(Money::add((string) $order->tax_amount, (string) $order->shipping_tax_amount)),
+                'tax' => $money($order->tax_amount),
                 'total' => $money($order->total),
                 'paid' => $money($netPaid),
                 'due' => $money(Money::max(Money::sub((string) $order->total, $netPaid), '0')),
@@ -210,7 +210,7 @@ final readonly class InvoiceTemplateService
             ])->values()->all(),
             'barcode' => $template->show_barcode ? $this->renderer->barcode($number) : null,
             'qr_code' => match (true) {
-                $zatca => $this->renderer->qrCode($this->zatcaPayload((string) $settings['store_name'], (string) $settings['vat_registration_number'], $issuedAt, (string) $order->total, Money::add((string) $order->tax_amount, (string) $order->shipping_tax_amount))),
+                $zatca => $this->renderer->qrCode($this->zatcaPayload((string) $settings['store_name'], (string) $settings['vat_registration_number'], $issuedAt, (string) $order->total, (string) $order->tax_amount)),
                 $template->show_qr_code => $this->renderer->qrCode($number),
                 default => null,
             },

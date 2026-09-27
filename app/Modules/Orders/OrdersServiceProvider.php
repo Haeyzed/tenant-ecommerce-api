@@ -39,24 +39,11 @@ final class OrdersServiceProvider extends ServiceProvider
             $usage->register('orders', static fn (Warehouse $w): bool => OrderItem::query()->where('warehouse_id', $w->id)->exists());
         });
 
-        // Orders are financial records: they stay, without personal data.
-        $this->app->afterResolving(CustomerPrivacyRegistry::class, static function (CustomerPrivacyRegistry $privacy): void {
-            $privacy->registerEraser('orders', static function (Customer $customer): void {
-                Order::withTrashed()->where('customer_id', $customer->id)->get()->each(static function (Order $order): void {
-                    $keep = static fn (?array $address): ?array => $address === null ? null
-                        : ['country_id' => $address['country_id'] ?? null, 'state_id' => $address['state_id'] ?? null];
-
-                    $order->forceFill([
-                        'customer_name' => 'Deleted customer',
-                        'customer_email' => null,
-                        'customer_phone' => null,
-                        'guest_token' => null,
-                        'shipping_address' => $keep($order->shipping_address),
-                        'billing_address' => $keep($order->billing_address),
-                        'customer_note' => null,
-                    ])->saveQuietly();
-                });
-            });
+        // Orders are financial records: they stay, and lose their personal
+        // snapshots once settled (§26.4 step 3); the daily maintenance job
+        // finishes orders still open at erasure.
+        $this->app->afterResolving(CustomerPrivacyRegistry::class, function (CustomerPrivacyRegistry $privacy): void {
+            $privacy->registerEraser('orders', fn (Customer $customer): int => $this->app->make(OrderService::class)->anonymizeSettledOrders($customer));
 
             $privacy->registerSection('orders', static fn (Customer $customer): iterable => Order::query()->with('items')
                 ->where('customer_id', $customer->id)->orderBy('id')->get()

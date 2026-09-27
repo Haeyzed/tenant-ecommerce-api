@@ -8,9 +8,11 @@ use App\Modules\Plans\Enums\ModuleState;
 use App\Modules\Plans\Services\FeatureAccessService;
 use App\Modules\Plans\Support\ModuleRegistry;
 use App\Modules\Tenancy\Models\Tenant;
+use Database\Seeders\Tenant\AccountingDefaultsSeeder;
 use Database\Seeders\Tenant\CatalogDefaultsSeeder;
 use Database\Seeders\Tenant\CmsDefaultsSeeder;
 use Database\Seeders\Tenant\CustomerDefaultsSeeder;
+use Database\Seeders\Tenant\DocumentDefaultsSeeder;
 use Database\Seeders\Tenant\NotificationTemplateSeeder;
 use Database\Seeders\Tenant\ReturnDefaultsSeeder;
 use Illuminate\Contracts\Container\Container;
@@ -36,6 +38,8 @@ final class TenantDefaultsSyncService
         CustomerDefaultsSeeder::class,
         CatalogDefaultsSeeder::class,
         ReturnDefaultsSeeder::class,
+        DocumentDefaultsSeeder::class,
+        AccountingDefaultsSeeder::class,
     ];
 
     public function __construct(

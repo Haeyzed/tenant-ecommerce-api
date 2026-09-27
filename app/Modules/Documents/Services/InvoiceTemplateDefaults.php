@@ -34,8 +34,9 @@ final class InvoiceTemplateDefaults
 
         if (! BarcodeSetting::query()->exists()) {
             $setting = new BarcodeSetting([
-                'name' => 'A4 sheet, 3 x 7', 'label_layout' => 'continuous', 'top_margin_inches' => '0.500', 'left_margin_inches' => '0.250',
-                'sticker_width_inches' => '2.600', 'sticker_height_inches' => '1.400', 'paper_width_inches' => '8.270', 'paper_height_inches' => '11.690',
+                // Standard A4 21-up stock (63.5 × 38.1 mm), inside printers' unprintable edge.
+                'name' => 'A4 sheet, 3 x 7', 'label_layout' => 'continuous', 'top_margin_inches' => '0.600', 'left_margin_inches' => '0.280',
+                'sticker_width_inches' => '2.500', 'sticker_height_inches' => '1.500', 'paper_width_inches' => '8.270', 'paper_height_inches' => '11.690',
                 'stickers_per_row' => 3, 'row_distance_inches' => '0.000', 'column_distance_inches' => '0.100', 'stickers_per_sheet' => 21,
             ]);
             $setting->forceFill(['is_default' => true])->save();

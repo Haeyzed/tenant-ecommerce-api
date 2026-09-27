@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Returns\Services;
 
+use App\Modules\Accounting\Support\AccountingOutbox;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\ProductVariant;
 use App\Modules\Checkout\Services\CheckoutService;
@@ -307,6 +308,8 @@ final readonly class ReturnService
             return;
         }
 
+        $cost = Money::normalize(0);
+
         foreach ($return->items()->with(['orderItem.product.bundleItems', 'orderItem.variant', 'orderItem.warehouse'])->get() as $item) {
             $line = $item->orderItem;
 
@@ -317,6 +320,15 @@ final readonly class ReturnService
             $this->inventory->applyOrderLines([['warehouse' => $line->warehouse, 'product' => $line->product, 'variant' => $line->variant, 'quantity' => (string) $item->quantity]],
                 'restock', $return, 'return_restock');
             $item->forceFill(['restocked' => true])->save();
+
+            if ($line->unit_cost_snapshot !== null) {
+                $cost = Money::add($cost, Money::mul((string) $line->unit_cost_snapshot, (string) $item->quantity));
+            }
+        }
+
+        // The restocked cost goes back into inventory (§57.3 postReturnRestock).
+        if (Money::isPositive($cost)) {
+            app(AccountingOutbox::class)->record('postReturnRestock', $return, now(), 'return_restock:'.$return->id, ['cost' => $cost]);
         }
     }
 

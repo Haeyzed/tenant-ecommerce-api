@@ -193,7 +193,7 @@ final readonly class InventoryService
      * @param  array{search?: string, per_page?: int}  $filters
      * @return LengthAwarePaginator<int, object>
      */
-    public function getLowStockProducts(?Warehouse $warehouse = null, array $filters = []): LengthAwarePaginator
+    public function getLowStockProducts(Warehouse|array|null $warehouse = null, array $filters = []): LengthAwarePaginator
     {
         $threshold = (int) $this->settings->get('low_stock_threshold', 5);
 
@@ -210,7 +210,7 @@ final readonly class InventoryService
      * @param  array{search?: string, per_page?: int}  $filters
      * @return LengthAwarePaginator<int, object>
      */
-    public function getOutOfStockProducts(?Warehouse $warehouse = null, array $filters = []): LengthAwarePaginator
+    public function getOutOfStockProducts(Warehouse|array|null $warehouse = null, array $filters = []): LengthAwarePaginator
     {
         return $this->stockLevels($warehouse, $filters)
             ->whereRaw('(COALESCE(s.quantity, 0) - COALESCE(s.reserved, 0)) <= 0')
@@ -586,14 +586,34 @@ final readonly class InventoryService
     }
 
     /**
+     * Low-stock and out-of-stock item counts with the same definitions as
+     * the lists above (§44.2), across the given warehouses or all active
+     * ones.
+     *
+     * @param  list<int>|null  $warehouseIds
+     * @return array{low: int, out: int}
+     */
+    public function stockCounts(?array $warehouseIds = null): array
+    {
+        $threshold = (int) $this->settings->get('low_stock_threshold', 5);
+        $row = DB::connection('tenant')->query()->fromSub($this->stockLevels($warehouseIds, [])->reorder(), 'levels')
+            ->selectRaw('SUM(CASE WHEN available > 0 AND available <= ? THEN 1 ELSE 0 END) as low', [$threshold])
+            ->selectRaw('SUM(CASE WHEN available <= 0 THEN 1 ELSE 0 END) as out_of_stock')
+            ->first();
+
+        return ['low' => (int) ($row->low ?? 0), 'out' => (int) ($row->out_of_stock ?? 0)];
+    }
+
+    /**
+     * @param  Warehouse|list<int>|null  $warehouse  one warehouse, a set of warehouse ids, or every active one
      * @param  array{search?: string}  $filters
      */
-    private function stockLevels(?Warehouse $warehouse, array $filters): Builder
+    private function stockLevels(Warehouse|array|null $warehouse, array $filters): Builder
     {
         $sums = DB::connection('tenant')->table('inventory as si')
             ->join('warehouses as sw', 'sw.id', '=', 'si.warehouse_id')
             ->when($warehouse !== null,
-                static fn (Builder $q) => $q->where('si.warehouse_id', $warehouse?->id),
+                static fn (Builder $q) => is_array($warehouse) ? $q->whereIn('si.warehouse_id', $warehouse) : $q->where('si.warehouse_id', $warehouse->id),
                 static fn (Builder $q) => $q->where('sw.is_active', true))
             ->groupBy('si.product_id', 'si.variant_key')
             ->selectRaw('si.product_id, si.variant_key, SUM(si.quantity) as quantity, SUM(si.reserved_quantity) as reserved');

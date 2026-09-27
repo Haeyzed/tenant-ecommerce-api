@@ -27,6 +27,7 @@ use App\Modules\Cms\Models\ContactSubmission;
 use App\Modules\Customers\Models\Customer;
 use App\Modules\Customers\Models\CustomerGroup;
 use App\Modules\CustomFields\Models\CustomFieldDefinition;
+use App\Modules\Documents\Models\InvoiceTemplate;
 use App\Modules\Exports\Models\DataExport;
 use App\Modules\Inventory\Models\StockAdjustment;
 use App\Modules\Inventory\Models\StockTransfer;
@@ -50,10 +51,10 @@ use App\Modules\PlatformSupport\Models\PlatformSupportMessageAttachment;
 use App\Modules\Promotions\Models\Coupon;
 use App\Modules\Promotions\Models\FlashSale;
 use App\Modules\Promotions\Models\Promotion;
+use App\Modules\Returns\Models\OrderReturn;
 use App\Modules\Settings\Models\PlatformSetting;
 use App\Modules\Settings\Models\StorefrontSetting;
 use App\Modules\Settings\Models\TenantPlatformSetting;
-use App\Modules\Returns\Models\OrderReturn;
 use App\Modules\Shipping\Models\DeliveryAssignment;
 use App\Modules\Shipping\Models\Driver;
 use App\Modules\Shipping\Models\Shipment;
@@ -143,6 +144,7 @@ final class MorphMap
         'shipment' => Shipment::class,
         'order_return' => OrderReturn::class,
         'delivery_assignment' => DeliveryAssignment::class,
+        'invoice_template' => InvoiceTemplate::class,
         'storefront_setting' => StorefrontSetting::class,
         'data_export' => DataExport::class,
         'custom_field_definition' => CustomFieldDefinition::class,

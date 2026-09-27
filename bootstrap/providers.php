@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Modules\Cart\CartServiceProvider;
 use App\Modules\Catalog\CatalogServiceProvider;
+use App\Modules\Documents\DocumentsServiceProvider;
 use App\Modules\Inventory\InventoryServiceProvider;
 use App\Modules\Orders\OrdersServiceProvider;
 use App\Modules\Promotions\PromotionsServiceProvider;
@@ -24,4 +25,5 @@ return [
     OrdersServiceProvider::class,
     ReturnsServiceProvider::class,
     ReviewsServiceProvider::class,
+    DocumentsServiceProvider::class,
 ];

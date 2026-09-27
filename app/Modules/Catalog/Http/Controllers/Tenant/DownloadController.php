@@ -30,7 +30,7 @@ final class DownloadController extends Controller
             'id' => $g->id,
             'order_number' => $g->orderItem->order->order_number,
             'item_name' => $g->orderItem->name_snapshot,
-            'file_name' => $g->file->getFirstMedia('file')?->file_name,
+            'file_name' => $g->file->getFirstMedia('file')?->name,
             'download_count' => $g->download_count,
             'download_limit' => $g->download_limit,
             'expires_at' => $g->expires_at?->toIso8601String(),

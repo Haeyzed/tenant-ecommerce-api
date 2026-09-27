@@ -11,6 +11,7 @@ use App\Modules\Payments\Jobs\CheckRefundOutcome;
 use App\Modules\Payments\Jobs\VerifyOrderPayment;
 use App\Modules\Payments\Models\OrderPayment;
 use App\Modules\Payments\Models\TenantPaymentSetting;
+use App\Modules\Payments\Support\PaymentPostings;
 use App\Modules\Returns\Models\OrderReturn;
 use App\Modules\Returns\Services\ReturnService;
 use App\Modules\Tenancy\Models\Tenant;
@@ -38,6 +39,7 @@ final readonly class OrderPaymentService
         private PaymentGatewayFactory $factory,
         private OrderService $orders,
         private NotificationDispatchService $notifications,
+        private PaymentPostings $postings,
     ) {}
 
     public static function modeOf(Order $order): string
@@ -228,6 +230,7 @@ final readonly class OrderPaymentService
                     'provider_reference' => $verified['provider_reference'] ?? $locked->provider_reference,
                     'meta' => [...(array) $locked->meta, 'fee' => $verified['fee'] ?? null],
                 ])->save();
+                $this->postings->payment($locked);
                 $outcome = 'successful';
             } else {
                 $locked->forceFill(['status' => OrderPayment::FAILED, 'meta' => [...(array) $locked->meta, 'failure_reason' => $verified['failure_reason'] ?? 'declined']])->save();
@@ -327,6 +330,7 @@ final readonly class OrderPaymentService
             ])->save();
 
             if (! $gateway) {
+                $this->postings->reversal($row);
                 $this->orders->recalculatePaymentStatus($original->order);
             }
 
@@ -436,6 +440,7 @@ final readonly class OrderPaymentService
             $refund->setRawAttributes($locked->getAttributes(), true);
 
             if ($status === OrderPayment::SUCCESSFUL) {
+                $this->postings->reversal($locked);
                 $this->orders->recalculatePaymentStatus($locked->order);
             }
 
@@ -619,6 +624,8 @@ final readonly class OrderPaymentService
             'paid_at' => now(),
             'meta' => ['late_success_of' => $failed->id, 'fee' => $verified['fee'] ?? null],
         ])->save();
+
+        $this->postings->payment($row);
 
         $this->orders->recalculatePaymentStatus($failed->order);
 

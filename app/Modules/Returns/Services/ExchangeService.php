@@ -10,6 +10,7 @@ use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Services\OrderService;
 use App\Modules\Payments\Models\OrderPayment;
 use App\Modules\Payments\Services\OrderPaymentService;
+use App\Modules\Payments\Support\PaymentPostings;
 use App\Modules\Returns\Models\OrderReturn;
 use App\Modules\Settings\Services\TenantSettingsService;
 use App\Modules\Tax\Services\TaxService;
@@ -121,6 +122,7 @@ final readonly class ExchangeService
                     'paid_at' => now(),
                     'notes' => 'Exchange credit from return '.$locked->return_number,
                 ])->save();
+                app(PaymentPostings::class)->payment($payment);
             }
 
             $this->orders->recalculatePaymentStatus($replacement);

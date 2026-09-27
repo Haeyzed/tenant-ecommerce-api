@@ -7,6 +7,7 @@ namespace App\Modules\Payments\Services;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Services\OrderService;
 use App\Modules\Payments\Models\OrderPayment;
+use App\Modules\Payments\Support\PaymentPostings;
 use App\Modules\Users\Models\User;
 use App\Shared\Exceptions\ApiException;
 use App\Shared\Support\Money;
@@ -25,6 +26,7 @@ final readonly class OrderPaymentLedgerService
     public function __construct(
         private OrderService $orders,
         private OrderPaymentService $payments,
+        private PaymentPostings $postings,
     ) {}
 
     /**
@@ -71,6 +73,7 @@ final readonly class OrderPaymentLedgerService
                 'notes' => $validated['notes'] ?? null,
             ])->save();
 
+            $this->postings->payment($row);
             $this->orders->recalculatePaymentStatus($order);
 
             return $row;
@@ -100,7 +103,14 @@ final readonly class OrderPaymentLedgerService
                 'amount_paid' => isset($validated['amount']) ? Money::normalize((string) $validated['amount']) : null,
                 'notes' => $validated['notes'] ?? null,
                 'paid_at' => $validated['paid_at'] ?? null,
-            ], static fn ($v): bool => $v !== null))->save();
+            ], static fn ($v): bool => $v !== null));
+
+            $reposts = $locked->isDirty(['payment_method', 'amount_paid', 'paid_at']);
+            $locked->save();
+
+            if ($reposts) {
+                $this->postings->edited($locked);
+            }
 
             $payment->setRawAttributes($locked->getAttributes(), true);
             $this->orders->recalculatePaymentStatus($locked->order);
@@ -119,6 +129,7 @@ final readonly class OrderPaymentLedgerService
 
         DB::connection('tenant')->transaction(function () use ($payment): void {
             $order = $payment->order;
+            $this->postings->deleted($payment);
             $payment->delete();
             $this->orders->recalculatePaymentStatus($order);
         });

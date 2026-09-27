@@ -7,7 +7,15 @@ use App\Modules\Billing\Metrics\PaymentMetrics;
 use App\Modules\Billing\Metrics\PlanMetrics;
 use App\Modules\Billing\Metrics\RevenueMetrics;
 use App\Modules\Billing\Metrics\SubscriptionMetrics;
+use App\Modules\Catalog\Metrics\CatalogMetrics;
+use App\Modules\Customers\Metrics\CustomerMetrics;
 use App\Modules\Dashboard\Metrics\OperationsMetrics;
+use App\Modules\Inventory\Metrics\InventoryMetrics;
+use App\Modules\Orders\Metrics\OrderMetrics;
+use App\Modules\Orders\Metrics\SalesMetrics;
+use App\Modules\Payments\Metrics\PaymentMetrics as TenantPaymentMetrics;
+use App\Modules\Promotions\Metrics\PromotionMetrics;
+use App\Modules\Returns\Metrics\ReturnMetrics;
 use App\Modules\Tenancy\Metrics\TenantMetrics;
 
 /*
@@ -105,7 +113,77 @@ return [
         ],
     ],
 
-    // Tenant sections are registered with the tenant dashboard (§44).
-    'tenant' => [],
+    // Tenant sections (§44.3). A tenant section may also name a 'feature'
+    // (an optional module key); it is listed and served only while that
+    // module is readable. Optional modules add their sections as built.
+    'tenant' => [
+        'overview' => [
+            'label' => 'Overview',
+            'feature' => 'core',
+            'permission' => 'orders.view',
+            'parts' => [
+                [SalesMetrics::class, 'overview'],
+                [CustomerMetrics::class, 'overview', 'customers.view'],
+                [InventoryMetrics::class, 'overview', 'inventory.view'],
+            ],
+            'alerts' => [],
+        ],
+        'sales' => [
+            'label' => 'Sales',
+            'feature' => 'core',
+            'permission' => 'orders.view',
+            'parts' => [[SalesMetrics::class, 'sales']],
+            'alerts' => [],
+        ],
+        'orders' => [
+            'label' => 'Orders',
+            'feature' => 'core',
+            'permission' => 'orders.view',
+            'parts' => [[OrderMetrics::class, 'orders']],
+            'alerts' => [[OrderMetrics::class, 'alerts']],
+        ],
+        'customers' => [
+            'label' => 'Customers',
+            'feature' => 'core',
+            'permission' => 'customers.view',
+            'parts' => [[CustomerMetrics::class, 'customers']],
+            'alerts' => [],
+        ],
+        'catalogue' => [
+            'label' => 'Catalogue',
+            'feature' => 'core',
+            'permission' => 'products.view',
+            'parts' => [[CatalogMetrics::class, 'catalogue']],
+            'alerts' => [],
+        ],
+        'inventory' => [
+            'label' => 'Inventory',
+            'feature' => 'core',
+            'permission' => 'inventory.view',
+            'parts' => [[InventoryMetrics::class, 'inventory']],
+            'alerts' => [[InventoryMetrics::class, 'alerts']],
+        ],
+        'promotions' => [
+            'label' => 'Promotions',
+            'feature' => 'core',
+            'permission' => 'promotions.view',
+            'parts' => [[PromotionMetrics::class, 'promotions']],
+            'alerts' => [],
+        ],
+        'payments' => [
+            'label' => 'Payments',
+            'feature' => 'core',
+            'permission' => 'order-payments.view',
+            'parts' => [[TenantPaymentMetrics::class, 'payments']],
+            'alerts' => [[TenantPaymentMetrics::class, 'alerts']],
+        ],
+        'returns' => [
+            'label' => 'Returns',
+            'feature' => 'core',
+            'permission' => 'returns.view',
+            'parts' => [[ReturnMetrics::class, 'returns']],
+            'alerts' => [[ReturnMetrics::class, 'alerts']],
+        ],
+    ],
 
 ];

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Inventory\Services;
 
+use App\Modules\Accounting\Support\AccountingOutbox;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\ProductVariant;
 use App\Modules\Inventory\Models\Inventory;
@@ -147,6 +148,7 @@ final readonly class StockAdjustmentService
             })->values()->all(), $locked);
 
             $locked->forceFill(['status' => StockAdjustment::SUBMITTED, 'submitted_at' => now()])->save();
+            app(AccountingOutbox::class)->record('postStockAdjustment', $locked, now(), 'stock_adjustment:'.$locked->id);
         });
 
         return $this->getAdjustment($adjustment->refresh());

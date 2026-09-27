@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Orders\Services;
 
+use App\Modules\Accounting\Support\AccountingOutbox;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\ProductVariant;
 use App\Modules\Catalog\Services\DigitalDownloadService;
@@ -20,6 +21,7 @@ use App\Modules\Payments\Models\OrderPayment;
 use App\Modules\Plans\Services\PlanLimitService;
 use App\Modules\Promotions\Services\FlashSaleService;
 use App\Modules\Promotions\Services\PromotionRedemptionService;
+use App\Modules\Settings\Services\PlatformSettingsService;
 use App\Modules\Settings\Services\TenantSettingsService;
 use App\Modules\Tenancy\Models\Tenant;
 use App\Modules\Users\Models\User;
@@ -57,6 +59,8 @@ final readonly class OrderService
         private UsageCounterRegistry $counters,
         private InvoiceNumberService $invoiceNumbers,
         private DigitalDownloadService $downloads,
+        private PlatformSettingsService $platformSettings,
+        private AccountingOutbox $outbox,
     ) {}
 
     /**
@@ -215,6 +219,7 @@ final readonly class OrderService
 
             $locked->save();
             $this->downloads->grantForOrder($locked);
+            $this->outbox->record('postOrderSale', $locked, $locked->confirmed_at ?? now(), 'order_sale:'.$locked->id);
             $order->setRawAttributes($locked->getAttributes(), true);
 
             return true;
@@ -412,6 +417,7 @@ final readonly class OrderService
             if ($locked->confirmed_at !== null) {
                 $this->moveStock($locked, 'restock', 'order_cancelled');
                 $this->redemptions->reverse($locked);
+                $this->outbox->record('reverseOrderSale', $locked, now(), 'order_sale_reversal:'.$locked->id);
             } else {
                 $this->moveStock($locked, 'release');
                 $this->redemptions->release($locked);
@@ -583,6 +589,58 @@ final readonly class OrderService
 
         return Order::query()->whereNull('customer_id')->where('guest_token', $guestToken)->where('customer_email', strtolower($customer->email))
             ->update(['customer_id' => $customer->id]);
+    }
+
+    /**
+     * Personal snapshots of an anonymised customer's orders (§26.4 step 3),
+     * once each order is settled: finished (delivered, completed, cancelled
+     * or refunded), past the return window (none configured: at
+     * completion), and with no open return, pending refund or pending
+     * chargeback. Orders stay as financial records. Runs at erasure and
+     * daily for orders that settle later.
+     *
+     * @return int the number of orders anonymised
+     */
+    public function anonymizeSettledOrders(?Customer $customer = null): int
+    {
+        $days = $this->settings->get('return_window_days') ?? $this->platformSettings->get('default_return_window_days');
+        $windowStart = $days === null ? now() : now()->subDays((int) $days);
+        $count = 0;
+
+        // At erasure the customer is not yet marked anonymised (erasers run first).
+        Order::withTrashed()
+            ->when($customer !== null,
+                static fn (Builder $q) => $q->where('customer_id', $customer?->id),
+                static fn (Builder $q) => $q->whereIn('customer_id', Customer::withTrashed()->select('id')->whereNotNull('anonymized_at')))
+            // Not yet anonymised (the address keeps its region, so it is not a marker).
+            ->where(static fn (Builder $q) => $q->where('customer_name', '!=', 'Deleted customer')->orWhereNull('customer_name')
+                ->orWhereNotNull('customer_email')->orWhereNotNull('customer_phone')->orWhereNotNull('guest_token'))
+            ->where(static fn (Builder $q) => $q->whereIn('status', [Order::CANCELLED, Order::REFUNDED])
+                ->orWhere(static fn (Builder $done) => $done->whereIn('status', [Order::DELIVERED, Order::COMPLETED])
+                    ->where(static fn (Builder $w) => $w->whereNull('completed_at')->orWhere('completed_at', '<=', $windowStart))))
+            ->whereNotExists(static fn ($q) => $q->from('order_returns')->whereColumn('order_returns.order_id', 'orders.id')
+                ->whereNotIn('status', ['rejected', 'refunded', 'exchanged', 'closed']))
+            ->whereNotExists(static fn ($q) => $q->from('order_payments')->whereColumn('order_payments.order_id', 'orders.id')
+                ->whereIn('kind', [OrderPayment::REFUND, OrderPayment::CHARGEBACK])->where('status', OrderPayment::PENDING))
+            ->chunkById(200, static function ($orders) use (&$count): void {
+                foreach ($orders as $order) {
+                    $keep = static fn (?array $address): ?array => $address === null ? null
+                        : ['country_id' => $address['country_id'] ?? null, 'state_id' => $address['state_id'] ?? null];
+
+                    $order->forceFill([
+                        'customer_name' => 'Deleted customer',
+                        'customer_email' => null,
+                        'customer_phone' => null,
+                        'guest_token' => null,
+                        'shipping_address' => $keep($order->shipping_address),
+                        'billing_address' => $keep($order->billing_address),
+                        'customer_note' => null,
+                    ])->saveQuietly();
+                    $count++;
+                }
+            });
+
+        return $count;
     }
 
     /**

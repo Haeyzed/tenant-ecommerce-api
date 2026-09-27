@@ -132,6 +132,7 @@ final class DigitalDownloadService
             }
         }
 
-        return $disk->download($media->getPathRelativeToRoot(), $media->file_name);
+        // The stored name is a UUID; the buyer gets the uploaded name.
+        return $disk->download($media->getPathRelativeToRoot(), $media->name !== '' ? $media->name : $media->file_name);
     }
 }
