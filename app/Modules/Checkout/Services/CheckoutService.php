@@ -143,6 +143,7 @@ final readonly class CheckoutService
                 'customer_email' => $customer?->email ?? $validated['guest_email'],
                 'customer_phone' => $customer?->phone ?? ($validated['guest_phone'] ?? $shippingAddress['phone'] ?? null),
                 'currency_code' => $quote->currency,
+                'exchange_rate' => $quote->exchangeRate,
                 'prices_include_tax' => $quote->pricesIncludeTax,
                 'lines' => array_values(array_map(static fn (array $l): array => [
                     'product' => $l['product'],

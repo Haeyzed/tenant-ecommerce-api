@@ -6,6 +6,8 @@ use App\Modules\Catalog\Models\ProductQuestion;
 use App\Modules\Catalog\Services\ProductQuestionService;
 use App\Modules\Inventory\Models\StockAdjustment;
 use App\Modules\Inventory\Services\StockAdjustmentService;
+use App\Modules\Purchasing\Models\PurchaseOrder;
+use App\Modules\Purchasing\Services\PurchaseOrderService;
 use App\Modules\Returns\Models\OrderReturn;
 use App\Modules\Returns\Services\ReturnService;
 use App\Modules\Reviews\Models\ProductReview;
@@ -56,6 +58,15 @@ return [
         'service' => ProductQuestionService::class,
         'feature' => 'core',
         'conditions' => [],
+    ],
+
+    // min_amount: the order total in the base currency.
+    'purchase_order' => [
+        'label' => 'Purchase orders',
+        'model' => PurchaseOrder::class,
+        'service' => PurchaseOrderService::class,
+        'feature' => 'purchasing',
+        'conditions' => ['min_amount'],
     ],
 
 ];

@@ -265,5 +265,6 @@ return [
         "Hello {{seller_name}},\n\nYour product {{product_name}} was not approved: {{moderation_note}}"),
     'quotation_request.sent' => $n(['supplier'], ['email' => true],
         'Request for quotation {{request_number}} from {{store_name}}',
-        "Hello {{supplier_name}},\n\n{{store_name}} requests a quotation for the items in request {{request_number}}, by {{respond_by}}: {{request_url}}"),
+        // Suppliers have no login (§49): the items are in the email and the answer is a reply.
+        "Hello {{supplier_name}},\n\n{{store_name}} requests a quotation for request {{request_number}}, by {{respond_by}}:\n\n{{items}}\n\nPlease reply to this email with your unit price and lead time for each item."),
 ];

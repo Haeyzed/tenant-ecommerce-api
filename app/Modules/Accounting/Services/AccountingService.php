@@ -22,6 +22,9 @@ use App\Modules\Notifications\Services\NotificationDispatchService;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Models\OrderItem;
 use App\Modules\Payments\Models\OrderPayment;
+use App\Modules\Purchasing\Models\PurchaseOrder;
+use App\Modules\Purchasing\Models\PurchaseReturn;
+use App\Modules\Purchasing\Models\SupplierPayment;
 use App\Modules\Returns\Models\OrderReturn;
 use App\Modules\Settings\Services\TenantSettingsService;
 use App\Modules\Users\Models\User;
@@ -158,6 +161,9 @@ final class AccountingService
             'postStockAdjustment' => $this->postStockAdjustment($record, $request, $date),
             'postExpense' => $this->postExpense($record, $request, $date),
             'postIncome' => $this->postIncome($record, $request, $date),
+            'postPurchaseOrderReceived' => $this->postPurchaseOrderReceived($record, $request, $date),
+            'postSupplierPayment' => $this->postSupplierPayment($record, $request, $date),
+            'postPurchaseReturn' => $this->postPurchaseReturn($record, $request, $date),
             default => throw new PostingException("Unknown posting method [{$request->method}]."),
         };
     }
@@ -395,6 +401,67 @@ final class AccountingService
         return $this->write($request, $date, 'Expense: '.$expense->category->name, $expense, [
             [$debit, JournalEntryLine::DEBIT, $amount, $expense->description === null ? null : mb_substr($expense->description, 0, 255)],
             [$this->cash($expense->paid_from_account_id), JournalEntryLine::CREDIT, $amount, null],
+        ]);
+    }
+
+    /**
+     * Dr Inventory Asset, Cr Accounts Payable for one receipt (§49.2). The
+     * received value (order currency) and the order's rate are snapshotted
+     * in the payload.
+     */
+    private function postPurchaseOrderReceived(Model $order, AccountingPostingRequest $request, Carbon $date): ?JournalEntry
+    {
+        if (! $order instanceof PurchaseOrder) {
+            return null;
+        }
+
+        $payload = (array) $request->payload;
+        $value = $this->base((string) ($payload['value'] ?? '0'), (string) ($payload['rate'] ?? $order->toBaseRate()));
+
+        return $this->write($request, $date, 'Stock received, purchase order '.$order->po_number, $order, [
+            [$this->system('inventory_asset'), JournalEntryLine::DEBIT, $value, null],
+            [$this->system('accounts_payable'), JournalEntryLine::CREDIT, $value, null],
+        ]);
+    }
+
+    /**
+     * Dr Accounts Payable, Cr Cash (the row's account, else cash_bank); a
+     * negative amount (the supplier refunded) reverses the sides (§49.4).
+     */
+    private function postSupplierPayment(Model $payment, AccountingPostingRequest $request, Carbon $date): ?JournalEntry
+    {
+        if (! $payment instanceof SupplierPayment) {
+            return null;
+        }
+
+        $payload = (array) $request->payload;
+        $amount = Money::normalize((string) ($payload['amount'] ?? $payment->amount_paid));
+        $refund = Money::cmp($amount, '0') < 0;
+        $value = $this->base($refund ? Money::sub('0', $amount) : $amount, (string) ($payload['rate'] ?? $payment->exchange_rate_used ?? '1'));
+        $cash = $this->cash($payload['account_id'] ?? $payment->account_id);
+        $payable = $this->system('accounts_payable');
+
+        return $this->write($request, $date, ($refund ? 'Supplier refund' : 'Supplier payment').($payment->reference === null ? '' : ' '.$payment->reference), $payment, [
+            [$refund ? $cash : $payable, JournalEntryLine::DEBIT, $value, null],
+            [$refund ? $payable : $cash, JournalEntryLine::CREDIT, $value, null],
+        ]);
+    }
+
+    /**
+     * Dr Accounts Payable, Cr Inventory Asset for the returned value (§49.5).
+     */
+    private function postPurchaseReturn(Model $return, AccountingPostingRequest $request, Carbon $date): ?JournalEntry
+    {
+        if (! $return instanceof PurchaseReturn) {
+            return null;
+        }
+
+        $payload = (array) $request->payload;
+        $value = $this->base((string) ($payload['value'] ?? '0'), (string) ($payload['rate'] ?? '1'));
+
+        return $this->write($request, $date, 'Purchase return '.$return->number(), $return, [
+            [$this->system('accounts_payable'), JournalEntryLine::DEBIT, $value, null],
+            [$this->system('inventory_asset'), JournalEntryLine::CREDIT, $value, null],
         ]);
     }
 

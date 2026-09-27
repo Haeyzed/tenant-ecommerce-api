@@ -673,7 +673,146 @@ With NGN prices in place, your unpaid store (NGN) now sees and pays NGN (§8.0).
 
 ---
 
-## 10. Troubleshooting
+## 10. Selling in more currencies (multi-currency) ➡ you
+
+Your store's **base currency** (NGN for Softmaxtech) is what accounting and reports use. Multi-currency lets shoppers buy in other currencies too. It's included from the **Standard** plan.
+
+### 10.1 Set it up (store admin, owner token)
+
+```http
+POST /admin/modules/multi_currency/enable
+POST /admin/currencies                          { "currency_code": "USD", "display_symbol": "$", "rate": "0.00065" }
+```
+
+`rate` means **1 base = rate of this currency**, so 1 NGN = 0.00065 USD, or about ₦1,538 per $1.
+
+A currency is offered to shoppers only when it is **active and has a rate**. `GET /admin/currencies` shows `is_offered` for each.
+
+**Rates:**
+
+| How | Request | Notes |
+|---|---|---|
+| By hand (default) | `PUT /admin/currencies/{id}/rate { "rate": "0.00065" }` | `rate_source: manual`. Never overwritten automatically. |
+| Automatically, daily | Set `FX_PROVIDER=open_er_api` in `.env` (free, no key) | Fetched once a day by the store's daily maintenance, or now with `POST /admin/currencies/refresh-rates` |
+| Back to automatic | `DELETE /admin/currencies/{id}/rate` | The provider fills it on the next refresh |
+
+**Fixed market prices (optional):** set a deliberate price per product (or variant) and currency. It always wins over the converted estimate:
+
+```http
+POST  /admin/products/{product}/prices          { "currency_code": "USD", "price": "30", "compare_at_price": "35", "product_variant_id": null }
+PATCH /admin/products/{product}/prices/{price}  { "price": "29" }
+GET   /admin/products/{product}/prices
+```
+
+Other routes:
+- `PATCH /admin/currencies/{id}/deactivate` stops offering a currency. Carts in it fall back to the base currency.
+- `POST /admin/currencies/{id}/set-base` changes the base currency, **only before the first order or journal entry**.
+- `GET /admin/accounting/reports/currency-exposure` shows unpaid balances by currency, with their base value. It needs accounting.
+
+### 10.2 What shoppers get (storefront)
+
+- `GET /storefront/config` returns `formatting.currencies`, the currencies on offer. Use it for a currency switcher.
+- Catalogue pages take `?currency=USD`: `GET /products?currency=USD`, `/products/{slug}?currency=USD`, and so on. Each price comes with `currency_code` and `is_estimated`. `true` means converted at the rate, so show it as "≈ $3.25". `false` means your fixed price, or the base currency.
+- `PATCH /cart/currency { "currency_code": "USD" }` switches the cart. Its quote is then fully in USD: items, shipping (converted), discounts and tax.
+- The order is created and paid in USD. Only payment providers that support USD are offered.
+- The order stores the rate used and its total in NGN (`exchange_rate_used`, `base_currency_amount`). These never change afterwards; accounting and reports use them.
+
+### 10.3 After pulling this step ➡ you (once)
+
+```powershell
+php artisan tenants:migrate        # adds the currency tables
+php artisan config:clear
+```
+
+Then restart the queue worker. The base currency row is created automatically.
+
+---
+
+## 11. Buying stock from suppliers (purchasing) ➡ you
+
+Purchasing is included from the **Standard** plan. Enable it with `POST /admin/modules/purchasing/enable`. Five default return reasons are created the first time.
+
+### 11.1 The everyday flow
+
+```http
+POST  /admin/suppliers                          { "name": "Lagos Leather", "email": "sales@leather.test", "payment_terms": "Net 30" }
+POST  /admin/suppliers/{id}/products            { "product_id": 12, "supplier_sku": "LL-RUN", "cost_price": "18000" }
+GET   /admin/purchase-orders/product-lookup?q=run        (product picker, with stock on hand)
+POST  /admin/purchase-orders                    { "supplier_id": 1, "warehouse_id": 1, "items": [{ "product_id": 12, "quantity": 10 }] }
+PATCH /admin/purchase-orders/{id}/submit
+PATCH /admin/purchase-orders/{id}/receive       { "items": [{ "purchase_order_item_id": 5, "quantity": 4 }] }
+```
+
+- A line without `unit_cost` uses the supplier's cost for that product, then the product's cost price.
+- Receiving **adds stock** to the order's warehouse. You can receive in parts: the status goes `partially_received`, then `received`. Staff get a "purchase order received" notification.
+- Only drafts can be edited. Only drafts or submitted orders with nothing received can be cancelled. `POST …/duplicate` copies an order as a new draft.
+
+### 11.2 Paying suppliers and balances
+
+```http
+POST /admin/suppliers/{id}/payments             { "purchase_order_id": 1, "amount_paid": "30000", "payment_method": "bank_transfer", "reference": "TRF-1" }
+POST /admin/suppliers/{id}/payments             { "amount_paid": "5000", "payment_method": "cash" }        (on account: no order)
+GET  /admin/purchase-orders/{id}/balance        (order currency)
+GET  /admin/suppliers/{id}/balance              (store base currency)
+GET  /admin/supplier-payments/outstanding       (every supplier you owe, largest first)
+```
+
+Payments are recorded only: they happen outside the platform, by transfer, cash or cheque. Editing or deleting one corrects the accounts automatically.
+
+### 11.3 Returns to the supplier
+
+```http
+POST  /admin/purchase-returns                   { "purchase_order_id": 1, "purchase_return_reason_id": 1, "items": [{ "purchase_order_item_id": 5, "quantity": 2 }] }
+PATCH /admin/purchase-returns/{id}/approve      (stock leaves the warehouse now)
+PATCH /admin/purchase-returns/{id}/ship-back
+POST  /admin/purchase-returns/{id}/refund       { "resolution": "refund", "payment_method": "bank_transfer" }   or { "resolution": "credit_note" }
+PATCH /admin/purchase-returns/{id}/close
+```
+
+- A **refund** records the money you got back, as a negative payment on the order.
+- A **credit note** leaves the amount as a credit that reduces what you owe on the order.
+
+### 11.4 Quotations (optional, before ordering)
+
+```http
+POST  /admin/quotation-requests                 { "warehouse_id": 1, "respond_by": "2026-10-10", "items": [{ "product_id": 12, "quantity": 20 }] }
+POST  /admin/quotation-requests/{id}/send       { "supplier_ids": [1, 2] }      (emails each supplier the item list)
+PATCH /admin/supplier-quotations/{id}/record    { "valid_until": "2026-10-20", "items": [{ "quotation_request_item_id": 3, "unit_price": "17000", "lead_time_days": 5 }] }
+PATCH /admin/supplier-quotations/{id}/accept    (creates a draft purchase order at the quoted prices)
+```
+
+Suppliers answer by replying to the email; staff enter the prices. A quote must price every line before it can be accepted. Quotes past `valid_until` expire overnight.
+
+### 11.5 Optional extras
+
+- **Foreign-currency orders:** send `"currency_code": "USD"` when creating an order, or set the `default_purchase_order_currency` setting. The currency needs a rate (§10.1) before the order can be submitted. The rate is fixed at submission, and payments on that order use it.
+- **Approval for large orders** (needs `approval_workflows`, Premium):
+
+  ```http
+  POST /admin/approval-workflows   { "name": "Big purchases", "module_key": "purchase_order", "trigger_conditions": { "min_amount": 500000 }, "steps": [...] }
+  ```
+
+  Receiving waits for the approval (`409 approval_pending`). A rejection cancels the order.
+- **Accounting (if enabled):**
+
+  | Event | Entry |
+  |---|---|
+  | Receiving | Dr Inventory, Cr Accounts Payable |
+  | A payment | Dr Accounts Payable, Cr Cash/Bank |
+  | A return | Dr Accounts Payable, Cr Inventory |
+  | A refund | Dr Cash/Bank, Cr Accounts Payable |
+
+### 11.6 After pulling this step ➡ you (once)
+
+```powershell
+php artisan tenants:migrate
+```
+
+Then restart the queue worker.
+
+---
+
+## 12. Troubleshooting
 
 | Symptom | Cause / fix |
 |---|---|
@@ -691,4 +830,8 @@ With NGN prices in place, your unpaid store (NGN) now sees and pays NGN (§8.0).
 | `409 payment_in_progress` | A checkout from the last 30 minutes is still pending. Finish it, wait, or confirm it (§8.6). |
 | `409 subscription_active` on `POST /admin/billing/subscription` | The store has already paid. Use swap-plan (§8.5, path B). |
 | `422 payment_method_required` on swap-plan | The store has never paid through a gateway, so there's no saved card to charge. Pay once with path A first. |
+| `422 currency_not_supported` on `?currency=` or `PATCH /cart/currency` | The currency isn't offered: `multi_currency` is off, the currency isn't added or is inactive, or it has no rate yet (§10.1). |
+| `409 approval_pending` on receive | A purchase-order approval workflow is still deciding the order. Decide it in `/admin/approvals` (§11.5). |
+| `422 exchange_rate_unavailable` on submit | The order's currency has no rate. Add one under Currencies (§10.1), or order in the base currency. |
+| `422 base_currency_locked` | The base currency can't change once any order or journal entry exists (§10.1). |
 | Paid, but the subscription is still `trialing` or `incomplete` | The webhook didn't arrive (§8.3), or the queue worker isn't running. Check the `webhook_logs` table in the landlord database, or use the fallback in §8.6. |

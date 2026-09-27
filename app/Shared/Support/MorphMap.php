@@ -60,6 +60,10 @@ use App\Modules\PlatformSupport\Models\PlatformSupportMessageAttachment;
 use App\Modules\Promotions\Models\Coupon;
 use App\Modules\Promotions\Models\FlashSale;
 use App\Modules\Promotions\Models\Promotion;
+use App\Modules\Purchasing\Models\PurchaseOrder;
+use App\Modules\Purchasing\Models\PurchaseReturn;
+use App\Modules\Purchasing\Models\Supplier;
+use App\Modules\Purchasing\Models\SupplierPayment;
 use App\Modules\Returns\Models\OrderReturn;
 use App\Modules\Reviews\Models\ProductReview;
 use App\Modules\Settings\Models\PlatformSetting;
@@ -145,6 +149,10 @@ final class MorphMap
         'stock_adjustment' => StockAdjustment::class,
         'warehouse_product_price' => WarehouseProductPrice::class,
         'tenant_currency' => TenantCurrency::class,
+        'supplier' => Supplier::class,
+        'purchase_order' => PurchaseOrder::class,
+        'purchase_return' => PurchaseReturn::class,
+        'supplier_payment' => SupplierPayment::class,
         'product_price' => ProductPrice::class,
         'seller' => Seller::class,
         'driver' => Driver::class,

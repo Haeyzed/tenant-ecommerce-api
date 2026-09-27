@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Modules\Purchasing\Support\PurchasingLifecycle;
+
 /*
 |--------------------------------------------------------------------------
 | Module registry (spec §11.4)
@@ -48,7 +50,7 @@ $module = static fn (
 return [
 
     'pos' => $module('Point of sale', 'module', '§51', 'Pos', ['pos'], windDown: ['tenant.admin.pos.sessions.close', 'tenant.admin.pos.sales.store']),
-    'purchasing' => $module('Suppliers and purchasing', 'module', '§49', 'Purchasing', ['suppliers', 'supplier-payments', 'purchase-orders', 'quotation-requests', 'supplier-quotations', 'purchase-returns', 'purchase-return-reasons'], customFieldEntities: ['supplier', 'purchase_order'], windDown: ['tenant.admin.purchase-orders.receive', 'tenant.admin.suppliers.payments.store', 'tenant.admin.purchase-returns.store', 'tenant.admin.purchase-returns.approve', 'tenant.admin.purchase-returns.ship-back', 'tenant.admin.purchase-returns.refund']),
+    'purchasing' => $module('Suppliers and purchasing', 'module', '§49', 'Purchasing', ['suppliers', 'supplier-payments', 'purchase-orders', 'quotation-requests', 'supplier-quotations', 'purchase-returns', 'purchase-return-reasons'], customFieldEntities: ['supplier', 'purchase_order'], lifecycle: PurchasingLifecycle::class, windDown: ['tenant.admin.purchase-orders.receive', 'tenant.admin.suppliers.payments.store', 'tenant.admin.purchase-returns.store', 'tenant.admin.purchase-returns.approve', 'tenant.admin.purchase-returns.ship-back', 'tenant.admin.purchase-returns.refund']),
     'accounting' => $module('Accounting (general ledger)', 'module', '§57', 'Accounting', ['accounting']),
     'expenses' => $module('Expenses, income and billers', 'module', '§57.4', 'Expenses', ['billers', 'expense-categories', 'expenses', 'income-categories', 'income'], activation: 'auto', customFieldEntities: ['expense']),
     'hr' => $module('Human resources', 'module', '§58', 'Hr', ['hr'], customFieldEntities: ['employee']),

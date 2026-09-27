@@ -8,7 +8,10 @@ use App\Modules\Accounting\Models\Account;
 use App\Modules\Accounting\Support\AccountingOutbox;
 use App\Modules\Expenses\Models\Expense;
 use App\Modules\Expenses\Models\ExpenseCategory;
+use App\Modules\Plans\Enums\ModuleState;
+use App\Modules\Plans\Services\FeatureAccessService;
 use App\Modules\Settings\Services\TenantSettingsService;
+use App\Modules\Tenancy\Models\Tenant;
 use App\Modules\Users\Models\User;
 use App\Shared\Exceptions\ApiException;
 use App\Shared\Support\Money;
@@ -221,8 +224,10 @@ final readonly class ExpenseService
         $validated = validator($data, [
             'expense_category_id' => [$req, 'integer', Rule::exists('tenant.expense_categories', 'id')->where('is_active', true)],
             'biller_id' => ['sometimes', 'nullable', 'integer', Rule::exists('tenant.billers', 'id')->where('is_active', true)],
-            // Suppliers arrive with purchasing (§49); until then no expense names one.
-            'supplier_id' => ['prohibited'],
+            // A supplier (§49) can be named while purchasing is enabled.
+            'supplier_id' => $this->purchasingEnabled()
+                ? ['sometimes', 'nullable', 'integer', Rule::exists('tenant.suppliers', 'id')->whereNull('deleted_at')]
+                : ['prohibited'],
             'amount' => [$req, 'numeric', 'gt:0', 'decimal:0,4', 'max:99999999999999'],
             'currency_code' => ['sometimes', 'string', 'size:3'],
             'expense_date' => [$req, 'date_format:Y-m-d'],
@@ -237,6 +242,13 @@ final readonly class ExpenseService
         unset($validated['currency_code']);
 
         return $validated;
+    }
+
+    private function purchasingEnabled(): bool
+    {
+        $tenant = tenant();
+
+        return $tenant instanceof Tenant && app(FeatureAccessService::class)->state($tenant, 'purchasing') === ModuleState::Enabled;
     }
 
     private function currency(): string

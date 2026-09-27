@@ -29,7 +29,8 @@ class ExchangeRate extends Model
 
     protected $table = 'currency_exchange_rates';
 
-    protected $fillable = [];
+    /** Written only by CurrencyService. */
+    protected $fillable = ['base_currency_code', 'target_currency_code', 'rate', 'source', 'fetched_at'];
 
     protected $casts = ['rate' => 'decimal:12', 'fetched_at' => 'datetime'];
 }

@@ -8,6 +8,7 @@ use App\Modules\Documents\DocumentsServiceProvider;
 use App\Modules\Inventory\InventoryServiceProvider;
 use App\Modules\Orders\OrdersServiceProvider;
 use App\Modules\Promotions\PromotionsServiceProvider;
+use App\Modules\Purchasing\PurchasingServiceProvider;
 use App\Modules\Returns\ReturnsServiceProvider;
 use App\Modules\Reviews\ReviewsServiceProvider;
 use App\Providers\ApiDocsServiceProvider;
@@ -27,5 +28,6 @@ return [
     ReturnsServiceProvider::class,
     ReviewsServiceProvider::class,
     DocumentsServiceProvider::class,
+    PurchasingServiceProvider::class,
     ApiDocsServiceProvider::class,
 ];

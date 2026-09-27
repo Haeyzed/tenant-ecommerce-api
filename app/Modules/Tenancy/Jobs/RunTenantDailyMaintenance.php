@@ -16,6 +16,9 @@ use App\Modules\Exports\Services\DataExportService;
 use App\Modules\Inventory\Support\StockAlerts;
 use App\Modules\Orders\Services\OrderService;
 use App\Modules\Payments\Services\OrderPaymentService;
+use App\Modules\Plans\Enums\ModuleState;
+use App\Modules\Plans\Services\FeatureAccessService;
+use App\Modules\Purchasing\Jobs\ExpireSupplierQuotations;
 use App\Modules\Seo\Support\SitemapBuilder;
 use App\Modules\Tenancy\Enums\TenantStatus;
 use App\Modules\Tenancy\Models\Tenant;
@@ -85,6 +88,11 @@ final class RunTenantDailyMaintenance implements ShouldBeUnique, ShouldQueue
             $this->task('unresolved_refunds', static fn () => app(OrderPaymentService::class)->flagUnresolvedRefunds());
             $this->task('anonymised_orders', static fn () => app(OrderService::class)->anonymizeSettledOrders());
             $this->task('accounting_outbox', static fn () => app(AccountingService::class)->redispatchStale());
+            $this->task('supplier_quotations', static function () use ($tenant): void {
+                if (app(FeatureAccessService::class)->state($tenant, 'purchasing') === ModuleState::Enabled) {
+                    ExpireSupplierQuotations::dispatch();
+                }
+            });
             $this->task('exchange_rates', static function (): void {
                 if (app(CurrencyService::class)->enabled() && app(ExchangeRateProvider::class)->configured()) {
                     RefreshExchangeRates::dispatch();

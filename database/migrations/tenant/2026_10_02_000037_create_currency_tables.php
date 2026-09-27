@@ -31,8 +31,10 @@ return new class extends Migration
         Schema::create('product_prices', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('product_id')->constrained('products')->cascadeOnDelete();
-            $table->foreignId('product_variant_id')->nullable()->constrained('product_variants')->cascadeOnDelete();
-            $table->unsignedBigInteger('variant_key')->storedAs('COALESCE(product_variant_id, 0)');
+            // Restrict: MySQL refuses a cascading key on a generated column's base
+            // column; variants are soft-deleted, as with warehouse_product_prices.
+            $table->foreignId('product_variant_id')->nullable()->constrained('product_variants')->restrictOnDelete();
+            $table->unsignedBigInteger('variant_key')->storedAs('COALESCE(`product_variant_id`, 0)');
             $table->char('currency_code', 3);
             $table->decimal('price', 18, 4);
             $table->decimal('compare_at_price', 18, 4)->nullable();
@@ -52,7 +54,7 @@ return new class extends Migration
             $table->dateTime('fetched_at');
             $table->timestamps();
 
-            $table->unique(['base_currency_code', 'target_currency_code']);
+            $table->unique(['base_currency_code', 'target_currency_code'], 'currency_exchange_rates_pair_unique');
         });
 
         foreach (['orders', 'order_payments', 'expenses', 'income_entries'] as $name) {

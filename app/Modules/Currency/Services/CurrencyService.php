@@ -51,8 +51,11 @@ final readonly class CurrencyService
     }
 
     /**
-     * The base row, seeded at provisioning and by the defaults sync (§9.4):
-     * inserted when the store has none, so the invariant always holds.
+     * The base row, seeded at provisioning and by the defaults sync (§9.4).
+     * tenant_settings.default_currency is the source of truth: the row is
+     * inserted when missing and moved when the setting differs (a store
+     * provisioned before this module, or a setting written directly), so
+     * the invariant always holds.
      */
     public function ensureBase(): TenantCurrency
     {
@@ -61,9 +64,12 @@ final readonly class CurrencyService
         return DB::connection('tenant')->transaction(function () use ($base): TenantCurrency {
             $current = TenantCurrency::query()->where('is_base', true)->lockForUpdate()->first();
 
-            if ($current !== null) {
+            if ($current !== null && $current->currency_code === $base) {
                 return $current;
             }
+
+            // The old row only mirrored the setting; it is not a currency the store chose to sell in.
+            $current?->forceFill(['is_base' => false, 'is_active' => false])->save();
 
             /** @var TenantCurrency $row */
             $row = TenantCurrency::query()->firstOrNew(['currency_code' => $base]);
