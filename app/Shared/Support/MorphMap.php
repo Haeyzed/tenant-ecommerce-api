@@ -62,6 +62,7 @@ use App\Modules\PlatformSupport\Models\PlatformSupportMessageAttachment;
 use App\Modules\Pos\Models\PosRegister;
 use App\Modules\Pos\Models\PosSession;
 use App\Modules\Pos\Models\PosSettings;
+use App\Modules\SalesAgents\Models\SalesAgent;
 use App\Modules\Promotions\Models\Coupon;
 use App\Modules\Promotions\Models\FlashSale;
 use App\Modules\Promotions\Models\Promotion;
@@ -161,6 +162,7 @@ final class MorphMap
         'pos_register' => PosRegister::class,
         'pos_session' => PosSession::class,
         'pos_settings' => PosSettings::class,
+        'sales_agent' => SalesAgent::class,
         'supplier' => Supplier::class,
         'purchase_order' => PurchaseOrder::class,
         'purchase_return' => PurchaseReturn::class,

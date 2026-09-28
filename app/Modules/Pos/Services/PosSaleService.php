@@ -33,6 +33,7 @@ use App\Modules\Promotions\Support\BuyerHistory;
 use App\Modules\Promotions\Support\PricingContext;
 use App\Modules\Promotions\Support\PricingLine;
 use App\Modules\RewardPoints\Services\RewardPointService;
+use App\Modules\SalesAgents\Services\SalesAgentService;
 use App\Modules\Settings\Services\TenantSettingsService;
 use App\Modules\Tax\Services\TaxService;
 use App\Modules\Users\Models\User;
@@ -78,6 +79,7 @@ final readonly class PosSaleService
         private PaymentPostings $postings,
         private NotificationDispatchService $notifications,
         private ReceiptPrinterService $printers,
+        private SalesAgentService $salesAgents,
     ) {}
 
     /**
@@ -277,6 +279,7 @@ final readonly class PosSaleService
             'quote_total' => ['sometimes', 'nullable', 'numeric'],
             'cashier_user_id' => ['sometimes', 'nullable', 'integer', Rule::exists('tenant.users', 'id')->where('is_active', true)],
             'notes' => ['sometimes', 'nullable', 'string', 'max:1000'],
+            'sales_agent_id' => ['sometimes', 'nullable', 'integer'],
         ])->validate();
 
         // §51.6: a synced offline sale never becomes a second order.
@@ -307,6 +310,7 @@ final readonly class PosSaleService
             throw ApiException::unprocessable('payment_invalid', 'Enter the cash tendered as one payment.');
         }
 
+        $agent = $this->salesAgents->resolveForSale(null, isset($validated['sales_agent_id']) ? (int) $validated['sales_agent_id'] : null);
         $at = $this->saleTime($validated['sold_at'] ?? null);
         $session = $this->resolveSession($register, $settings->cash_register_enabled, $validated['pos_session_id'] ?? null, $at);
         $customer = $this->resolveCustomer($validated['customer_id'] ?? null, $settings->default_customer_id);
@@ -346,7 +350,7 @@ final readonly class PosSaleService
         $cashierId = $validated['cashier_user_id'] ?? $settings->default_cashier_user_id ?? $by->id;
         $offline = $at !== null;
 
-        $order = DB::connection('tenant')->transaction(function () use ($register, $validated, $quote, $customer, $session, $plan, $at, $offline, $cashierId, $by): Order {
+        $order = DB::connection('tenant')->transaction(function () use ($register, $validated, $quote, $customer, $session, $plan, $at, $offline, $cashierId, $by, $agent): Order {
             $order = $this->orders->createOrder([
                 'order_source' => 'pos',
                 'status' => Order::COMPLETED,
@@ -369,6 +373,7 @@ final readonly class PosSaleService
                 'idempotency_key' => $validated['idempotency_key'],
                 'customer_note' => $validated['notes'] ?? null,
                 'pos_session_id' => $session?->id,
+                'sales_agent_id' => $agent?->id,
                 'placed_at' => $at ?? now(),
                 'one_pass' => true,
             ]);

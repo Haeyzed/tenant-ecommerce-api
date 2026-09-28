@@ -73,7 +73,7 @@ function posSale(array $body, ?array $register = null): TestResponse
     ], test()->staff);
 }
 
-function shoeStock(): string
+function posShoeStock(): string
 {
     tenancy()->initialize(test()->tenant);
 
@@ -91,7 +91,7 @@ it('sells at the counter with change and split tender, then closes the drawer wi
     $this->tenantJson('POST', '/api/admin/pos/sessions', ['register_id' => $this->register['id'], 'opening_cash_float' => '0'], $this->staff)
         ->assertStatus(409)->assertJsonPath('meta.error_code', 'session_already_open');
 
-    // Scan, then quote: 2 × 40,000 + 7.5% VAT at the shop.
+    // Scan, then quote: 2 Ã— 40,000 + 7.5% VAT at the shop.
     $this->tenantJson('GET', "/api/admin/pos/products/lookup?barcode=5901234123457&register_id={$this->register['id']}", [], $this->staff)->assertOk()
         ->assertJsonPath('data.0.product_id', $this->shoe->id)->assertJsonPath('data.0.price', '40000.0000')->assertJsonPath('data.0.stock', '5.000');
     $this->tenantJson('POST', '/api/admin/pos/quote', ['register_id' => $this->register['id'], 'lines' => [['product_id' => $this->shoe->id, 'quantity' => 2]]], $this->staff)
@@ -105,7 +105,7 @@ it('sells at the counter with change and split tender, then closes the drawer wi
         ->and($sale['sale']['customer']['id'])->toBe($this->walkIn->id)
         ->and($sale['receipt']['payments'][0])->toMatchArray(['method' => 'cash', 'amount_paid' => '86000.0000', 'amount_received' => '100000.0000', 'change_given' => '14000.0000'])
         ->and($sale['receipt']['register']['name'])->toBe('Front Counter')
-        ->and(shoeStock())->toBe('3.000');
+        ->and(posShoeStock())->toBe('3.000');
 
     // The synced retry returns the same sale; no staff alert and no customer mail per till sale.
     posSale(['idempotency_key' => $key, 'payments' => [['method' => 'cash', 'amount' => '100000']]])->assertOk()->assertJsonPath('data.sale.id', $sale['sale']['id']);
@@ -147,7 +147,7 @@ it('voids a sale while its session is open: refunds, restocks and returns the gi
     posSale(['reward_points' => 100, 'payments' => [['method' => 'cash', 'amount' => '43000']]])->assertStatus(422)->assertJsonPath('meta.error_code', 'customer_required');
     posSale(['credit_sale' => true, 'payments' => []])->assertStatus(422)->assertJsonPath('meta.error_code', 'customer_required');
 
-    // 43,000 − 1,000 (100 points) = 42,000: 5,000 on the gift card, the rest in cash.
+    // 43,000 âˆ’ 1,000 (100 points) = 42,000: 5,000 on the gift card, the rest in cash.
     $sale = posSale(['customer_id' => $this->ada->id, 'reward_points' => 100, 'payments' => [
         ['method' => 'gift_card', 'amount' => '5000', 'gift_card_code' => strtolower($card->code)],
         ['method' => 'cash', 'amount' => '37000'],
@@ -155,16 +155,16 @@ it('voids a sale while its session is open: refunds, restocks and returns the gi
     expect($sale)->toMatchArray(['total' => '42000.0000', 'reward_points_discount_amount' => '1000.0000', 'payment_status' => 'paid']);
 
     tenancy()->initialize($this->tenant);
-    // Earned on completion: (40,000 − 1,000) / 1,000 = 39.
+    // Earned on completion: (40,000 âˆ’ 1,000) / 1,000 = 39.
     expect(app(RewardPointService::class)->getBalance($this->ada))->toBe(139)
         ->and((string) $card->refresh()->current_balance)->toBe('0.0000')
-        ->and(shoeStock())->toBe('4.000');
+        ->and(posShoeStock())->toBe('4.000');
 
     $voided = $this->tenantJson('POST', "/api/admin/pos/sales/{$sale['id']}/void", ['reason' => 'Wrong size'], $this->staff)->assertOk()->json('data');
     expect($voided)->toMatchArray(['status' => 'refunded', 'payment_status' => 'refunded', 'cancellation_reason' => 'Wrong size']);
 
     tenancy()->initialize($this->tenant);
-    expect(shoeStock())->toBe('5.000')
+    expect(posShoeStock())->toBe('5.000')
         ->and((string) $card->refresh()->current_balance)->toBe('5000.0000')
         ->and(app(RewardPointService::class)->getBalance($this->ada))->toBe(200)
         ->and((string) OrderPayment::query()->where('order_id', $sale['id'])->where('kind', 'refund')->where('payment_method', 'cash')->value('amount_paid'))->toBe('-37000.0000');
@@ -173,7 +173,7 @@ it('voids a sale while its session is open: refunds, restocks and returns the gi
     // Credit sale: confirmed with the balance still due.
     $credit = posSale(['customer_id' => $this->ada->id, 'credit_sale' => true, 'payments' => [['method' => 'cash', 'amount' => '10000']]])
         ->assertCreated()->assertJsonPath('data.sale.payment_status', 'partially_paid')->json('data.sale');
-    expect($credit['confirmed_at'])->not->toBeNull()->and(shoeStock())->toBe('4.000');
+    expect($credit['confirmed_at'])->not->toBeNull()->and(posShoeStock())->toBe('4.000');
 
     // After the session closes, a sale can only be returned.
     $this->tenantJson('POST', "/api/admin/pos/sessions/{$session['id']}/close", ['closing_cash_float' => '10000'], $this->staff)->assertOk()
@@ -241,7 +241,7 @@ it('syncs an offline sale once, into the session it was made in, and flags a pro
     $promotion = app(PromotionService::class)->createPromotion(['name' => 'Opening week', 'trigger' => 'automatic', 'scope' => 'order', 'discount_type' => 'percentage', 'discount_value' => 10, 'usage_limit_total' => 1]);
     $session = $this->tenantJson('POST', '/api/admin/pos/sessions', ['register_id' => $this->register['id'], 'opening_cash_float' => '0'], $this->staff)->assertCreated()->json('data');
 
-    // Online at the counter: 40,000 − 10% + 7.5% VAT = 38,700; the promotion is used up.
+    // Online at the counter: 40,000 âˆ’ 10% + 7.5% VAT = 38,700; the promotion is used up.
     posSale(['payments' => [['method' => 'cash', 'amount' => '38700']]])->assertCreated()->assertJsonPath('data.sale.total', '38700.0000');
 
     $this->travel(20)->minutes();

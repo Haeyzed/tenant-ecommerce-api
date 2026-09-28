@@ -18,6 +18,7 @@ use App\Modules\Orders\Metrics\SalesMetrics;
 use App\Modules\Payments\Metrics\PaymentMetrics as TenantPaymentMetrics;
 use App\Modules\Promotions\Metrics\PromotionMetrics;
 use App\Modules\Returns\Metrics\ReturnMetrics;
+use App\Modules\SalesAgents\Metrics\SalesAgentMetrics;
 use App\Modules\Tenancy\Metrics\TenantMetrics;
 
 /*
@@ -198,6 +199,13 @@ return [
             'feature' => 'expenses',
             'permission' => 'expenses.view',
             'parts' => [[ExpenseMetrics::class, 'expenses']],
+            'alerts' => [],
+        ],
+        'sales_agents' => [
+            'label' => 'Sales agents',
+            'feature' => 'sales_agents',
+            'permission' => 'sales-agents.view',
+            'parts' => [[SalesAgentMetrics::class, 'salesAgents']],
             'alerts' => [],
         ],
     ],

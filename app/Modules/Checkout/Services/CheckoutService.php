@@ -29,6 +29,7 @@ use App\Modules\Promotions\Support\BuyerHistory;
 use App\Modules\Promotions\Support\PricingContext;
 use App\Modules\Promotions\Support\PricingLine;
 use App\Modules\RewardPoints\Services\RewardPointService;
+use App\Modules\SalesAgents\Services\SalesAgentService;
 use App\Modules\Settings\Services\PlatformSettingsService;
 use App\Modules\Settings\Services\TenantSettingsService;
 use App\Modules\Shipping\Services\ShippingService;
@@ -62,6 +63,7 @@ final readonly class CheckoutService
         private GiftCardService $giftCards,
         private RewardPointService $rewardPoints,
         private InstallmentPlanService $installments,
+        private SalesAgentService $salesAgents,
     ) {}
 
     /**
@@ -106,7 +108,11 @@ final readonly class CheckoutService
             'installment_plan' => ['sometimes', 'nullable', 'array'],
             'installment_plan.number_of_installments' => ['required_with:installment_plan', 'integer'],
             'installment_plan.frequency' => ['required_with:installment_plan', 'string'],
+            // §52.2: the agent who referred the sale.
+            'sales_agent_code' => ['sometimes', 'nullable', 'string', 'max:32'],
         ])->validate();
+
+        $agent = $this->salesAgents->resolveForSale($validated['sales_agent_code'] ?? null);
 
         if ($customer === null && ! ((bool) $this->settings->get('guest_checkout_enabled', true) && (bool) $this->platformSettings->get('guest_checkout_allowed_platform_wide', true))) {
             throw ApiException::forbidden('guest_checkout_disabled', 'Sign in to place an order.');
@@ -143,7 +149,7 @@ final readonly class CheckoutService
         $shippingAddress = $this->addressSnapshot($cart, $data, $validated);
 
         // 11. The commit: no network calls inside.
-        $order = DB::connection('tenant')->transaction(function () use ($cart, $quote, $customer, $validated, $shippingAddress, $idempotencyKey): Order {
+        $order = DB::connection('tenant')->transaction(function () use ($cart, $quote, $customer, $validated, $shippingAddress, $idempotencyKey, $agent): Order {
             Cart::query()->whereKey($cart->id)->lockForUpdate()->first();
 
             $order = $this->orders->createOrder([
@@ -177,6 +183,7 @@ final readonly class CheckoutService
                 'billing_address' => $validated['billing_address'] ?? $shippingAddress,
                 'payment_gateway' => $validated['gateway'] ?? null,
                 'customer_note' => $validated['customer_note'] ?? null,
+                'sales_agent_id' => $agent?->id,
                 'idempotency_key' => $idempotencyKey,
                 'expires' => true,
             ]);

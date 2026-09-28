@@ -38,6 +38,7 @@ final class OrderPresenter
         if ($admin) {
             $base += [
                 'order_source' => $order->order_source,
+                'sales_agent_id' => $order->sales_agent_id,
                 'customer' => ['id' => $order->customer_id, 'name' => $order->customer_name, 'email' => $order->customer_email],
             ];
         }

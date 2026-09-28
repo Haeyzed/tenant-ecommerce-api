@@ -167,6 +167,7 @@ final readonly class OrderService
                 'idempotency_key' => $data['idempotency_key'] ?? null,
                 'customer_note' => $data['customer_note'] ?? null,
                 'pos_session_id' => $data['pos_session_id'] ?? null,
+                'sales_agent_id' => $data['sales_agent_id'] ?? null,
                 // An offline POS sale keeps the time it was made (§51.6).
                 'placed_at' => $placedAt,
                 'payment_expires_at' => $expires ? now()->addMinutes((int) $this->settings->get('unpaid_order_expiry_minutes', 60)) : null,

@@ -6,6 +6,7 @@ namespace App\Modules\Orders\Models;
 
 use App\Modules\Customers\Models\Customer;
 use App\Modules\Promotions\Models\PromotionRedemption;
+use App\Modules\SalesAgents\Models\SalesAgent;
 use App\Modules\Shipping\Models\ShippingMethod;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
@@ -51,6 +52,8 @@ use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
  * @property array<string, mixed>|null $billing_address
  * @property string|null $payment_gateway
  * @property int|null $created_by_user_id
+ * @property int|null $pos_session_id
+ * @property int|null $sales_agent_id
  * @property string|null $idempotency_key
  * @property string|null $customer_note
  * @property Carbon $placed_at
@@ -98,6 +101,8 @@ class Order extends Model implements AuditableContract
 
     protected $casts = [
         'customer_id' => 'integer',
+        'pos_session_id' => 'integer',
+        'sales_agent_id' => 'integer',
         'is_test' => 'boolean',
         'prices_include_tax' => 'boolean',
         'subtotal' => 'decimal:4',
@@ -159,5 +164,15 @@ class Order extends Model implements AuditableContract
     public function shippingMethod(): BelongsTo
     {
         return $this->belongsTo(ShippingMethod::class)->withTrashed();
+    }
+
+    /**
+     * The attributed agent (§52.2); also the sales_agent notification audience.
+     *
+     * @return BelongsTo<SalesAgent, $this>
+     */
+    public function salesAgent(): BelongsTo
+    {
+        return $this->belongsTo(SalesAgent::class);
     }
 }

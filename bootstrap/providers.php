@@ -15,6 +15,7 @@ use App\Modules\Purchasing\PurchasingServiceProvider;
 use App\Modules\Returns\ReturnsServiceProvider;
 use App\Modules\Reviews\ReviewsServiceProvider;
 use App\Modules\RewardPoints\RewardPointsServiceProvider;
+use App\Modules\SalesAgents\SalesAgentsServiceProvider;
 use App\Providers\ApiDocsServiceProvider;
 use App\Providers\AppServiceProvider;
 use App\Providers\ModuleServiceProvider;
@@ -37,5 +38,6 @@ return [
     InstallmentsServiceProvider::class,
     RewardPointsServiceProvider::class,
     PosServiceProvider::class,
+    SalesAgentsServiceProvider::class,
     ApiDocsServiceProvider::class,
 ];
