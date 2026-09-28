@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Payments\Services;
 
+use App\Modules\GiftCards\Services\GiftCardService;
+use App\Modules\Installments\Services\InstallmentPlanService;
 use App\Modules\Notifications\Services\NotificationDispatchService;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Services\OrderService;
@@ -82,6 +84,23 @@ final readonly class OrderPaymentService
      */
     public function initiateOrderPayment(Order $order, string $provider, ?string $idempotencyKey = null): array
     {
+        // An order on a plan is paid installment by installment (§47.3).
+        if (InstallmentPlanService::activeFor($order->id)) {
+            throw ApiException::unprocessable('installment_plan_active', 'This order is paid in installments: pay the next installment instead.');
+        }
+
+        return $this->initiateGatewayPayment($order, $provider, null, $idempotencyKey);
+    }
+
+    /**
+     * A gateway payment of the order balance, or of an installment (then
+     * with the installment id on the ledger row and the authorization saved
+     * for the scheduled charges).
+     *
+     * @return array{checkout_url: string, reference: string}
+     */
+    public function initiateGatewayPayment(Order $order, string $provider, ?string $amount, ?string $idempotencyKey = null, ?int $installmentPaymentId = null, bool $saveAuthorization = false): array
+    {
         if ($order->status === Order::CANCELLED || ! in_array($order->payment_status, ['unpaid', 'partially_paid', 'failed'], true)) {
             throw ApiException::unprocessable('order_not_payable', 'This order cannot be paid.');
         }
@@ -109,7 +128,7 @@ final readonly class OrderPaymentService
         }
 
         $order->refresh();
-        $amount = $this->balance($order);
+        $amount = $amount === null ? $this->balance($order) : Money::min(Money::normalize($amount), $this->balance($order));
 
         if (! Money::isPositive($amount)) {
             throw ApiException::unprocessable('order_not_payable', 'Nothing is due on this order.');
@@ -128,6 +147,7 @@ final readonly class OrderPaymentService
             'amount_due' => $amount,
             'amount_paid' => $amount,
             'currency_code' => $order->currency_code,
+            'installment_payment_id' => $installmentPaymentId,
         ])->save();
 
         try {
@@ -139,6 +159,7 @@ final readonly class OrderPaymentService
                 customerName: $order->customer_name,
                 callbackUrl: $this->callbackUrl($order),
                 metadata: ['order_number' => $order->order_number],
+                saveAuthorization: $saveAuthorization,
                 description: 'Order '.$order->order_number,
             ));
         } catch (PaymentGatewayException $e) {
@@ -232,9 +253,17 @@ final readonly class OrderPaymentService
                 ])->save();
                 $this->postings->payment($locked);
                 $outcome = 'successful';
+
+                if ($locked->installment_payment_id !== null) {
+                    app(InstallmentPlanService::class)->handleInstallmentPaid($locked, $verified['authorization_token'] ?? null);
+                }
             } else {
                 $locked->forceFill(['status' => OrderPayment::FAILED, 'meta' => [...(array) $locked->meta, 'failure_reason' => $verified['failure_reason'] ?? 'declined']])->save();
                 $outcome = 'failed';
+
+                if ($locked->installment_payment_id !== null) {
+                    app(InstallmentPlanService::class)->handleInstallmentFailed($locked);
+                }
             }
 
             $payment->setRawAttributes($locked->getAttributes(), true);
@@ -288,7 +317,8 @@ final readonly class OrderPaymentService
             throw ApiException::unprocessable('refund_invalid', 'The refund amount must be positive.');
         }
 
-        if (in_array($payment->payment_method, ['exchange_credit', 'card_terminal', 'gift_card'], true)) {
+        // A gift-card payment refunds onto its card (§46.3), ledger only.
+        if (in_array($payment->payment_method, ['exchange_credit', 'card_terminal'], true)) {
             throw ApiException::unprocessable('refund_method_unsupported', 'This payment cannot be refunded here.');
         }
 
@@ -330,6 +360,10 @@ final readonly class OrderPaymentService
             ])->save();
 
             if (! $gateway) {
+                if ($row->payment_method === 'gift_card') {
+                    app(GiftCardService::class)->reverseRedemption($row);
+                }
+
                 $this->postings->reversal($row);
                 $this->orders->recalculatePaymentStatus($original->order);
             }
@@ -401,7 +435,7 @@ final readonly class OrderPaymentService
 
             $capacity = $this->capacity($payment);
 
-            if (! Money::isPositive($capacity) || in_array($payment->payment_method, ['exchange_credit', 'card_terminal', 'gift_card'], true)) {
+            if (! Money::isPositive($capacity) || in_array($payment->payment_method, ['exchange_credit', 'card_terminal'], true)) {
                 continue;
             }
 
@@ -566,6 +600,7 @@ final readonly class OrderPaymentService
             'fee' => $event->fee,
             'provider_reference' => $event->providerReference,
             'failure_reason' => $event->failureReason,
+            'authorization_token' => $event->authorizationToken,
         ]);
     }
 

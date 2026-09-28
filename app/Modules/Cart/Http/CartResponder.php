@@ -7,6 +7,7 @@ namespace App\Modules\Cart\Http;
 use App\Modules\Cart\Models\Cart;
 use App\Modules\Cart\Services\CartService;
 use App\Modules\Checkout\Services\CheckoutService;
+use App\Modules\Checkout\Support\Quote;
 use App\Modules\Customers\Models\Customer;
 use App\Shared\Exceptions\ApiException;
 use App\Shared\Http\APIResponse;
@@ -63,6 +64,13 @@ final readonly class CartResponder
             'shipping_method_id' => ['sometimes', 'integer'],
             'guest_email' => ['sometimes', 'email:rfc', 'max:255'],
         ]);
+    }
+
+    public function quote(Request $request, Cart $cart): Quote
+    {
+        $cart->unsetRelation('items');
+
+        return $this->checkout->quote($cart, $this->checkoutData($request));
     }
 
     public function respond(Request $request, ?Cart $cart, string $message = 'OK', int $status = 200): JsonResponse

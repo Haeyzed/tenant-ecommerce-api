@@ -38,6 +38,8 @@ use App\Modules\Documents\Models\InvoiceTemplate;
 use App\Modules\Expenses\Models\Expense;
 use App\Modules\Expenses\Models\IncomeEntry;
 use App\Modules\Exports\Models\DataExport;
+use App\Modules\GiftCards\Models\GiftCard;
+use App\Modules\Installments\Models\InstallmentPlan;
 use App\Modules\Inventory\Models\StockAdjustment;
 use App\Modules\Inventory\Models\StockTransfer;
 use App\Modules\Inventory\Models\Warehouse;
@@ -66,6 +68,7 @@ use App\Modules\Purchasing\Models\Supplier;
 use App\Modules\Purchasing\Models\SupplierPayment;
 use App\Modules\Returns\Models\OrderReturn;
 use App\Modules\Reviews\Models\ProductReview;
+use App\Modules\RewardPoints\Models\RewardPointSettings;
 use App\Modules\Settings\Models\PlatformSetting;
 use App\Modules\Settings\Models\StorefrontSetting;
 use App\Modules\Settings\Models\TenantPlatformSetting;
@@ -149,6 +152,9 @@ final class MorphMap
         'stock_adjustment' => StockAdjustment::class,
         'warehouse_product_price' => WarehouseProductPrice::class,
         'tenant_currency' => TenantCurrency::class,
+        'gift_card' => GiftCard::class,
+        'installment_plan' => InstallmentPlan::class,
+        'reward_point_settings' => RewardPointSettings::class,
         'supplier' => Supplier::class,
         'purchase_order' => PurchaseOrder::class,
         'purchase_return' => PurchaseReturn::class,

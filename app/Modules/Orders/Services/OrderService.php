@@ -18,6 +18,7 @@ use App\Modules\Inventory\Services\WarehouseService;
 use App\Modules\Notifications\Services\NotificationDispatchService;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Models\OrderItem;
+use App\Modules\Orders\Support\OrderLifecycle;
 use App\Modules\Payments\Models\OrderPayment;
 use App\Modules\Plans\Services\PlanLimitService;
 use App\Modules\Promotions\Services\FlashSaleService;
@@ -62,6 +63,7 @@ final readonly class OrderService
         private DigitalDownloadService $downloads,
         private PlatformSettingsService $platformSettings,
         private AccountingOutbox $outbox,
+        private OrderLifecycle $lifecycle,
     ) {}
 
     /**
@@ -145,6 +147,8 @@ final readonly class OrderService
                 'shipping_discount_amount' => $totals['shipping_discount_amount'] ?? '0',
                 'shipping_tax_amount' => $totals['shipping_tax_amount'] ?? '0',
                 'tax_amount' => $totals['tax_amount'] ?? '0',
+                'reward_points_redeemed' => (int) ($data['reward_points_redeemed'] ?? 0),
+                'reward_points_discount_amount' => $totals['reward_points_discount_amount'] ?? '0',
                 'total' => $totals['total'],
                 // §48.2: captured once, never recomputed. exchange_rate_used is
                 // 1 order currency = x base; a quote's rate is 1 base = x order.
@@ -163,24 +167,25 @@ final readonly class OrderService
             ])->save();
 
             foreach ((array) $data['lines'] as $line) {
-                /** @var Product $product */
-                $product = $line['product'];
+                /** @var Product|null $product a non-product line (a gift card, §46.2) has none */
+                $product = $line['product'] ?? null;
                 /** @var ProductVariant|null $variant */
                 $variant = $line['variant'] ?? null;
 
                 $item = new OrderItem;
                 $item->forceFill([
                     'order_id' => $order->id,
-                    'product_id' => $product->id,
+                    'product_id' => $product?->id,
                     'product_variant_id' => $variant?->id,
-                    'name_snapshot' => mb_substr($product->name.($variant === null ? '' : ' ('.$variant->sku.')'), 0, 255),
-                    'sku_snapshot' => $variant?->sku ?? $product->sku,
-                    'seller_id' => $product->seller_id,
-                    'warehouse_id' => $line['warehouse']?->id,
+                    'name_snapshot' => mb_substr($product === null ? (string) $line['name'] : $product->name.($variant === null ? '' : ' ('.$variant->sku.')'), 0, 255),
+                    'sku_snapshot' => $variant?->sku ?? $product?->sku,
+                    'seller_id' => $product?->seller_id,
+                    'warehouse_id' => ($line['warehouse'] ?? null)?->id,
                     'quantity' => $line['quantity'],
                     'unit_price' => $line['unit_price'],
                     'price_source' => $line['price_source'],
-                    'unit_cost_snapshot' => $variant?->cost_price ?? $product->cost_price,
+                    'unit_cost_snapshot' => $variant?->cost_price ?? $product?->cost_price,
+                    'meta' => $line['meta'] ?? null,
                     'discount_amount' => $line['discount_amount'] ?? '0',
                     'seller_funded_discount_amount' => $line['seller_funded_discount_amount'] ?? '0',
                     'tax_rate_applied' => $line['tax_rate_applied'] ?? '0',
@@ -241,6 +246,12 @@ final readonly class OrderService
             $locked->save();
             $this->downloads->grantForOrder($locked);
             $this->outbox->record('postOrderSale', $locked, $locked->confirmed_at ?? now(), 'order_sale:'.$locked->id);
+            $this->lifecycle->run(OrderLifecycle::CONFIRMED, $locked);
+
+            if ($locked->completed_at !== null && in_array($locked->status, [Order::DELIVERED, Order::COMPLETED], true)) {
+                $this->lifecycle->run(OrderLifecycle::COMPLETED, $locked);
+            }
+
             $order->setRawAttributes($locked->getAttributes(), true);
 
             return true;
@@ -392,12 +403,17 @@ final readonly class OrderService
     public function setStatus(Order $locked, string $status): void
     {
         $changes = ['status' => $status];
+        $completes = in_array($status, [Order::DELIVERED, Order::COMPLETED], true) && $locked->completed_at === null;
 
-        if (in_array($status, [Order::DELIVERED, Order::COMPLETED], true) && $locked->completed_at === null) {
+        if ($completes) {
             $changes['completed_at'] = now();
         }
 
         $locked->forceFill($changes)->save();
+
+        if ($completes) {
+            $this->lifecycle->run(OrderLifecycle::COMPLETED, $locked);
+        }
     }
 
     public function notifyStatus(Order $order, string $status): void
@@ -431,7 +447,7 @@ final readonly class OrderService
                 throw ApiException::unprocessable('order_shipped', 'Part of this order has shipped. Use a return or a refund instead.');
             }
 
-            if ($byCustomer && ! in_array($locked->payment_status, ['unpaid', 'failed'], true)) {
+            if ($byCustomer && ! $this->onlyStoredValuePaid($locked)) {
                 throw ApiException::unprocessable('order_paid', 'A paid order can be cancelled by the store only. Contact the store.');
             }
 
@@ -446,6 +462,9 @@ final readonly class OrderService
 
             $this->flashSales->release($locked);
             $this->downloads->revokeForOrder($locked);
+            // Gift-card redemptions go back onto the cards, redeemed points
+            // are restored, an installment plan stops (§46.3, §54.2, §47.4).
+            $this->lifecycle->run(OrderLifecycle::CANCELLED, $locked);
 
             $locked->forceFill([
                 'status' => Order::CANCELLED,
@@ -453,6 +472,11 @@ final readonly class OrderService
                 'cancellation_reason' => mb_substr($reason, 0, 255),
                 'payment_expires_at' => null,
             ])->save();
+
+            // Reversals written by the hooks (gift-card credits) move the payment status.
+            if (OrderPayment::query()->where('order_id', $locked->id)->exists()) {
+                $this->recalculatePaymentStatus($locked);
+            }
 
             $order->setRawAttributes($locked->getAttributes(), true);
         });
@@ -467,6 +491,22 @@ final readonly class OrderService
     }
 
     /**
+     * Unpaid, failed, or paid only with a gift card (which cancellation
+     * credits back, §46.3): such an order can still expire or be cancelled
+     * by its customer.
+     */
+    private function onlyStoredValuePaid(Order $order): bool
+    {
+        if (in_array($order->payment_status, ['unpaid', 'failed'], true)) {
+            return true;
+        }
+
+        return $order->payment_status === 'partially_paid'
+            && ! OrderPayment::query()->where('order_id', $order->id)->where('status', OrderPayment::SUCCESSFUL)
+                ->where('payment_method', '!=', 'gift_card')->exists();
+    }
+
+    /**
      * The ExpireUnpaidOrder job (§39.5). Returns "cancelled", "pending"
      * (a gateway payment is still in flight: the caller verifies and
      * retries) or "skipped".
@@ -476,7 +516,7 @@ final readonly class OrderService
         $locked = Order::query()->find($order->id);
 
         if ($locked === null || $locked->confirmed_at !== null || $locked->status === Order::CANCELLED
-            || ! in_array($locked->payment_status, ['unpaid', 'failed'], true)
+            || ! $this->onlyStoredValuePaid($locked)
             || $locked->payment_expires_at === null || $locked->payment_expires_at->isFuture()) {
             return 'skipped';
         }

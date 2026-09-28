@@ -12,6 +12,7 @@ use App\Modules\Inventory\Support\WarehouseUsage;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Models\OrderItem;
 use App\Modules\Orders\Services\OrderService;
+use App\Modules\Orders\Support\OrderLifecycle;
 use App\Modules\Promotions\Support\BuyerHistory;
 use App\Shared\Support\UsageCounterRegistry;
 use Illuminate\Support\Facades\Event;
@@ -27,6 +28,9 @@ final class OrdersServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        // Gift cards, installments and reward points hook in here (§46, §47, §54).
+        $this->app->singleton(OrderLifecycle::class);
+
         $this->app->afterResolving(BuyerHistory::class, function (BuyerHistory $history): void {
             $history->useResolver(fn (?int $customerId, ?string $email, ?int $excludeOrderId): bool => $this->app->make(OrderService::class)->hasOrdered($customerId, $email, $excludeOrderId));
         });

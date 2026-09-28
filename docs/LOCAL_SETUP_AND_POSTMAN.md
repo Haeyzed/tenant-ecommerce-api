@@ -812,11 +812,110 @@ Then restart the queue worker.
 
 ---
 
-## 12. Troubleshooting
+## 12. Gift cards, reward points and installments ➡ you
+
+Gift cards and reward points are included from the **Standard** plan; installments need **Premium**. Enable each one you want:
+
+```http
+POST /admin/modules/gift_cards/enable
+POST /admin/modules/reward_points/enable
+POST /admin/modules/installments/enable
+```
+
+> **Test mode matters here.** A new store starts in payment **test mode**, and every order it takes is a test order. Test orders never use or create real stored value. So while you are in test mode:
+>
+> - gift cards can't be applied to a cart (reason `test_mode`);
+> - buying a gift card issues no card;
+> - points can't be redeemed or earned.
+>
+> Installments work in test mode, using your gateway's test keys. To try cards and points end to end, switch the store to live mode (`PATCH /admin/payment-settings/mode`).
+
+### 12.1 Gift cards
+
+```http
+POST  /admin/gift-cards                  { "initial_value": "5000", "recipient_email": "friend@mail.test", "expires_at": "2027-12-31" }   (Idempotency-Key header)
+GET   /admin/gift-cards                  (lists show only the last 4 characters)
+PATCH /admin/gift-cards/{id}/disable
+GET   /gift-cards/{code}/balance         (public, rate-limited)
+POST  /cart/apply-gift-card              { "code": "ABCD…" }
+DELETE /cart/gift-card
+POST  /gift-cards/purchase               { "amount": "10000", "recipient_email": "friend@mail.test", "recipient_message": "Happy birthday" }   (Idempotency-Key header)
+```
+
+- **Copy the code when you issue a card.** It is shown in full only once; the recipient also gets it by email.
+- **The cart shows the split.** Once a card is applied, the quote shows `gift_card_amount_applied` and `amount_due` (what is still left to pay). The card becomes a payment on the order when the order is placed.
+- **Cancelling puts the value back.** If the order is cancelled, the amount goes back onto the card. A customer can cancel an order that was paid only by gift card.
+- **Buying a card creates an order.** Pay it like any other order (`POST /orders/{id}/pay`, or record a payment in the admin). The card is issued and emailed when the order is paid.
+- Cards past their expiry date expire overnight.
+
+### 12.2 Reward points
+
+```http
+PUT  /admin/reward-points/settings       { "is_active": true, "amount_per_point": "100", "redeem_amount_per_point": "1", "minimum_redeem_points": 50, "point_expiry_days": 365 }
+POST /admin/customers/{id}/reward-points/adjust   { "points": 200, "reason": "Welcome bonus" }
+GET  /account/reward-points/balance      (customer token)
+GET  /account/reward-points/history
+POST /cart/apply-reward-points           { "points": 100 }     (0 removes them)
+```
+
+- **Earning.** With the settings above, a customer earns 1 point per 100 spent, on the items' amount without tax, after any points discount. Points are added once the order is delivered or completed.
+- **Redeeming.** Each point is worth 1 off. The discount is taken at checkout, and the points come back if the order is cancelled.
+- **Expiry.** Points expire `point_expiry_days` after they were earned. The check runs nightly.
+
+### 12.3 Installments (pay over time)
+
+First switch it on, and optionally set a minimum order amount:
+
+```http
+PATCH /admin/settings   { "installments_enabled": true, "installments_minimum_order_amount": "50000", "installments_fulfillment_policy": "on_full_payment" }
+```
+
+The customer then chooses installments at checkout, or right after placing the order:
+
+```http
+POST /orders   { "quote_hash": "…", "installment_plan": { "number_of_installments": 3, "frequency": "monthly" } }
+GET  /orders/{id}/installment-eligibility
+POST /orders/{id}/installment-plan       { "number_of_installments": 3, "frequency": "monthly" }
+GET  /orders/{id}/installment-plan
+POST /installment-payments/{id}/pay      { "gateway": "paystack" }   (Idempotency-Key header)
+```
+
+- **The split.** The total is split evenly, and any rounding difference goes on the last installment. The first installment is due today.
+- **Later installments are charged automatically.** When the customer pays the first installment through the gateway, their card is saved. Each later installment is charged on its due date by the scheduler (`schedule:work` locally).
+- **If a charge fails,** the customer can pay that installment with the same `/pay` call.
+- **Overdue and defaulted.** An unpaid installment past its due date becomes `overdue`. After `installments_default_after_overdue_count` overdue installments (default 2), the plan is flagged `defaulted` for staff. Nothing is cancelled automatically.
+- **When the order is released:**
+  - `on_full_payment` (the default): the order is confirmed and shipped once everything is paid;
+  - `on_first_payment`: the order is confirmed after the first installment.
+- A gift card and an installment plan can't be combined in one checkout.
+
+Staff:
+
+```http
+GET   /admin/installment-plans?status=defaulted
+POST  /admin/installment-plans/{plan}/payments/{payment}/charge   (charge now with the saved card; Idempotency-Key header)
+PATCH /admin/installment-plans/{plan}/cancel
+```
+
+### 12.4 After pulling this step ➡ you (once)
+
+```powershell
+php artisan tenants:migrate
+php artisan tenants:sync-defaults     # new permissions and email templates for stores that already exist (runs on the queue worker)
+```
+
+Then restart the queue worker and `schedule:work`. Installment charges, and gift-card and points expiry, run from the daily tenant maintenance.
+
+> `tenants:sync-defaults` also covers steps 10 and 11. If you pulled those without running it, your existing store's owner gets `403 forbidden` on the currency and purchasing admin routes (the response names the missing `permission`). New stores get everything when they are created.
+
+---
+
+## 13. Troubleshooting
 
 | Symptom | Cause / fix |
 |---|---|
 | `503 registration_unavailable` | The Terms or Privacy Policy is not published (§4.2), or `tenant_registration_enabled` is `false`. |
+| `403 forbidden` with a `permission` in `meta.details`, on a newly added admin route (owner token) | The store was created before that route existed. Run `php artisan tenants:sync-defaults` with the queue worker running (§12.4). |
 | `422 legal_version_outdated` on `/register` | `accepted_legal_document_ids` must be exactly the current published ids from `GET /legal-documents/current`. |
 | No code in `laravel.log` | The queue worker isn't running (§3.1). Check `php artisan queue:failed` too. |
 | Status stays `provisioning` | The worker isn't running, or the job failed. Run `php artisan queue:failed`, fix the cause, then `php artisan queue:retry all`. |

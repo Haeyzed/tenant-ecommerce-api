@@ -13,12 +13,16 @@ use App\Modules\Currency\Jobs\RefreshExchangeRates;
 use App\Modules\Currency\Services\CurrencyService;
 use App\Modules\Currency\Support\ExchangeRateProvider;
 use App\Modules\Exports\Services\DataExportService;
+use App\Modules\GiftCards\Jobs\ExpireGiftCards;
+use App\Modules\Installments\Jobs\ChargeDueInstallments;
+use App\Modules\Installments\Jobs\MarkOverdueInstallments;
 use App\Modules\Inventory\Support\StockAlerts;
 use App\Modules\Orders\Services\OrderService;
 use App\Modules\Payments\Services\OrderPaymentService;
 use App\Modules\Plans\Enums\ModuleState;
 use App\Modules\Plans\Services\FeatureAccessService;
 use App\Modules\Purchasing\Jobs\ExpireSupplierQuotations;
+use App\Modules\RewardPoints\Jobs\ExpireRewardPoints;
 use App\Modules\Seo\Support\SitemapBuilder;
 use App\Modules\Tenancy\Enums\TenantStatus;
 use App\Modules\Tenancy\Models\Tenant;
@@ -88,9 +92,15 @@ final class RunTenantDailyMaintenance implements ShouldBeUnique, ShouldQueue
             $this->task('unresolved_refunds', static fn () => app(OrderPaymentService::class)->flagUnresolvedRefunds());
             $this->task('anonymised_orders', static fn () => app(OrderService::class)->anonymizeSettledOrders());
             $this->task('accounting_outbox', static fn () => app(AccountingService::class)->redispatchStale());
-            $this->task('supplier_quotations', static function () use ($tenant): void {
-                if (app(FeatureAccessService::class)->state($tenant, 'purchasing') === ModuleState::Enabled) {
-                    ExpireSupplierQuotations::dispatch();
+            // Module jobs run only while their module is enabled.
+            $enabled = static fn (string $key): bool => app(FeatureAccessService::class)->state($tenant, $key) === ModuleState::Enabled;
+            $this->task('supplier_quotations', static fn () => $enabled('purchasing') ? ExpireSupplierQuotations::dispatch() : null);
+            $this->task('gift_cards', static fn () => $enabled('gift_cards') ? ExpireGiftCards::dispatch() : null);
+            $this->task('reward_points', static fn () => $enabled('reward_points') ? ExpireRewardPoints::dispatch() : null);
+            $this->task('installments', static function () use ($enabled): void {
+                if ($enabled('installments')) {
+                    MarkOverdueInstallments::dispatch();
+                    ChargeDueInstallments::dispatch();
                 }
             });
             $this->task('exchange_rates', static function (): void {

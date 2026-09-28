@@ -25,6 +25,7 @@ final class OrderPresenter
         $base = [
             'id' => $order->id,
             'order_number' => $order->order_number,
+            'order_type' => $order->order_type,
             'status' => $order->status,
             'payment_status' => $order->payment_status,
             'currency_code' => $order->currency_code,
@@ -37,7 +38,6 @@ final class OrderPresenter
         if ($admin) {
             $base += [
                 'order_source' => $order->order_source,
-                'order_type' => $order->order_type,
                 'customer' => ['id' => $order->customer_id, 'name' => $order->customer_name, 'email' => $order->customer_email],
             ];
         }

@@ -44,6 +44,9 @@ final readonly class Quote
         public string $hash,
         // 1 base = exchangeRate basket currency; '1' in the base currency.
         public string $exchangeRate = '1',
+        // Points redeemed and the gift card applied (§54, §46), when valid.
+        public int $rewardPoints = 0,
+        public ?int $giftCardId = null,
     ) {}
 
     public function isComplete(): bool
@@ -83,6 +86,8 @@ final readonly class Quote
                 'applied' => $this->promotions->couponApplied(),
                 'reason' => $this->promotions->couponRejectionReason,
             ],
+            'reward_points_redeemed' => $this->rewardPoints,
+            'gift_card_applied' => $this->giftCardId !== null,
             'requires_shipping' => $this->requiresShipping,
             'shipping_method' => $this->shippingMethod === null ? null : ['id' => $this->shippingMethod->id, 'name' => $this->shippingMethod->name],
             ...$this->totals,

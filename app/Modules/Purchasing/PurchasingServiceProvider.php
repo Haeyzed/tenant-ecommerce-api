@@ -25,8 +25,8 @@ final class PurchasingServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->afterResolving(CustomFieldEntityRegistry::class, static function (CustomFieldEntityRegistry $registry): void {
-            $registry->register(SupplierService::ENTITY, Supplier::class, 'suppliers');
-            $registry->register(PurchaseOrderService::ENTITY, PurchaseOrder::class, 'purchase-orders');
+            $registry->register(SupplierService::ENTITY, Supplier::class, 'suppliers', 'purchasing');
+            $registry->register(PurchaseOrderService::ENTITY, PurchaseOrder::class, 'purchase-orders', 'purchasing');
         });
 
         $this->app->afterResolving(WarehouseUsage::class, static function (WarehouseUsage $usage): void {

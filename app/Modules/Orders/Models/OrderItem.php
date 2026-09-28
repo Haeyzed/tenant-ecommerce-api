@@ -46,6 +46,7 @@ class OrderItem extends Model
     protected $fillable = [];
 
     protected $casts = [
+        'meta' => 'array',
         'order_id' => 'integer',
         'product_id' => 'integer',
         'product_variant_id' => 'integer',

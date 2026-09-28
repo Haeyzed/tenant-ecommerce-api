@@ -13,6 +13,9 @@ use App\Modules\Catalog\Models\ProductVariant;
 use App\Modules\Checkout\Support\Quote;
 use App\Modules\Currency\Services\CurrencyService;
 use App\Modules\Customers\Models\Address;
+use App\Modules\GiftCards\Models\GiftCard;
+use App\Modules\GiftCards\Services\GiftCardService;
+use App\Modules\Installments\Services\InstallmentPlanService;
 use App\Modules\Inventory\Models\Warehouse;
 use App\Modules\Inventory\Services\InventoryService;
 use App\Modules\Orders\Jobs\ExpireUnpaidOrder;
@@ -25,6 +28,7 @@ use App\Modules\Promotions\Services\PromotionRedemptionService;
 use App\Modules\Promotions\Support\BuyerHistory;
 use App\Modules\Promotions\Support\PricingContext;
 use App\Modules\Promotions\Support\PricingLine;
+use App\Modules\RewardPoints\Services\RewardPointService;
 use App\Modules\Settings\Services\PlatformSettingsService;
 use App\Modules\Settings\Services\TenantSettingsService;
 use App\Modules\Shipping\Services\ShippingService;
@@ -55,6 +59,9 @@ final readonly class CheckoutService
         private PromotionRedemptionService $redemptions,
         private PlatformSettingsService $platformSettings,
         private CurrencyService $currencies,
+        private GiftCardService $giftCards,
+        private RewardPointService $rewardPoints,
+        private InstallmentPlanService $installments,
     ) {}
 
     /**
@@ -95,6 +102,10 @@ final readonly class CheckoutService
             'billing_address' => ['sometimes', 'nullable', 'array'],
             'gateway' => ['sometimes', 'nullable', 'string', 'in:'.implode(',', array_keys((array) config('payments.providers')))],
             'customer_note' => ['sometimes', 'nullable', 'string', 'max:2000'],
+            // §47.3 step 1: pay in installments (feature and setting checked at commit).
+            'installment_plan' => ['sometimes', 'nullable', 'array'],
+            'installment_plan.number_of_installments' => ['required_with:installment_plan', 'integer'],
+            'installment_plan.frequency' => ['required_with:installment_plan', 'string'],
         ])->validate();
 
         if ($customer === null && ! ((bool) $this->settings->get('guest_checkout_enabled', true) && (bool) $this->platformSettings->get('guest_checkout_allowed_platform_wide', true))) {
@@ -144,6 +155,7 @@ final readonly class CheckoutService
                 'customer_phone' => $customer?->phone ?? ($validated['guest_phone'] ?? $shippingAddress['phone'] ?? null),
                 'currency_code' => $quote->currency,
                 'exchange_rate' => $quote->exchangeRate,
+                'reward_points_redeemed' => $quote->rewardPoints,
                 'prices_include_tax' => $quote->pricesIncludeTax,
                 'lines' => array_values(array_map(static fn (array $l): array => [
                     'product' => $l['product'],
@@ -171,6 +183,19 @@ final readonly class CheckoutService
 
             $this->flashSales->claim($order);
             $this->redemptions->reserve($order, $quote->promotions);
+
+            // 11.4 and 11.5: the gift card (a payment) and the points, each under its lock.
+            if ($quote->giftCardId !== null && Money::isPositive((string) $quote->totals['gift_card_amount_applied'])) {
+                $this->giftCards->redeemGiftCard(GiftCard::query()->findOrFail($quote->giftCardId), $order, (string) $quote->totals['gift_card_amount_applied']);
+            }
+
+            $this->rewardPoints->redeemPoints($order, $quote->rewardPoints);
+
+            if (! empty($validated['installment_plan'])) {
+                $this->installments->createPlan($order, (int) $validated['installment_plan']['number_of_installments'], (string) $validated['installment_plan']['frequency']);
+                $order->refresh();
+            }
+
             $this->orders->recalculatePaymentStatus($order);
 
             $cart->items()->delete();
@@ -374,6 +399,37 @@ final readonly class CheckoutService
             $issues[] = ['code' => 'shipping_method_required', 'message' => 'Choose a shipping method.'];
         }
 
+        // 7. Reward points (§54.2): an order discount on the total, capped at it.
+        $points = 0;
+        $pointsDiscount = Money::normalize(0);
+
+        if ((int) $cart->reward_points_to_redeem > 0 && $customer !== null && $this->rewardPoints->active()) {
+            $check = $this->rewardPoints->validateRedemption($customer, (int) $cart->reward_points_to_redeem, $total, $currency, $rate);
+
+            if ($check['valid']) {
+                $points = $check['points'];
+                $pointsDiscount = $check['discount'];
+                $total = Money::sub($total, $pointsDiscount);
+            } else {
+                $issues[] = ['code' => 'reward_points_unavailable', 'message' => 'The points on this cart cannot be used ('.$check['reason'].'). Change or remove them.'];
+            }
+        }
+
+        // The gift card: a payment against the total, not a discount (§46.3).
+        $giftCardId = null;
+        $giftCardAmount = Money::normalize(0);
+
+        if ($cart->gift_card_id !== null && $this->giftCards->enabled()) {
+            $check = $this->giftCards->check(GiftCard::query()->find($cart->gift_card_id), $currency, $total);
+
+            if ($check['valid']) {
+                $giftCardId = (int) $cart->gift_card_id;
+                $giftCardAmount = $check['applicable_amount'];
+            } else {
+                $issues[] = ['code' => 'gift_card_unavailable', 'message' => 'The gift card on this cart cannot be used ('.$check['reason'].'). Remove it.'];
+            }
+        }
+
         $totals = [
             'subtotal' => $subtotal,
             'discount_amount' => $discount,
@@ -381,14 +437,14 @@ final readonly class CheckoutService
             'shipping_discount_amount' => $shippingAmount === null ? null : $shippingDiscount,
             'shipping_tax_amount' => $shippingTax,
             'tax_amount' => $taxTotal,
-            'reward_points_discount_amount' => Money::normalize(0),
-            'gift_card_amount_applied' => Money::normalize(0),
+            'reward_points_discount_amount' => $pointsDiscount,
+            'gift_card_amount_applied' => $giftCardAmount,
             'total' => $total,
-            'amount_due' => $total,
+            'amount_due' => Money::sub($total, $giftCardAmount),
         ];
 
         return new Quote($currency, array_values($lines), $address, $requiresShipping, $method, $result, $cart->coupon?->code,
-            $inclusive, $totals, $issues, $this->hash($currency, $lines, $totals, $cart->coupon?->code, $method?->id, $address), $rate);
+            $inclusive, $totals, $issues, $this->hash($currency, $lines, $totals, $cart->coupon?->code, $method?->id, $address), $rate, $points, $giftCardId);
     }
 
     /**
