@@ -59,6 +59,9 @@ use App\Modules\Plans\Models\TenantLimitOverride;
 use App\Modules\Plans\Models\TenantModule;
 use App\Modules\PlatformSupport\Models\PlatformSupportConversation;
 use App\Modules\PlatformSupport\Models\PlatformSupportMessageAttachment;
+use App\Modules\Pos\Models\PosRegister;
+use App\Modules\Pos\Models\PosSession;
+use App\Modules\Pos\Models\PosSettings;
 use App\Modules\Promotions\Models\Coupon;
 use App\Modules\Promotions\Models\FlashSale;
 use App\Modules\Promotions\Models\Promotion;
@@ -155,6 +158,9 @@ final class MorphMap
         'gift_card' => GiftCard::class,
         'installment_plan' => InstallmentPlan::class,
         'reward_point_settings' => RewardPointSettings::class,
+        'pos_register' => PosRegister::class,
+        'pos_session' => PosSession::class,
+        'pos_settings' => PosSettings::class,
         'supplier' => Supplier::class,
         'purchase_order' => PurchaseOrder::class,
         'purchase_return' => PurchaseReturn::class,

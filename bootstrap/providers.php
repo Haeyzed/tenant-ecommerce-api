@@ -9,6 +9,7 @@ use App\Modules\GiftCards\GiftCardsServiceProvider;
 use App\Modules\Installments\InstallmentsServiceProvider;
 use App\Modules\Inventory\InventoryServiceProvider;
 use App\Modules\Orders\OrdersServiceProvider;
+use App\Modules\Pos\PosServiceProvider;
 use App\Modules\Promotions\PromotionsServiceProvider;
 use App\Modules\Purchasing\PurchasingServiceProvider;
 use App\Modules\Returns\ReturnsServiceProvider;
@@ -35,5 +36,6 @@ return [
     GiftCardsServiceProvider::class,
     InstallmentsServiceProvider::class,
     RewardPointsServiceProvider::class,
+    PosServiceProvider::class,
     ApiDocsServiceProvider::class,
 ];

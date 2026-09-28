@@ -14,6 +14,7 @@ use App\Modules\Payments\Jobs\VerifyOrderPayment;
 use App\Modules\Payments\Models\OrderPayment;
 use App\Modules\Payments\Models\TenantPaymentSetting;
 use App\Modules\Payments\Support\PaymentPostings;
+use App\Modules\Pos\Terminals\PosTerminalGatewayFactory;
 use App\Modules\Returns\Models\OrderReturn;
 use App\Modules\Returns\Services\ReturnService;
 use App\Modules\Tenancy\Models\Tenant;
@@ -308,8 +309,12 @@ final readonly class OrderPaymentService
      * The only refund path (§40.4), two-phase: reserve the capacity under a
      * lock on the original row, then call the provider outside the
      * transaction. Manual methods complete at once (ledger only).
+     *
+     * A card-terminal payment is refunded through its terminal driver
+     * (§51.3). A provider without a refund API needs the cashier to reverse
+     * it on the device first ($reversedOnTerminal): then the ledger only.
      */
-    public function refund(OrderPayment $payment, string $amount, string $reason, ?User $by = null, ?string $idempotencyKey = null, ?OrderReturn $return = null): OrderPayment
+    public function refund(OrderPayment $payment, string $amount, string $reason, ?User $by = null, ?string $idempotencyKey = null, ?OrderReturn $return = null, bool $reversedOnTerminal = false): OrderPayment
     {
         $amount = Money::normalize($amount);
 
@@ -318,12 +323,18 @@ final readonly class OrderPaymentService
         }
 
         // A gift-card payment refunds onto its card (§46.3), ledger only.
-        if (in_array($payment->payment_method, ['exchange_credit', 'card_terminal'], true)) {
+        if ($payment->payment_method === 'exchange_credit') {
             throw ApiException::unprocessable('refund_method_unsupported', 'This payment cannot be refunded here.');
         }
 
+        $terminal = $payment->payment_method === 'card_terminal' && ! $reversedOnTerminal ? app(PosTerminalGatewayFactory::class)->forPayment($payment) : null;
+
+        if ($terminal !== null && ! $terminal->supportsRefunds()) {
+            throw ApiException::unprocessable('terminal_refund_unsupported', 'This terminal provider cannot refund through its API. Reverse the payment on the terminal, then confirm it was reversed.');
+        }
+
         /** @var OrderPayment $refund */
-        $refund = DB::connection('tenant')->transaction(function () use ($payment, $amount, $reason, $by, $idempotencyKey, $return): OrderPayment {
+        $refund = DB::connection('tenant')->transaction(function () use ($payment, $amount, $reason, $by, $idempotencyKey, $return, $terminal, $reversedOnTerminal): OrderPayment {
             /** @var OrderPayment $original */
             $original = OrderPayment::query()->whereKey($payment->id)->lockForUpdate()->firstOrFail();
 
@@ -339,7 +350,7 @@ final readonly class OrderPaymentService
                 throw ApiException::unprocessable('refund_exceeds_payment', 'The refund exceeds what is left of this payment.', ['refundable' => $this->capacity($original)]);
             }
 
-            $gateway = $original->payment_method === 'gateway';
+            $gateway = $original->payment_method === 'gateway' || $terminal !== null;
             $row = new OrderPayment;
             $row->forceFill([
                 'order_id' => $original->order_id,
@@ -354,9 +365,11 @@ final readonly class OrderPaymentService
                 'currency_code' => $original->currency_code,
                 'refund_of_order_payment_id' => $original->id,
                 'order_return_id' => $return?->id,
+                'pos_session_id' => $original->pos_session_id,
                 'recorded_by_user_id' => $by?->id,
                 'paid_at' => $gateway ? null : now(),
                 'notes' => mb_substr($reason, 0, 1000),
+                'meta' => $reversedOnTerminal && $original->payment_method === 'card_terminal' ? ['reversed_on_terminal' => true] : null,
             ])->save();
 
             if (! $gateway) {
@@ -384,8 +397,10 @@ final readonly class OrderPaymentService
         }
 
         try {
-            $result = $this->factory->forTenant((string) $payment->provider, $payment->mode)
-                ->refund((string) $payment->provider_reference, $amount, $payment->currency_code, $refund->reference);
+            $result = $terminal !== null
+                ? $terminal->refund((string) ($payment->meta['terminal_reference'] ?? ''), $payment->provider_reference, $amount, $payment->currency_code, $refund->reference)
+                : $this->factory->forTenant((string) $payment->provider, $payment->mode)
+                    ->refund((string) $payment->provider_reference, $amount, $payment->currency_code, $refund->reference);
         } catch (PaymentGatewayException $e) {
             if (! $e->pending) {
                 $this->completeRefund($refund, OrderPayment::FAILED, null, 'provider_rejected');

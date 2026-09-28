@@ -97,6 +97,7 @@ return [
     'export.ready' => ['eyebrow' => 'Export', 'action' => 'download_url', 'action_text' => 'Download export'],
 
     'gift_card.issued' => ['tone' => 'success', 'eyebrow' => 'Gift card', 'highlight' => 'amount', 'highlight_label' => 'Gift card value'],
+    'pos.sale_receipt' => ['tone' => 'success', 'eyebrow' => 'Receipt', 'highlight' => 'order_total', 'highlight_label' => 'Total paid'],
     'sales_quotation.sent' => ['eyebrow' => 'Quotation', 'highlight' => 'total', 'highlight_label' => 'Quotation total', 'action' => 'quotation_url', 'action_text' => 'View quotation'],
     'quotation_request.sent' => ['eyebrow' => 'Quotation request', 'highlight' => 'request_number', 'highlight_label' => 'Request'],
     'product_subscription.payment_failed' => ['tone' => 'danger', 'eyebrow' => 'Subscription', 'action' => 'account_url', 'action_text' => 'Update payment'],

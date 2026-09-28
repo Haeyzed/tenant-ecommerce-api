@@ -127,6 +127,8 @@ final readonly class OrderService
             $expires = (bool) ($data['expires'] ?? false) && Money::isPositive((string) $totals['total']);
 
             $order = new Order;
+            $status = (string) ($data['status'] ?? $this->initialStatus($source));
+            $placedAt = $data['placed_at'] ?? now();
             $order->forceFill([
                 'order_number' => $this->generateOrderNumber(),
                 'customer_id' => $customer?->id,
@@ -134,7 +136,9 @@ final readonly class OrderService
                 'customer_name' => $data['customer_name'] ?? $customer?->name,
                 'customer_email' => isset($data['customer_email']) ? strtolower((string) $data['customer_email']) : $customer?->email,
                 'customer_phone' => $data['customer_phone'] ?? $customer?->phone,
-                'status' => (string) ($data['status'] ?? $this->initialStatus($source)),
+                'status' => $status,
+                // A POS sale is handed over at once (§51.3).
+                'completed_at' => in_array($status, [Order::DELIVERED, Order::COMPLETED], true) ? $placedAt : null,
                 'payment_status' => 'unpaid',
                 'order_type' => (string) ($data['order_type'] ?? 'standard'),
                 'order_source' => $source,
@@ -162,7 +166,9 @@ final readonly class OrderService
                 'replaces_order_return_id' => $data['replaces_order_return_id'] ?? null,
                 'idempotency_key' => $data['idempotency_key'] ?? null,
                 'customer_note' => $data['customer_note'] ?? null,
-                'placed_at' => now(),
+                'pos_session_id' => $data['pos_session_id'] ?? null,
+                // An offline POS sale keeps the time it was made (§51.6).
+                'placed_at' => $placedAt,
                 'payment_expires_at' => $expires ? now()->addMinutes((int) $this->settings->get('unpaid_order_expiry_minutes', 60)) : null,
             ])->save();
 
@@ -205,11 +211,14 @@ final readonly class OrderService
             return $order;
         });
 
-        $this->notifications->dispatch('order.new_order_received', $order, [
-            'order_number' => $order->order_number,
-            'order_total' => Money::format((string) $order->total, $order->currency_code),
-            'customer_name' => (string) ($order->customer_name ?? 'A guest'),
-        ]);
+        // Staff made a POS sale themselves: no new-order alert per till sale.
+        if ($source !== 'pos') {
+            $this->notifications->dispatch('order.new_order_received', $order, [
+                'order_number' => $order->order_number,
+                'order_total' => Money::format((string) $order->total, $order->currency_code),
+                'customer_name' => (string) ($order->customer_name ?? 'A guest'),
+            ]);
+        }
 
         return $order;
     }
@@ -217,9 +226,10 @@ final readonly class OrderService
     /**
      * The committed sale (§39.4), exactly once: reservations become
      * deductions and promotion redemptions commit. An order with no
-     * physical lines is delivered at once.
+     * physical lines is delivered at once. $notify is false for a POS sale:
+     * POS sends its own receipt when the store asks for it (§51.3 step 6).
      */
-    public function confirmOrder(Order $order, bool $onePass = false): void
+    public function confirmOrder(Order $order, bool $onePass = false, bool $notify = true): void
     {
         $confirmed = DB::connection('tenant')->transaction(function () use ($order, $onePass): bool {
             $locked = $this->lock($order);
@@ -257,7 +267,7 @@ final readonly class OrderService
             return true;
         });
 
-        if ($confirmed) {
+        if ($confirmed && $notify) {
             $this->notifications->dispatch('order.confirmed', $order, [
                 'customer_name' => (string) ($order->customer_name ?? ''),
                 'order_number' => $order->order_number,
@@ -486,6 +496,48 @@ final readonly class OrderService
             'order_number' => $order->order_number,
             'reason' => $reason === 'payment_timeout' ? 'the payment was not completed in time' : $reason,
         ]);
+
+        return $order;
+    }
+
+    /**
+     * A POS void (§51.3): the sale is undone. The caller has already
+     * refunded every payment except gift cards (provider calls stay outside
+     * this transaction). Here stock returns (pos_void), the sale and its
+     * promotions are reversed, and the cancellation hooks credit gift cards
+     * back and settle points. The order ends refunded.
+     */
+    public function voidOrder(Order $order, string $reason): Order
+    {
+        DB::connection('tenant')->transaction(function () use ($order, $reason): void {
+            $locked = $this->lock($order);
+
+            // The refunds before the void may already have marked the sale refunded.
+            if ($locked->order_source !== 'pos' || $locked->cancelled_at !== null || ! in_array($locked->status, [Order::COMPLETED, Order::REFUNDED], true)) {
+                throw ApiException::invalidTransition($locked->status, Order::REFUNDED);
+            }
+
+            $locked->load('items.product.bundleItems', 'items.variant', 'items.warehouse');
+
+            if ($locked->confirmed_at !== null) {
+                $this->moveStock($locked, 'restock', 'pos_void');
+                $this->redemptions->reverse($locked);
+                $this->outbox->record('reverseOrderSale', $locked, now(), 'order_sale_reversal:'.$locked->id);
+            }
+
+            $this->flashSales->release($locked);
+            $this->downloads->revokeForOrder($locked);
+            $this->lifecycle->run(OrderLifecycle::CANCELLED, $locked);
+
+            $locked->forceFill([
+                'status' => Order::REFUNDED,
+                'cancelled_at' => now(),
+                'cancellation_reason' => mb_substr($reason, 0, 255),
+            ])->save();
+
+            $this->recalculatePaymentStatus($locked);
+            $order->setRawAttributes($locked->getAttributes(), true);
+        });
 
         return $order;
     }

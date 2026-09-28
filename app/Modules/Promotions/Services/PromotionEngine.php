@@ -302,7 +302,7 @@ final readonly class PromotionEngine
             $promotion->starts_at !== null && $promotion->starts_at->gt($at) => 'not_started',
             ($coupon->expires_at !== null && $coupon->expires_at->lte($at)) || ($promotion->ends_at !== null && $promotion->ends_at->lte($at)) => 'expired',
             $coupon->assigned_customer_id !== null && $coupon->assigned_customer_id !== $context->customerId => 'customer_not_eligible',
-            $coupon->usage_limit !== null && $coupon->times_redeemed >= $coupon->usage_limit => 'usage_limit_reached',
+            ! $context->offline && $coupon->usage_limit !== null && $coupon->times_redeemed >= $coupon->usage_limit => 'usage_limit_reached',
             default => null,
         };
 
@@ -341,6 +341,10 @@ final readonly class PromotionEngine
 
         if ($promotion->first_order_only && ! $context->isFirstOrder) {
             return 'first_order_only';
+        }
+
+        if ($context->offline) {
+            return null;
         }
 
         if ($promotion->usage_limit_total !== null && $promotion->times_redeemed >= $promotion->usage_limit_total) {

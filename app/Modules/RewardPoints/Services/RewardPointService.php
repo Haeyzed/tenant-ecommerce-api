@@ -139,21 +139,35 @@ final readonly class RewardPointService
 
     /**
      * The cancellation hook (§54.2): redeemed points come back once, as an
-     * adjustment.
+     * adjustment. A voided POS sale (§51.3) had also earned points on
+     * completion: those are taken back once, never below a zero balance.
      */
     public function restorePoints(Order $order): void
     {
-        $redeemed = (int) RewardPointTransaction::query()->where('order_id', $order->id)->where('type', RewardPointTransaction::REDEEMED)->sum('points');
-        $restored = (int) RewardPointTransaction::query()->where('order_id', $order->id)->where('type', RewardPointTransaction::ADJUSTED)
-            ->where('notes', 'like', 'Restored:%')->sum('points');
-        $owed = -$redeemed - $restored;
-
-        if ($owed <= 0 || $order->customer_id === null) {
+        if ($order->customer_id === null) {
             return;
         }
 
-        $balance = $this->lockBalance((int) $order->customer_id);
-        $this->write((int) $order->customer_id, $order->id, RewardPointTransaction::ADJUSTED, $owed, $balance + $owed, 'Restored: order '.$order->order_number.' cancelled');
+        $sum = static fn (string $type, ?string $notes = null): int => (int) RewardPointTransaction::query()->where('order_id', $order->id)->where('type', $type)
+            ->when($notes !== null, static fn ($q) => $q->where('notes', 'like', $notes.'%'))->sum('points');
+
+        $owed = -$sum(RewardPointTransaction::REDEEMED) - $sum(RewardPointTransaction::ADJUSTED, 'Restored:');
+
+        if ($owed > 0) {
+            $balance = $this->lockBalance((int) $order->customer_id);
+            $this->write((int) $order->customer_id, $order->id, RewardPointTransaction::ADJUSTED, $owed, $balance + $owed, 'Restored: order '.$order->order_number.' cancelled');
+        }
+
+        $earned = $sum(RewardPointTransaction::EARNED) + $sum(RewardPointTransaction::ADJUSTED, 'Reversed:');
+
+        if ($earned > 0) {
+            $balance = $this->lockBalance((int) $order->customer_id);
+            $taken = min($earned, $balance);
+
+            if ($taken > 0) {
+                $this->write((int) $order->customer_id, $order->id, RewardPointTransaction::ADJUSTED, -$taken, $balance - $taken, 'Reversed: points earned on order '.$order->order_number);
+            }
+        }
     }
 
     /**

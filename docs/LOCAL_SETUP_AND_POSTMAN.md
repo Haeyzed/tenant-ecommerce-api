@@ -910,7 +910,89 @@ Then restart the queue worker and `schedule:work`. Installment charges, and gift
 
 ---
 
-## 13. Troubleshooting
+## 13. Selling in a shop (point of sale) ➡ you
+
+POS is included from the **Standard** plan: 3 registers on Standard, 10 on Premium. A POS sale is a normal order (`order_source = pos`), so it shows up in orders, stock and reports. Cashiers are staff users; give them a role with the `pos.*` permissions.
+
+```http
+POST /admin/modules/pos/enable
+PUT  /admin/pos/settings   { "default_customer_id": 12, "enabled_payment_methods": ["cash", "bank_transfer", "card_terminal", "gift_card", "reward_points", "credit_sale"] }
+POST /admin/pos/registers  { "warehouse_id": 1, "name": "Front Counter" }
+```
+
+- **Walk-in customer.** Create an ordinary customer called "Walk-in Customer" and set it as `default_customer_id`. Sales without a chosen customer go to it.
+- **Tax.** POS charges tax at the register's warehouse, so give the warehouse a country (and state).
+- **Cash drawer.** `cash_register_enabled` is on by default: every sale then needs an open session. Turn it off for card-only shops.
+
+### 13.1 A shift at the till
+
+```http
+POST /admin/pos/sessions                    { "register_id": 1, "opening_cash_float": "10000" }
+GET  /admin/pos/products/lookup?barcode=5901234123457&register_id=1     (or ?q=runner)
+POST /admin/pos/quote                       { "register_id": 1, "lines": [{ "product_id": 7, "quantity": 2 }] }
+POST /admin/pos/sales                       { "register_id": 1, "idempotency_key": "<uuid from the till>", "quote_total": "86000",
+                                              "lines": [{ "product_id": 7, "quantity": 2 }],
+                                              "payments": [{ "method": "cash", "amount": "100000" }] }
+GET  /admin/pos/sales/{id}/receipt
+POST /admin/pos/sessions/{id}/close         { "closing_cash_float": "96000" }      (what you counted in the drawer)
+```
+
+- **Cash and change.** Enter the cash the customer handed over. The response shows `change_given`.
+- **Paying several ways.** Put more than one entry in `payments`, for example part bank transfer and part cash. Only cash may be more than the total.
+- **The sale response** includes the receipt data and the warehouse's receipt printer, if one is set up in Documents.
+- **Closing the drawer.** Closing a session shows the expected cash and the variance. Set `pos_cash_variance_threshold` in `PATCH /admin/settings` to alert staff when the variance is larger than that amount.
+- **Credit sales** (`"credit_sale": true`) and **reward points** (`"reward_points": 100`) need a real customer, not the walk-in record.
+- **Gift cards.** Add a payment with `"method": "gift_card", "gift_card_code": "…"`.
+- **Receipt by email or SMS.** Turn on `send_sms_after_sale` in the POS settings. Known customers then get their receipt.
+
+### 13.2 Card terminals (Moniepoint, OPay, Stripe Terminal)
+
+Card terminals need live mode: the store must be in live payment mode, because there is no test mode for terminals.
+
+```http
+PATCH /admin/pos/registers/1/terminal   { "provider": "opay", "credentials": { "merchant_id": "…", "secret_key": "…", "terminal_serial": "N7810…" } }
+POST  /admin/pos/terminal-charges       { "register_id": 1, "amount": "43000" }       → reference PTC-…, the terminal asks for the card
+GET   /admin/pos/terminal-charges/PTC-…?register_id=1                                    (poll until "successful")
+POST  /admin/pos/sales                  { …, "payments": [{ "method": "card_terminal", "amount": "43000", "reference": "PTC-…" }] }
+```
+
+| Provider | Credentials | Where to find them |
+|---|---|---|
+| `moniepoint` | `client_id`, `client_secret`, `terminal_serial` | Moniepoint business account → API keys. Also turn on **ERP integration** under POS terminal features. |
+| `opay` | `merchant_id`, `secret_key`, `terminal_serial` | OPay Business Dashboard → Developer Tools, as Super Admin. |
+| `stripe_terminal` | `secret_key`, `reader_id` | Stripe dashboard → Developers (keys); Terminal → Readers (`tmr_…`). |
+
+- **Credentials are write-only.** Responses show only `has_terminal_credentials`.
+- **Each card payment pays one sale.** Reusing a reference fails with `terminal_charge_used`.
+- **Moniepoint (check before going live).** We send amounts in kobo. Try one small real sale first and check the amount on the terminal.
+
+### 13.3 Voids and offline sales
+
+```http
+POST /admin/pos/sales/{id}/void   { "reason": "Wrong size" }
+```
+
+- **When you can void.** While the sale's session is open. Without sessions, within 24 hours. After that, use a return.
+- **What a void does.** Cash and bank payments are refunded in the books, and OPay and Stripe card payments are refunded through the provider. Stock goes back, a gift card gets its value back, and points go back to how they were before the sale.
+- **Moniepoint can't refund through its API.** Reverse the payment on the terminal first, then void with `"terminal_reversed": true`.
+- **Offline sales.** The till can save sales while offline and send them later with the same body plus `sold_at` (when the sale happened) and `pos_session_id`.
+  - The same `idempotency_key` never makes a second sale: a repeat returns the first sale with status 200.
+  - If a promotion ran out while you were offline, the sale is still accepted, and staff get a "limit exceeded offline" notice.
+  - If there isn't enough stock, the sale is refused with `409 stock_conflict`. Keep it on the till and fix the stock first.
+
+### 13.4 After pulling this step ➡ you (once)
+
+```powershell
+php artisan tenants:migrate
+php artisan tenants:sync-defaults     # POS permissions and the pos.sale_receipt template
+php artisan config:clear
+```
+
+Then restart the queue worker. Add the `POS_*` lines from `.env.example` to your `.env` if you want to change the defaults.
+
+---
+
+## 14. Troubleshooting
 
 | Symptom | Cause / fix |
 |---|---|

@@ -93,6 +93,10 @@ return [
     'gift_card.issued' => $n(['customer'], ['email' => true],
         'You received a {{store_name}} gift card',
         "Hello,\n\n{{sender_name}} sent you a gift card worth {{amount}}.\n\nCode: {{code}}\n\n{{message}}"),
+    // §51.3 step 6: sent when pos_settings.send_sms_after_sale is on.
+    'pos.sale_receipt' => $n(['customer'], ['email' => true, 'sms' => true],
+        'Your receipt from {{store_name}}',
+        "Hello {{customer_name}},\n\nThank you for shopping at {{store_name}}. Receipt {{order_number}} of {{sale_date}}: {{order_total}}."),
     'sales_quotation.sent' => $n(['customer'], ['email' => true],
         'Quotation {{quotation_number}} from {{store_name}}',
         "Hello {{customer_name}},\n\nPlease find quotation {{quotation_number}} for {{total}}, valid until {{valid_until}}: {{quotation_url}}"),

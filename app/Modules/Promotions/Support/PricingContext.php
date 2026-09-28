@@ -33,5 +33,9 @@ final readonly class PricingContext
         public ?string $couponCode = null,
         public ?string $shippingAmount = null,
         public ?CarbonInterface $at = null,
+        // An offline POS sale being synced (§51.6, A-69): the discount was
+        // already given, so usage limits do not remove it; the redemption
+        // is flagged over_limit instead.
+        public bool $offline = false,
     ) {}
 }

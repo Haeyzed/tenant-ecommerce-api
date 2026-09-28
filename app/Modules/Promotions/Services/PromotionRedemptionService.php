@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Promotions\Services;
 
+use App\Modules\Notifications\Services\NotificationDispatchService;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Promotions\Models\Coupon;
 use App\Modules\Promotions\Models\Promotion;
@@ -14,6 +15,7 @@ use App\Modules\Promotions\Support\PromotionResult;
 use App\Modules\Settings\Services\TenantSettingsService;
 use App\Shared\Exceptions\ApiException;
 use App\Shared\Support\Money;
+use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -42,20 +44,27 @@ final readonly class PromotionRedemptionService
     /**
      * Re-checks every applied promotion under lock (409
      * promotion_unavailable) and records reserved redemptions.
+     *
+     * An offline POS sale (§51.6, A-69) is checked at its recorded sale time
+     * ($at), and a usage limit exhausted since is accepted: the redemption
+     * is flagged over_limit and staff are told, because the goods and money
+     * have already changed hands. Online checkout never exceeds a limit.
      */
-    public function reserve(Order $order, PromotionResult $result): void
+    public function reserve(Order $order, PromotionResult $result, ?CarbonInterface $at = null, bool $offline = false): void
     {
         if ($result->applied === []) {
             return;
         }
 
-        DB::connection('tenant')->transaction(function () use ($order, $result): void {
+        $exceeded = [];
+
+        DB::connection('tenant')->transaction(function () use ($order, $result, $at, $offline, &$exceeded): void {
             $promotions = $this->lockPromotions(array_column($result->applied, 'promotion_id'));
             $couponIds = array_values(array_filter(array_column($result->applied, 'coupon_id')));
             $coupons = $couponIds === [] ? collect() : Coupon::query()->whereKey($couponIds)->orderBy('id')->lockForUpdate()->get()->keyBy('id');
             $email = $order->customer_email === null ? null : strtolower($order->customer_email);
             $channelPos = $order->order_source === 'pos';
-            $now = now();
+            $now = $at ?? now();
 
             foreach ($result->applied as $row) {
                 /** @var Promotion|null $promotion */
@@ -63,21 +72,27 @@ final readonly class PromotionRedemptionService
                 /** @var Coupon|null $coupon */
                 $coupon = $row['coupon_id'] === null ? null : $coupons->get($row['coupon_id']);
 
-                $valid = $promotion !== null && ! $promotion->trashed() && $promotion->is_active
+                $eligible = $promotion !== null && ! $promotion->trashed() && $promotion->is_active
                     && ($promotion->starts_at === null || $promotion->starts_at->lte($now))
                     && ($promotion->ends_at === null || $promotion->ends_at->gt($now))
                     && $this->engine->validNow($promotion, $now)
                     && ($channelPos ? $promotion->applies_to_pos : $promotion->applies_to_online)
-                    && ($promotion->usage_limit_total === null || $promotion->times_redeemed < $promotion->usage_limit_total)
                     && ($row['coupon_id'] === null || ($coupon !== null && $coupon->is_active
-                        && ($coupon->usage_limit === null || $coupon->times_redeemed < $coupon->usage_limit)
                         && ($coupon->expires_at === null || $coupon->expires_at->gt($now))
                         && ($coupon->assigned_customer_id === null || $coupon->assigned_customer_id === $order->customer_id)))
-                    && ($promotion->usage_limit_per_customer === null || $this->usedBy($promotion, $order->customer_id, $email) < $promotion->usage_limit_per_customer)
                     && (! $promotion->first_order_only || $this->history->isFirstOrder($order->customer_id, $email, $order->id));
 
-                if (! $valid) {
+                $withinLimits = $promotion !== null
+                    && ($promotion->usage_limit_total === null || $promotion->times_redeemed < $promotion->usage_limit_total)
+                    && ($coupon === null || $coupon->usage_limit === null || $coupon->times_redeemed < $coupon->usage_limit)
+                    && ($promotion->usage_limit_per_customer === null || $this->usedBy($promotion, $order->customer_id, $email) < $promotion->usage_limit_per_customer);
+
+                if (! $eligible || (! $withinLimits && ! ($offline && $channelPos))) {
                     throw ApiException::conflict('promotion_unavailable', 'A promotion on this basket is no longer available. Review the cart.', ['promotion_id' => $row['promotion_id']]);
+                }
+
+                if (! $withinLimits) {
+                    $exceeded[] = $promotion;
                 }
 
                 /** @var Promotion $promotion */
@@ -102,11 +117,16 @@ final readonly class PromotionRedemptionService
                     'base_discount_amount' => Money::round(bcmul((string) $row['amount'], (string) ($order->exchange_rate_used ?? '1'), 12), $this->baseCurrency()),
                     'seller_id' => $promotion->seller_id,
                     'status' => PromotionRedemption::RESERVED,
+                    'over_limit' => ! $withinLimits,
                 ])->save();
             }
         });
 
         $this->cache->flush();
+
+        foreach ($exceeded as $promotion) {
+            app(NotificationDispatchService::class)->dispatch('promotion.limit_exceeded_offline', $promotion, ['promotion_name' => $promotion->name]);
+        }
     }
 
     public function commit(Order $order): void
