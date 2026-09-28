@@ -992,7 +992,52 @@ Then restart the queue worker. Add the `POS_*` lines from `.env.example` to your
 
 ---
 
-## 14. Troubleshooting
+## 14. Sales agents and commissions ➡ you
+
+Sales agents need the **Premium** plan. An agent is a referral or sales rep who earns a commission on sales the store fulfils; agents don't need a login.
+
+```http
+POST  /admin/modules/sales_agents/enable
+PATCH /admin/settings                              { "default_sales_agent_commission_rate": "5" }        (percent)
+POST  /admin/sales-agents                          { "name": "Bola Ade", "phone": "+234…", "email": "bola@…", "commission_rate": "7.5" }   (rate optional)
+GET   /admin/sales-agents?status=active&search=bola
+```
+
+The response includes `agent_code`, for example `BOLAX7K2`. Give it to the agent; it works in any letter case.
+
+**Crediting a sale to an agent** (only before the order is confirmed):
+
+| Where | How |
+|---|---|
+| Online checkout | `"sales_agent_code": "BOLAX7K2"` in `POST /orders` |
+| POS | `"sales_agent_id": 3` in `POST /admin/pos/sales` |
+| Staff, on an unpaid order | `PATCH /admin/orders/{id}/sales-agent { "sales_agent_id": 3 }` (use `null` to clear) |
+
+**Commissions:**
+
+- **When it's earned.** When the order is confirmed (paid), the agent earns: the items' amount without tax, shipping or discounts, in store currency, times their rate. It starts as `pending`.
+- **Approve, then pay.** Approve the commission, pay the agent outside the platform, then mark it paid:
+
+  ```http
+  GET   /admin/sales-agents/{id}/commissions?status=pending
+  PATCH /admin/sales-agent-commissions/{id}/approve
+  PATCH /admin/sales-agent-commissions/{id}/mark-paid
+  GET   /admin/sales-agents/{id}/balance          (outstanding = approved but not yet paid)
+  GET   /admin/dashboard/sales_agents?range=this_month
+  ```
+- **Test orders earn nothing.**
+- **Refunds don't change commissions automatically.** If a sale is refunded, simply don't approve its commission.
+
+After pulling this step:
+
+```powershell
+php artisan tenants:migrate
+php artisan tenants:sync-defaults
+```
+
+---
+
+## 15. Troubleshooting
 
 | Symptom | Cause / fix |
 |---|---|

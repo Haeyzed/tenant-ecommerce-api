@@ -6834,6 +6834,13 @@
                                                 "type": "string"
                                             }
                                         }
+                                    },
+                                    "sales_agent_code": {
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ],
+                                        "maxLength": 32
                                     }
                                 },
                                 "required": [
@@ -41681,6 +41688,790 @@
                                         "message": {
                                             "type": "string",
                                             "const": "OK"
+                                        },
+                                        "data": {
+                                            "type": "string"
+                                        },
+                                        "meta": {
+                                            "type": [
+                                                "object",
+                                                "array"
+                                            ]
+                                        },
+                                        "errors": {
+                                            "anyOf": [
+                                                {
+                                                    "type": "object"
+                                                },
+                                                {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    },
+                                                    "minItems": 0,
+                                                    "maxItems": 0
+                                                }
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "message",
+                                        "data",
+                                        "meta",
+                                        "errors"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    }
+                }
+            }
+        },
+        "/admin/sales-agents": {
+            "get": {
+                "operationId": "tenant.admin.sales-agents.index",
+                "tags": [
+                    "SalesAgent"
+                ],
+                "parameters": [
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "active",
+                                "inactive"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "search",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 120
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "const": "OK"
+                                        },
+                                        "data": {
+                                            "type": "string"
+                                        },
+                                        "meta": {
+                                            "type": [
+                                                "object",
+                                                "array"
+                                            ]
+                                        },
+                                        "errors": {
+                                            "anyOf": [
+                                                {
+                                                    "type": "object"
+                                                },
+                                                {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    },
+                                                    "minItems": 0,
+                                                    "maxItems": 0
+                                                }
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "message",
+                                        "data",
+                                        "meta",
+                                        "errors"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            },
+            "post": {
+                "operationId": "tenant.admin.sales-agents.store",
+                "summary": "Body: name, phone, email?, agent_code? (generated when absent), commission_rate?, user_id?",
+                "tags": [
+                    "SalesAgent"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "maxLength": 120
+                                    },
+                                    "phone": {
+                                        "type": "string",
+                                        "maxLength": 32
+                                    },
+                                    "email": {
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ],
+                                        "format": "email",
+                                        "maxLength": 255
+                                    },
+                                    "agent_code": {
+                                        "type": "string",
+                                        "minLength": 3,
+                                        "maxLength": 32
+                                    },
+                                    "commission_rate": {
+                                        "type": [
+                                            "number",
+                                            "null"
+                                        ]
+                                    },
+                                    "user_id": {
+                                        "type": [
+                                            "integer",
+                                            "null"
+                                        ]
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "const": "Sales agent created"
+                                        },
+                                        "data": {
+                                            "type": "string"
+                                        },
+                                        "meta": {
+                                            "type": [
+                                                "object",
+                                                "array"
+                                            ]
+                                        },
+                                        "errors": {
+                                            "anyOf": [
+                                                {
+                                                    "type": "object"
+                                                },
+                                                {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    },
+                                                    "minItems": 0,
+                                                    "maxItems": 0
+                                                }
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "message",
+                                        "data",
+                                        "meta",
+                                        "errors"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/sales-agents/{agent}": {
+            "patch": {
+                "operationId": "tenant.admin.sales-agents.update",
+                "summary": "Body: name?, phone?, email?, agent_code?, commission_rate?, user_id?, status?",
+                "tags": [
+                    "SalesAgent"
+                ],
+                "parameters": [
+                    {
+                        "name": "agent",
+                        "in": "path",
+                        "required": true,
+                        "description": "The agent ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "status": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "const": "Sales agent updated"
+                                        },
+                                        "data": {
+                                            "type": "string"
+                                        },
+                                        "meta": {
+                                            "type": [
+                                                "object",
+                                                "array"
+                                            ]
+                                        },
+                                        "errors": {
+                                            "anyOf": [
+                                                {
+                                                    "type": "object"
+                                                },
+                                                {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    },
+                                                    "minItems": 0,
+                                                    "maxItems": 0
+                                                }
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "message",
+                                        "data",
+                                        "meta",
+                                        "errors"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    }
+                }
+            },
+            "delete": {
+                "operationId": "tenant.admin.sales-agents.destroy",
+                "tags": [
+                    "SalesAgent"
+                ],
+                "parameters": [
+                    {
+                        "name": "agent",
+                        "in": "path",
+                        "required": true,
+                        "description": "The agent ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "const": "Sales agent deactivated"
+                                        },
+                                        "data": {
+                                            "type": "string"
+                                        },
+                                        "meta": {
+                                            "type": [
+                                                "object",
+                                                "array"
+                                            ]
+                                        },
+                                        "errors": {
+                                            "anyOf": [
+                                                {
+                                                    "type": "object"
+                                                },
+                                                {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    },
+                                                    "minItems": 0,
+                                                    "maxItems": 0
+                                                }
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "message",
+                                        "data",
+                                        "meta",
+                                        "errors"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    }
+                }
+            }
+        },
+        "/admin/orders/{order}/sales-agent": {
+            "patch": {
+                "operationId": "tenant.admin.orders.sales-agent",
+                "summary": "Body: sales_agent_id (null clears). Only before the order is confirmed",
+                "tags": [
+                    "SalesAgent"
+                ],
+                "parameters": [
+                    {
+                        "name": "order",
+                        "in": "path",
+                        "required": true,
+                        "description": "The order ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "sales_agent_id": {
+                                        "type": [
+                                            "integer",
+                                            "null"
+                                        ]
+                                    }
+                                },
+                                "required": [
+                                    "sales_agent_id"
+                                ]
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "const": "Sales agent set"
+                                        },
+                                        "data": {
+                                            "type": "string"
+                                        },
+                                        "meta": {
+                                            "type": [
+                                                "object",
+                                                "array"
+                                            ]
+                                        },
+                                        "errors": {
+                                            "anyOf": [
+                                                {
+                                                    "type": "object"
+                                                },
+                                                {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    },
+                                                    "minItems": 0,
+                                                    "maxItems": 0
+                                                }
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "message",
+                                        "data",
+                                        "meta",
+                                        "errors"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    }
+                }
+            }
+        },
+        "/admin/sales-agents/{agent}/commissions": {
+            "get": {
+                "operationId": "tenant.admin.sales-agents.commissions.index",
+                "tags": [
+                    "SalesAgentCommission"
+                ],
+                "parameters": [
+                    {
+                        "name": "agent",
+                        "in": "path",
+                        "required": true,
+                        "description": "The agent ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "pending",
+                                "approved",
+                                "paid"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "from",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "to",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 100
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "const": "OK"
+                                        },
+                                        "data": {
+                                            "type": "string"
+                                        },
+                                        "meta": {
+                                            "type": [
+                                                "object",
+                                                "array"
+                                            ]
+                                        },
+                                        "errors": {
+                                            "anyOf": [
+                                                {
+                                                    "type": "object"
+                                                },
+                                                {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    },
+                                                    "minItems": 0,
+                                                    "maxItems": 0
+                                                }
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "message",
+                                        "data",
+                                        "meta",
+                                        "errors"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    }
+                }
+            }
+        },
+        "/admin/sales-agents/{agent}/balance": {
+            "get": {
+                "operationId": "tenant.admin.sales-agents.balance",
+                "summary": "outstanding = approved and not yet paid",
+                "tags": [
+                    "SalesAgentCommission"
+                ],
+                "parameters": [
+                    {
+                        "name": "agent",
+                        "in": "path",
+                        "required": true,
+                        "description": "The agent ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "const": "OK"
+                                        },
+                                        "data": {
+                                            "type": "string"
+                                        },
+                                        "meta": {
+                                            "type": [
+                                                "object",
+                                                "array"
+                                            ]
+                                        },
+                                        "errors": {
+                                            "anyOf": [
+                                                {
+                                                    "type": "object"
+                                                },
+                                                {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    },
+                                                    "minItems": 0,
+                                                    "maxItems": 0
+                                                }
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "message",
+                                        "data",
+                                        "meta",
+                                        "errors"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    }
+                }
+            }
+        },
+        "/admin/sales-agent-commissions/{commission}/approve": {
+            "patch": {
+                "operationId": "tenant.admin.sales-agent-commissions.approve",
+                "tags": [
+                    "SalesAgentCommission"
+                ],
+                "parameters": [
+                    {
+                        "name": "commission",
+                        "in": "path",
+                        "required": true,
+                        "description": "The commission ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "const": "Commission approved"
+                                        },
+                                        "data": {
+                                            "type": "string"
+                                        },
+                                        "meta": {
+                                            "type": [
+                                                "object",
+                                                "array"
+                                            ]
+                                        },
+                                        "errors": {
+                                            "anyOf": [
+                                                {
+                                                    "type": "object"
+                                                },
+                                                {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    },
+                                                    "minItems": 0,
+                                                    "maxItems": 0
+                                                }
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "message",
+                                        "data",
+                                        "meta",
+                                        "errors"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    }
+                }
+            }
+        },
+        "/admin/sales-agent-commissions/{commission}/mark-paid": {
+            "patch": {
+                "operationId": "tenant.admin.sales-agent-commissions.mark-paid",
+                "tags": [
+                    "SalesAgentCommission"
+                ],
+                "parameters": [
+                    {
+                        "name": "commission",
+                        "in": "path",
+                        "required": true,
+                        "description": "The commission ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "const": "Commission marked paid"
                                         },
                                         "data": {
                                             "type": "string"
