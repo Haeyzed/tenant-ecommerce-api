@@ -18,6 +18,7 @@ use App\Modules\Billing\Models\PaymentTransaction;
 use App\Modules\Billing\Models\PlatformCoupon;
 use App\Modules\Billing\Models\PlatformPaymentGateway;
 use App\Modules\Billing\Models\Subscription;
+use App\Modules\Booking\Models\Booking;
 use App\Modules\Catalog\Models\Brand;
 use App\Modules\Catalog\Models\Category;
 use App\Modules\Catalog\Models\DigitalProductFile;
@@ -50,6 +51,7 @@ use App\Modules\Inventory\Models\StockTransfer;
 use App\Modules\Inventory\Models\Warehouse;
 use App\Modules\Inventory\Models\WarehouseProductPrice;
 use App\Modules\Legal\Models\LegalDocument;
+use App\Modules\Manufacturing\Models\WorkOrder;
 use App\Modules\Marketplace\Models\Seller;
 use App\Modules\Marketplace\Models\SellerGroup;
 use App\Modules\Marketplace\Models\SellerPayout;
@@ -79,6 +81,7 @@ use App\Modules\Purchasing\Models\PurchaseOrder;
 use App\Modules\Purchasing\Models\PurchaseReturn;
 use App\Modules\Purchasing\Models\Supplier;
 use App\Modules\Purchasing\Models\SupplierPayment;
+use App\Modules\Repair\Models\RepairJob;
 use App\Modules\Returns\Models\OrderReturn;
 use App\Modules\Reviews\Models\ProductReview;
 use App\Modules\RewardPoints\Models\RewardPointSettings;
@@ -185,6 +188,9 @@ final class MorphMap
         'hr_payroll_run' => HrPayrollRun::class,
         'support_message_attachment' => SupportMessageAttachment::class,
         'project' => Project::class,
+        'work_order' => WorkOrder::class,
+        'booking' => Booking::class,
+        'repair_job' => RepairJob::class,
         'product_subscription_plan' => ProductSubscriptionPlan::class,
         'customer_subscription' => CustomerSubscription::class,
         'supplier' => Supplier::class,

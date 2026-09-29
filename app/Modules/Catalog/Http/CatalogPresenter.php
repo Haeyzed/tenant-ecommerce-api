@@ -163,6 +163,8 @@ final readonly class CatalogPresenter
             // Product subscriptions (§55): the schedules come from GET /api/products/{product}/subscription-plans.
             'subscription' => $product->is_subscribable && $this->subscriptionsEnabled()
                 ? ['discount_percent' => $product->subscription_discount_percent === null ? null : (string) $product->subscription_discount_percent] : null,
+            // Booking (§66): the slots come from GET /api/products/{product}/available-slots.
+            'booking' => $product->is_bookable && $this->featureEnabled('booking') ? ['duration_minutes' => $product->duration_minutes] : null,
             'seo' => $this->seo($product),
             'custom_fields' => $this->customFields->valuesFor($product, ProductService::ENTITY, CustomFieldService::PUBLIC),
         ];
@@ -170,9 +172,14 @@ final readonly class CatalogPresenter
 
     private function subscriptionsEnabled(): bool
     {
+        return $this->featureEnabled('product_subscriptions');
+    }
+
+    private function featureEnabled(string $feature): bool
+    {
         $tenant = tenant();
 
-        return $tenant instanceof Tenant && app(FeatureAccessService::class)->state($tenant, 'product_subscriptions') === ModuleState::Enabled;
+        return $tenant instanceof Tenant && app(FeatureAccessService::class)->state($tenant, $feature) === ModuleState::Enabled;
     }
 
     /**
@@ -214,6 +221,8 @@ final readonly class CatalogPresenter
             'has_warehouse_pricing' => (bool) $product->has_warehouse_pricing,
             'is_subscribable' => (bool) $product->is_subscribable,
             'subscription_discount_percent' => $product->subscription_discount_percent !== null ? (string) $product->subscription_discount_percent : null,
+            'is_bookable' => (bool) $product->is_bookable,
+            'duration_minutes' => $product->duration_minutes,
             'meta_title' => $product->meta_title,
             'meta_description' => $product->meta_description,
             'meta_keywords' => $product->meta_keywords,

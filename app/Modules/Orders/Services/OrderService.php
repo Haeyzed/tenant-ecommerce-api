@@ -167,6 +167,7 @@ final readonly class OrderService
                 'idempotency_key' => $data['idempotency_key'] ?? null,
                 'customer_note' => $data['customer_note'] ?? null,
                 'pos_session_id' => $data['pos_session_id'] ?? null,
+                'restaurant_table_id' => $data['restaurant_table_id'] ?? null,
                 'sales_agent_id' => $data['sales_agent_id'] ?? null,
                 // An offline POS sale keeps the time it was made (§51.6).
                 'placed_at' => $placedAt,
@@ -174,32 +175,7 @@ final readonly class OrderService
             ])->save();
 
             foreach ((array) $data['lines'] as $line) {
-                /** @var Product|null $product a non-product line (a gift card, §46.2) has none */
-                $product = $line['product'] ?? null;
-                /** @var ProductVariant|null $variant */
-                $variant = $line['variant'] ?? null;
-
-                $item = new OrderItem;
-                $item->forceFill([
-                    'order_id' => $order->id,
-                    'product_id' => $product?->id,
-                    'product_variant_id' => $variant?->id,
-                    'name_snapshot' => mb_substr($product === null ? (string) $line['name'] : $product->name.($variant === null ? '' : ' ('.$variant->sku.')'), 0, 255),
-                    'sku_snapshot' => $variant?->sku ?? $product?->sku,
-                    'seller_id' => $product?->seller_id,
-                    'warehouse_id' => ($line['warehouse'] ?? null)?->id,
-                    'quantity' => $line['quantity'],
-                    'unit_price' => $line['unit_price'],
-                    'price_source' => $line['price_source'],
-                    'unit_cost_snapshot' => $variant?->cost_price ?? $product?->cost_price,
-                    'meta' => $line['meta'] ?? null,
-                    'discount_amount' => $line['discount_amount'] ?? '0',
-                    'seller_funded_discount_amount' => $line['seller_funded_discount_amount'] ?? '0',
-                    'tax_rate_applied' => $line['tax_rate_applied'] ?? '0',
-                    'tax_amount' => $line['tax_amount'] ?? '0',
-                    'tax_breakdown' => $line['tax_breakdown'] ?? null,
-                    'line_total' => $line['line_total'],
-                ])->save();
+                $this->createItem($order, $line);
             }
 
             $order->load('items.product.bundleItems', 'items.variant', 'items.warehouse');
@@ -834,15 +810,115 @@ final readonly class OrderService
     }
 
     /**
+     * One more round on an open order (§39.5, §65.4): table orders take
+     * dishes over several rounds. Allowed while the order is pending,
+     * unconfirmed and unpaid; the new lines reserve their stock and the
+     * totals are recalculated from every line.
+     *
+     * @param  list<array<string, mixed>>  $lines  the createOrder() line shape
+     */
+    public function appendItems(Order $order, array $lines): Order
+    {
+        return DB::connection('tenant')->transaction(function () use ($order, $lines): Order {
+            $locked = $this->lock($order);
+
+            if ($locked->status !== Order::PENDING || $locked->confirmed_at !== null) {
+                throw ApiException::unprocessable('order_not_open', 'Only an open, unconfirmed order takes more items.');
+            }
+
+            if (OrderPayment::query()->where('order_id', $locked->id)->where('status', OrderPayment::SUCCESSFUL)->exists()) {
+                throw ApiException::unprocessable('order_has_payments', 'This order has payments; it can no longer change.');
+            }
+
+            $ids = [];
+
+            foreach ($lines as $line) {
+                $ids[] = $this->createItem($locked, $line)->id;
+            }
+
+            $this->moveStock($locked, 'reserve', null, OrderItem::query()->with(['product.bundleItems', 'variant', 'warehouse'])->whereKey($ids)->get());
+
+            // Totals from every line (no shipping, points or gift card on an order that grows).
+            $items = OrderItem::query()->where('order_id', $locked->id)->get();
+            $subtotal = $discount = $tax = Money::normalize(0);
+
+            foreach ($items as $item) {
+                $subtotal = Money::add($subtotal, Money::round(bcmul((string) $item->unit_price, (string) $item->quantity, 10), $locked->currency_code));
+                $discount = Money::add($discount, (string) $item->discount_amount);
+                $tax = Money::add($tax, (string) $item->tax_amount);
+            }
+
+            $shipping = Money::sub((string) $locked->shipping_amount, (string) $locked->shipping_discount_amount);
+            $tax = Money::add($tax, (string) $locked->shipping_tax_amount);
+            $total = Money::add(Money::sub(Money::sub($subtotal, $discount), (string) $locked->reward_points_discount_amount), $shipping);
+            $total = $locked->prices_include_tax ? $total : Money::add($total, $tax);
+            $base = strtoupper((string) ($this->settings->get('default_currency') ?: 'USD'));
+
+            $locked->forceFill([
+                'subtotal' => $subtotal,
+                'discount_amount' => $discount,
+                'tax_amount' => $tax,
+                'total' => $total,
+                'base_currency_amount' => Money::round(bcmul($total, (string) ($locked->exchange_rate_used ?? '1'), CurrencyService::SCALE), $base),
+            ])->save();
+            $order->setRawAttributes($locked->getAttributes(), true);
+
+            return $locked->load('items');
+        });
+    }
+
+    /**
+     * @param  array<string, mixed>  $line
+     */
+    private function createItem(Order $order, array $line): OrderItem
+    {
+        /** @var Product|null $product a non-product line (a gift card §46.2, repair labour §67.3) has none */
+        $product = $line['product'] ?? null;
+        /** @var ProductVariant|null $variant */
+        $variant = $line['variant'] ?? null;
+
+        $item = new OrderItem;
+        $item->forceFill([
+            'order_id' => $order->id,
+            'product_id' => $product?->id,
+            'product_variant_id' => $variant?->id,
+            'name_snapshot' => mb_substr($product === null ? (string) $line['name'] : $product->name.($variant === null ? '' : ' ('.$variant->sku.')'), 0, 255),
+            'sku_snapshot' => $variant?->sku ?? $product?->sku,
+            'seller_id' => $product?->seller_id,
+            'warehouse_id' => ($line['warehouse'] ?? null)?->id,
+            'quantity' => $line['quantity'],
+            'unit_price' => $line['unit_price'],
+            'price_source' => $line['price_source'],
+            'unit_cost_snapshot' => $line['unit_cost'] ?? $variant?->cost_price ?? $product?->cost_price,
+            'meta' => $line['meta'] ?? null,
+            'discount_amount' => $line['discount_amount'] ?? '0',
+            'seller_funded_discount_amount' => $line['seller_funded_discount_amount'] ?? '0',
+            'tax_rate_applied' => $line['tax_rate_applied'] ?? '0',
+            'tax_amount' => $line['tax_amount'] ?? '0',
+            'tax_breakdown' => $line['tax_breakdown'] ?? null,
+            'line_total' => $line['line_total'],
+            // A repair part left the shelf when it was fitted (§67.3).
+            'stock_already_deducted' => (bool) ($line['stock_already_deducted'] ?? false),
+            // A dish sent to the kitchen (§65.3).
+            'kitchen_status' => $line['kitchen_status'] ?? null,
+        ])->save();
+
+        return $item;
+    }
+
+    /**
      * One stock operation over the order's physical lines; a shortfall is
      * 409 stock_conflict.
+     *
+     * @param  iterable<OrderItem>|null  $items  a subset of the order's lines; null = every line
      */
-    private function moveStock(Order $order, string $operation, ?string $reason = null): void
+    private function moveStock(Order $order, string $operation, ?string $reason = null, ?iterable $items = null): void
     {
         $lines = [];
 
-        foreach ($order->items as $item) {
-            if (! $item->isPhysical()) {
+        foreach ($items ?? $order->items as $item) {
+            // Not physical, or already deducted outside the order (repair parts).
+            if (! $item->isPhysical() || $item->stock_already_deducted) {
                 continue;
             }
 

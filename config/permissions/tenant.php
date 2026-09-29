@@ -46,6 +46,7 @@ return [
             'orders.*', 'order-payments.view', 'shipments.*', 'delivery-assignments.*', 'drivers.*', 'returns.*',
             'return-reasons.*', 'customers.*', 'customer-groups.*', 'promotions.*', 'coupons.*', 'flash-sales.*',
             'reviews.*', 'cms.*', 'reports.*', 'dashboard.view', 'exports.*', 'lookups.*', 'product-subscriptions.*', 'ai-assistant.ask',
+            'bill-of-materials.*', 'work-orders.*', 'restaurant.*', 'booking-staff.*', 'bookings.*', 'repair-jobs.*',
         ],
         'staff' => [
             'orders.view', 'orders.status', 'orders.invoice', 'orders.packing-slip', 'orders.shipments.*',
@@ -60,6 +61,7 @@ return [
         'sales' => [
             'customers.*', 'orders.view', 'orders.duplicate', 'sales-quotation-requests.*', 'sales-quotations.*',
             'pos.*', 'gift-cards.view', 'gift-cards.create', 'products.view', 'dashboard.view', 'lookups.*',
+            'restaurant.tables.*', 'restaurant.table-orders.*', 'restaurant.reservations.*', 'restaurant.kitchen.*',
         ],
         'warehouse' => [
             'inventory.*', 'warehouses.view', 'warehouses.inventory.view', 'stock-transfers.*',

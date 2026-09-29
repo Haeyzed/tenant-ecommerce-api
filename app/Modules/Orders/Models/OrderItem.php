@@ -7,6 +7,7 @@ namespace App\Modules\Orders\Models;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\ProductVariant;
 use App\Modules\Inventory\Models\Warehouse;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -34,6 +35,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property array<string, string>|null $tax_breakdown
  * @property string $line_total
  * @property bool $stock_already_deducted
+ * @property string|null $kitchen_status pending | preparing | ready | served (restaurant table orders, §65.3)
+ * @property Carbon|null $kitchen_ready_at
+ * @property Carbon $created_at
  * @property-read Order $order
  * @property-read Product|null $product
  * @property-read ProductVariant|null $variant
@@ -63,6 +67,7 @@ class OrderItem extends Model
         'tax_breakdown' => 'array',
         'line_total' => 'decimal:4',
         'stock_already_deducted' => 'boolean',
+        'kitchen_ready_at' => 'datetime',
     ];
 
     /**

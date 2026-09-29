@@ -77,6 +77,8 @@ final readonly class Quote
                 'tax_rate_applied' => $l['tax_rate_applied'],
                 'tax_amount' => $l['tax_amount'],
                 'line_total' => $l['line_total'],
+                // POS lines with menu options (§65.2).
+                ...(($l['modifiers'] ?? []) === [] ? [] : ['modifiers' => array_column($l['modifiers'], 'name')]),
             ], $this->lines),
             'promotions' => array_map(static fn (array $p): array => [
                 'promotion_id' => $p['promotion_id'], 'label' => $p['label'], 'scope' => $p['scope'], 'amount' => $p['amount'],

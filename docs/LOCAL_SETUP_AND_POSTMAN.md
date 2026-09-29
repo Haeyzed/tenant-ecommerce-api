@@ -1399,7 +1399,95 @@ php artisan config:clear
 
 ---
 
-## 20. Troubleshooting
+## 20. Manufacturing, restaurants, bookings and repairs ➡ you
+
+These four industry modules need the **Premium** plan. Switch each on with `POST /admin/modules/{key}/enable`, where the key is `manufacturing`, `restaurant`, `booking` or `repair`. The restaurant module also needs `pos`.
+
+### 20.1 Manufacturing
+
+```http
+POST  /admin/products/{product}/bill-of-materials   { "name": "Standard loaf", "yield_quantity": 10, "items": [ { "component_product_id": 7, "quantity_required": 5 } ] }
+PATCH /admin/bill-of-materials/{bom}/set-default
+POST  /admin/work-orders                            { "bill_of_material_id": 1, "warehouse_id": 1, "quantity_to_produce": 20 }
+PATCH /admin/work-orders/{order}/start              (reserves the components; 409 if one is short)
+PATCH /admin/work-orders/{order}/complete           (uses up the components and adds the finished goods)
+PATCH /admin/work-orders/{order}/cancel             (releases the reserved components)
+```
+
+- **Cost price:** the default recipe sets the product's cost price from its components. If a component has no cost price, the cost is left as it was.
+
+### 20.2 Restaurant
+
+First turn on tables: `PUT /admin/pos/settings { "table_management_enabled": true }`.
+
+```http
+POST  /admin/restaurant/floors                      { "name": "Main Hall", "warehouse_id": 1 }
+POST  /admin/restaurant/tables                      { "restaurant_floor_id": 1, "name": "Table 4", "seats": 4 }
+POST  /admin/restaurant/modifier-groups             { "name": "Spice", "selection_type": "single", "is_required": true, "options": [ { "name": "Hot", "price_adjustment": "200" } ] }
+POST  /admin/products/{product}/modifier-groups/{group}
+POST  /admin/restaurant/tables/{table}/orders       { "lines": [ { "product_id": 5, "quantity": 2, "modifier_option_ids": [2] } ] }
+POST  /admin/restaurant/table-orders/{order}/items  { "lines": [ ... ] }      (the next round)
+GET   /admin/restaurant/kitchen/tickets
+PATCH /admin/restaurant/kitchen/order-items/{item}/status   { "status": "preparing" }   (then ready, then served)
+POST  /admin/restaurant/table-orders/{order}/settle { "register_id": 1, "payments": [ { "method": "cash", "amount": "10000" } ] }
+POST  /admin/restaurant/table-orders/{order}/void   { "reason": "Party left" }     (before payment only)
+POST  /admin/restaurant/reservations                { "restaurant_table_id": 1, "customer_name": "Chidi", "party_size": 3, "reservation_time": "2026-10-06 19:00" }
+PATCH /admin/restaurant/reservations/{id}/seat      (opens the table order)
+```
+
+- **Settling** works like a till sale. If you use cash sessions, open one on the register first. Only cash can be more than the bill; the difference is given as change.
+- **Reserved tables:** a table shows as reserved 30 minutes before its booking. This needs the queue worker running.
+- **Modifiers** also work on ordinary till sales (`POST /admin/pos/sales`) while the restaurant module is on.
+
+### 20.3 Bookings
+
+Make a service bookable (`product_type: "service"`, `is_bookable: true`, `duration_minutes: 60`), then:
+
+```http
+POST /admin/booking-staff                           { "user_id": 3 }
+PUT  /admin/booking-staff/{staff}/availability      { "slots": [ { "day_of_week": 2, "start_time": "09:00", "end_time": "17:00" } ] }   (0 = Sunday)
+POST /admin/booking-staff/{staff}/time-off          { "start_datetime": "2026-10-06 12:00", "end_datetime": "2026-10-06 13:00" }
+POST /admin/products/{product}/booking-staff/{staff}
+GET  /products/{product}/available-slots?date=2026-10-06
+POST /bookings                                      { "product_id": 9, "booking_staff_id": 1, "start_datetime": "2026-10-06 10:00", "guest_name": "Chidi", "guest_email": "chidi@example.com" }
+POST /admin/bookings/{booking}/invoice              (creates the order to pay)
+```
+
+- **Times** are in the store's timezone setting.
+- **Pay when booking:** set `booking_requires_prepayment` to true in the store settings. A booking from the storefront then waits for its order to be paid, and is cancelled if the order expires unpaid. A guest paying this way must send the `X-Guest-Token` header.
+- **Customers** see and cancel their own bookings at `/account/bookings`.
+
+### 20.4 Repairs
+
+```http
+POST  /admin/repair-jobs                            { "customer_id": 4, "item_description": "Phone, cracked screen", "warehouse_id": 1 }
+PATCH /admin/repair-jobs/{job}/status               { "status": "diagnosing" }
+PATCH /admin/repair-jobs/{job}/diagnosis            { "diagnosis_notes": "Screen needs replacing", "estimated_cost": "40000" }
+PATCH /account/repair-jobs/{job}/approve            (the customer)   or   PATCH /admin/repair-jobs/{job}/approval (staff)
+PATCH /admin/repair-jobs/{job}/status               { "status": "in_repair" }
+POST  /admin/repair-jobs/{job}/parts                { "product_id": 12, "quantity": 1 }     (taken out of stock now)
+POST  /admin/repair-jobs/{job}/labor                { "description": "Screen fitting", "amount": "5000" }
+POST  /admin/repair-jobs/{job}/generate-invoice
+PATCH /admin/repair-jobs/{job}/status               { "status": "completed" }   (the customer is told it's ready)
+PATCH /admin/repair-jobs/{job}/picked-up
+```
+
+- **Labour is not taxed.** Parts are taxed like any product.
+- **Cancelling a job** puts its parts back in stock.
+
+After pulling this step:
+
+```powershell
+php artisan tenants:migrate
+php artisan tenants:sync-defaults
+php artisan config:clear
+```
+
+Then restart `php artisan queue:work`, which runs the reserved-table job, and re-import the Postman collection.
+
+---
+
+## 21. Troubleshooting
 
 | Symptom | Cause / fix |
 |---|---|

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Pos\Services;
 
 use App\Modules\Cart\Services\PricingService;
+use App\Modules\Cart\Support\PriceResult;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\ProductVariant;
 use App\Modules\Checkout\Services\CheckoutService;
@@ -23,6 +24,8 @@ use App\Modules\Orders\Services\OrderService;
 use App\Modules\Payments\Models\OrderPayment;
 use App\Modules\Payments\Services\OrderPaymentService;
 use App\Modules\Payments\Support\PaymentPostings;
+use App\Modules\Plans\Enums\ModuleState;
+use App\Modules\Plans\Services\FeatureAccessService;
 use App\Modules\Pos\Models\PosRegister;
 use App\Modules\Pos\Models\PosSession;
 use App\Modules\Pos\Models\PosTerminalCharge;
@@ -32,10 +35,12 @@ use App\Modules\Promotions\Services\PromotionRedemptionService;
 use App\Modules\Promotions\Support\BuyerHistory;
 use App\Modules\Promotions\Support\PricingContext;
 use App\Modules\Promotions\Support\PricingLine;
+use App\Modules\Restaurant\Services\ModifierSelectionService;
 use App\Modules\RewardPoints\Services\RewardPointService;
 use App\Modules\SalesAgents\Services\SalesAgentService;
 use App\Modules\Settings\Services\TenantSettingsService;
 use App\Modules\Tax\Services\TaxService;
+use App\Modules\Tenancy\Models\Tenant;
 use App\Modules\Users\Models\User;
 use App\Shared\Exceptions\ApiException;
 use App\Shared\Support\Money;
@@ -80,6 +85,8 @@ final readonly class PosSaleService
         private NotificationDispatchService $notifications,
         private ReceiptPrinterService $printers,
         private SalesAgentService $salesAgents,
+        private ModifierSelectionService $modifierSelections,
+        private FeatureAccessService $features,
     ) {}
 
     /**
@@ -94,6 +101,8 @@ final readonly class PosSaleService
             'lines.*.product_id' => ['required', 'integer'],
             'lines.*.variant_id' => ['sometimes', 'nullable', 'integer'],
             'lines.*.quantity' => ['required', 'numeric', 'gt:0', 'decimal:0,3', 'max:100000'],
+            'lines.*.modifier_option_ids' => ['sometimes', 'array', 'max:30'],
+            'lines.*.modifier_option_ids.*' => ['integer', 'distinct'],
         ])->validate();
 
         $register->loadMissing('warehouse');
@@ -128,6 +137,26 @@ final readonly class PosSaleService
 
             $price = $status === Quote::UNAVAILABLE ? null : $this->pricing->resolveUnitPrice($product, $variant, $physical ? $warehouse : null, $currency, '1');
             $zero = Money::normalize(0);
+            $modifiers = [];
+
+            // Menu options (§65.2): the restaurant module's modifiers, added to the unit price.
+            if (($line['modifier_option_ids'] ?? []) !== [] && $price !== null) {
+                $tenant = tenant();
+
+                if (! $tenant instanceof Tenant || $this->features->state($tenant, 'restaurant') !== ModuleState::Enabled) {
+                    throw ApiException::unprocessable('modifiers_unavailable', 'Menu options need the restaurant module.', ['line' => $i]);
+                }
+
+                $selection = $this->modifierSelections->resolve($product, array_values($line['modifier_option_ids']), $i);
+                $modifiers = $selection['modifiers'];
+                $unit = Money::add($price->unitPrice, $selection['adjustment']);
+
+                if (Money::cmp($unit, '0') < 0) {
+                    throw ApiException::unprocessable('modifier_invalid', 'These options take the price below zero.', ['line' => $i]);
+                }
+
+                $price = new PriceResult($unit, null, $price->currencyCode, $price->source, $price->isEstimated);
+            }
 
             $priced[] = [
                 'item_id' => null,
@@ -144,6 +173,7 @@ final readonly class PosSaleService
                 'tax_amount' => null,
                 'tax_breakdown' => null,
                 'line_total' => null,
+                'modifiers' => $modifiers,
             ];
         }
 
@@ -245,7 +275,7 @@ final readonly class PosSaleService
 
         $hash = hash('sha256', (string) json_encode([
             $register->id,
-            array_map(static fn (array $l): array => [$l['product']->id, $l['variant']?->id, $l['quantity'], $l['status'], $l['price']?->unitPrice, $l['discount_amount'], $l['tax_amount']], $priced),
+            array_map(static fn (array $l): array => [$l['product']->id, $l['variant']?->id, $l['quantity'], $l['status'], $l['price']?->unitPrice, $l['discount_amount'], $l['tax_amount'], array_column($l['modifiers'], 'modifier_option_id')], $priced),
             $totals,
             $couponCode,
             $points,
@@ -377,6 +407,8 @@ final readonly class PosSaleService
                 'placed_at' => $at ?? now(),
                 'one_pass' => true,
             ]);
+
+            $this->modifierSelections->snapshot($order->items->sortBy('id')->values()->all(), array_column($quote->lines, 'modifiers'));
 
             $this->flashSales->claim($order);
             $this->redemptions->reserve($order, $quote->promotions, $at, $offline);
@@ -599,7 +631,7 @@ final readonly class PosSaleService
      * @param  list<array<string, mixed>>  $payments
      * @return list<array{method: string, amount: string, received: string|null, change: string|null, reference: string|null, gift_card_code: string|null}>
      */
-    private function planTenders(array $payments, string $total, bool $creditSale): array
+    public function planTenders(array $payments, string $total, bool $creditSale): array
     {
         $currency = $this->currencies->baseCurrency();
         $plan = [];
@@ -644,7 +676,7 @@ final readonly class PosSaleService
     /**
      * @param  array{method: string, amount: string, received: string|null, change: string|null, reference: string|null, gift_card_code: string|null}  $tender
      */
-    private function recordTender(Order $order, PosRegister $register, ?PosSession $session, array $tender, User $by, ?CarbonInterface $at): void
+    public function recordTender(Order $order, PosRegister $register, ?PosSession $session, array $tender, User $by, ?CarbonInterface $at): void
     {
         if ($tender['method'] === 'gift_card') {
             $card = GiftCard::query()->where('code', strtoupper(trim((string) $tender['gift_card_code'])))->first();
@@ -710,7 +742,7 @@ final readonly class PosSaleService
      * offline sale may name the session it was made in, even if it has
      * closed since, when its time falls inside that session (§51.6).
      */
-    private function resolveSession(PosRegister $register, bool $required, ?int $sessionId, ?CarbonInterface $at): ?PosSession
+    public function resolveSession(PosRegister $register, bool $required, ?int $sessionId, ?CarbonInterface $at): ?PosSession
     {
         if ($sessionId !== null) {
             $session = PosSession::query()->where('pos_register_id', $register->id)->find($sessionId)

@@ -648,6 +648,9 @@ final readonly class ProductService
             // Product subscriptions (§55): offered once plans exist for the product.
             'is_subscribable' => ['sometimes', 'boolean'],
             'subscription_discount_percent' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:100', 'decimal:0,4'],
+            // Booking (§66): only service products are bookable, and they need a duration.
+            'is_bookable' => [$type === Product::SERVICE ? 'sometimes' : 'prohibited', 'boolean'],
+            'duration_minutes' => [$type === Product::SERVICE ? 'sometimes' : 'prohibited', 'nullable', 'integer', 'min:5', 'max:1440'],
             'meta_title' => ['sometimes', 'nullable', 'string', 'max:200'],
             'meta_description' => ['sometimes', 'nullable', 'string', 'max:320'],
             'meta_keywords' => ['sometimes', 'nullable', 'string', 'max:255'],
@@ -666,6 +669,12 @@ final readonly class ProductService
         $validator = Validator::make($data, $rules);
         $errors = $validator->errors()->toArray();
         $custom = [];
+        $bookable = (bool) ($data['is_bookable'] ?? $existing?->is_bookable ?? false);
+        $duration = array_key_exists('duration_minutes', $data) ? $data['duration_minutes'] : $existing?->duration_minutes;
+
+        if ($type === Product::SERVICE && $bookable && $duration === null && ! isset($errors['duration_minutes'])) {
+            $errors['duration_minutes'] = ['A bookable service needs a duration.'];
+        }
 
         try {
             $custom = $this->customFields->validate(self::ENTITY, (array) ($data['custom_fields'] ?? []), CustomFieldService::ADMIN, $existing === null);

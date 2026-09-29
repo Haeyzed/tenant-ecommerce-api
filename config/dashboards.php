@@ -8,6 +8,7 @@ use App\Modules\Billing\Metrics\PaymentMetrics;
 use App\Modules\Billing\Metrics\PlanMetrics;
 use App\Modules\Billing\Metrics\RevenueMetrics;
 use App\Modules\Billing\Metrics\SubscriptionMetrics;
+use App\Modules\Booking\Metrics\BookingMetrics;
 use App\Modules\Catalog\Metrics\CatalogMetrics;
 use App\Modules\Customers\Metrics\CustomerMetrics;
 use App\Modules\Dashboard\Metrics\OperationsMetrics;
@@ -16,6 +17,7 @@ use App\Modules\GiftCards\Metrics\GiftCardMetrics;
 use App\Modules\Hr\Metrics\HrMetrics;
 use App\Modules\Installments\Metrics\InstallmentMetrics;
 use App\Modules\Inventory\Metrics\InventoryMetrics;
+use App\Modules\Manufacturing\Metrics\ManufacturingMetrics;
 use App\Modules\Marketplace\Metrics\MarketplaceMetrics;
 use App\Modules\Orders\Metrics\OrderMetrics;
 use App\Modules\Orders\Metrics\SalesMetrics;
@@ -25,6 +27,8 @@ use App\Modules\ProductSubscriptions\Metrics\ProductSubscriptionMetrics;
 use App\Modules\Projects\Metrics\ProjectMetrics;
 use App\Modules\Promotions\Metrics\PromotionMetrics;
 use App\Modules\Purchasing\Metrics\PurchasingMetrics;
+use App\Modules\Repair\Metrics\RepairMetrics;
+use App\Modules\Restaurant\Metrics\RestaurantMetrics;
 use App\Modules\Returns\Metrics\ReturnMetrics;
 use App\Modules\RewardPoints\Metrics\RewardPointMetrics;
 use App\Modules\SalesAgents\Metrics\SalesAgentMetrics;
@@ -245,6 +249,34 @@ return [
             'feature' => 'hr',
             'permission' => 'hr.employees.view',
             'parts' => [[HrMetrics::class, 'hr']],
+            'alerts' => [],
+        ],
+        'manufacturing' => [
+            'label' => 'Manufacturing',
+            'feature' => 'manufacturing',
+            'permission' => 'work-orders.view',
+            'parts' => [[ManufacturingMetrics::class, 'manufacturing']],
+            'alerts' => [],
+        ],
+        'restaurant' => [
+            'label' => 'Restaurant',
+            'feature' => 'restaurant',
+            'permission' => 'restaurant.tables.view',
+            'parts' => [[RestaurantMetrics::class, 'restaurant']],
+            'alerts' => [],
+        ],
+        'booking' => [
+            'label' => 'Bookings',
+            'feature' => 'booking',
+            'permission' => 'bookings.view',
+            'parts' => [[BookingMetrics::class, 'booking']],
+            'alerts' => [],
+        ],
+        'repair' => [
+            'label' => 'Repairs',
+            'feature' => 'repair',
+            'permission' => 'repair-jobs.view',
+            'parts' => [[RepairMetrics::class, 'repair']],
             'alerts' => [],
         ],
         'projects' => [

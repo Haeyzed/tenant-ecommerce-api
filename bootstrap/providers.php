@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Modules\BackInStock\BackInStockServiceProvider;
+use App\Modules\Booking\BookingServiceProvider;
 use App\Modules\Cart\CartServiceProvider;
 use App\Modules\Catalog\CatalogServiceProvider;
 use App\Modules\Documents\DocumentsServiceProvider;
@@ -10,6 +11,7 @@ use App\Modules\GiftCards\GiftCardsServiceProvider;
 use App\Modules\Hr\HrServiceProvider;
 use App\Modules\Installments\InstallmentsServiceProvider;
 use App\Modules\Inventory\InventoryServiceProvider;
+use App\Modules\Manufacturing\ManufacturingServiceProvider;
 use App\Modules\Marketplace\MarketplaceServiceProvider;
 use App\Modules\Orders\OrdersServiceProvider;
 use App\Modules\Pos\PosServiceProvider;
@@ -17,7 +19,9 @@ use App\Modules\ProductSubscriptions\ProductSubscriptionsServiceProvider;
 use App\Modules\Projects\ProjectsServiceProvider;
 use App\Modules\Promotions\PromotionsServiceProvider;
 use App\Modules\Purchasing\PurchasingServiceProvider;
+use App\Modules\Repair\RepairServiceProvider;
 use App\Modules\Reporting\ReportingServiceProvider;
+use App\Modules\Restaurant\RestaurantServiceProvider;
 use App\Modules\Returns\ReturnsServiceProvider;
 use App\Modules\Reviews\ReviewsServiceProvider;
 use App\Modules\RewardPoints\RewardPointsServiceProvider;
@@ -55,5 +59,9 @@ return [
     SupportServiceProvider::class,
     ProjectsServiceProvider::class,
     ReportingServiceProvider::class,
+    ManufacturingServiceProvider::class,
+    RestaurantServiceProvider::class,
+    BookingServiceProvider::class,
+    RepairServiceProvider::class,
     ApiDocsServiceProvider::class,
 ];

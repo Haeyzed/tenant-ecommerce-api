@@ -54,6 +54,7 @@ use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
  * @property int|null $created_by_user_id
  * @property int|null $pos_session_id
  * @property int|null $sales_agent_id
+ * @property int|null $restaurant_table_id
  * @property string|null $idempotency_key
  * @property string|null $customer_note
  * @property Carbon $placed_at
@@ -103,6 +104,7 @@ class Order extends Model implements AuditableContract
         'customer_id' => 'integer',
         'pos_session_id' => 'integer',
         'sales_agent_id' => 'integer',
+        'restaurant_table_id' => 'integer',
         'is_test' => 'boolean',
         'prices_include_tax' => 'boolean',
         'subtotal' => 'decimal:4',
