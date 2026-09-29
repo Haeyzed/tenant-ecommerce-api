@@ -79,6 +79,6 @@ final class ProductController extends Controller
             'ids.*' => ['integer'],
         ]);
 
-        return APIResponse::success(['results' => $this->products->bulk($validated['action'], $validated['ids'])]);
+        return APIResponse::success($this->products->bulk($validated['action'], $validated['ids']));
     }
 }

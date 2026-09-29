@@ -13,7 +13,7 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
-use Throwable;
+use App\Shared\Support\BulkOperation;
 
 /**
  * Coupon codes (spec §37.4, §37.8). Codes are 4–32 characters of A–Z, 0–9
@@ -167,23 +167,11 @@ final readonly class CouponService
      * §70.12: one result per id.
      *
      * @param  list<int>  $ids
-     * @return list<array{id: int, status: string, error: string|null, message: string|null}>
+     * @return array{operation_id: string, succeeded: int, failed: int, results: list<array{id: int, status: string, error: string|null, message: string|null}>}
      */
     public function bulk(string $action, array $ids): array
     {
-        $results = [];
-
-        foreach (array_values(array_unique(array_map('intval', $ids))) as $id) {
-            try {
-                $coupon = Coupon::query()->findOrFail($id);
-                $this->updateCoupon($coupon, ['is_active' => $action === 'activate']);
-                $results[] = ['id' => $id, 'status' => 'ok', 'error' => null, 'message' => null];
-            } catch (Throwable $e) {
-                $results[] = ['id' => $id, 'status' => 'error', 'error' => $e instanceof ApiException ? $e->errorCode : 'not_found', 'message' => $e->getMessage()];
-            }
-        }
-
-        return $results;
+        return BulkOperation::run('coupons', $action, $ids, fn (int $id) => $this->updateCoupon(Coupon::query()->findOrFail($id), ['is_active' => $action === 'activate']));
     }
 
     public function findByCode(string $code): ?Coupon

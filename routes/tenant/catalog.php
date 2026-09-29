@@ -66,6 +66,7 @@ Route::middleware(['tenant.admin', 'module.notice:core'])->prefix('admin')->name
     Route::get('categories', [CategoryController::class, 'index'])->name('categories.index');
     Route::post('categories', [CategoryController::class, 'store'])->name('categories.store');
     Route::post('categories/reorder', [CategoryController::class, 'reorder'])->name('categories.reorder');
+    Route::post('categories/bulk', [CategoryController::class, 'bulk'])->name('categories.bulk');
     Route::patch('categories/{category}', [CategoryController::class, 'update'])->whereNumber('category')->name('categories.update');
     Route::delete('categories/{category}', [CategoryController::class, 'destroy'])->whereNumber('category')->name('categories.destroy');
     Route::post('categories/{category}/image', [CategoryController::class, 'image'])->whereNumber('category')->middleware('usage.limit:max_storage_mb')->name('categories.image');

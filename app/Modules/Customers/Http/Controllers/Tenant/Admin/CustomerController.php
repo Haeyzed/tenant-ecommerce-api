@@ -12,6 +12,7 @@ use App\Modules\Customers\Services\CustomerGroupService;
 use App\Modules\Customers\Services\CustomerService;
 use App\Modules\Users\Models\User;
 use App\Shared\Http\APIResponse;
+use App\Shared\Support\BulkOperation;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -52,6 +53,26 @@ final class CustomerController extends Controller
     public function update(Request $request, Customer $customer): JsonResponse
     {
         return APIResponse::success(new CustomerResource($this->customers->updateCustomer($customer, $request->all(), $this->staff($request))->load('group')), 'Customer updated');
+    }
+
+    public function activate(Request $request, Customer $customer): JsonResponse
+    {
+        return APIResponse::success(new CustomerResource($this->customers->activateCustomer($customer, $this->staff($request))), 'Customer activated');
+    }
+
+    /**
+     * Body: action (activate | deactivate | assign_group), ids[] (≤ 100), customer_group_id (assign_group)
+     */
+    public function bulk(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'action' => ['required', Rule::in(['activate', 'deactivate', 'assign_group'])],
+            'ids' => ['required', 'array', 'min:1', 'max:'.BulkOperation::MAX_ITEMS],
+            'ids.*' => ['integer'],
+            'customer_group_id' => ['required_if:action,assign_group', 'nullable', 'integer', Rule::exists('tenant.customer_groups', 'id')],
+        ]);
+
+        return APIResponse::success($this->customers->bulk($validated['action'], $validated['ids'], $validated['customer_group_id'] ?? null, $this->staff($request)));
     }
 
     public function deactivate(Request $request, Customer $customer): JsonResponse

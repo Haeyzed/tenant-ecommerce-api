@@ -30,6 +30,7 @@ Route::middleware(['tenant.storefront', 'module.notice:core'])->name('tenant.ord
 
 Route::middleware(['tenant.admin', 'module.notice:core'])->prefix('admin')->name('tenant.orders.admin.')->group(function (): void {
     Route::get('orders', [AdminOrderController::class, 'index'])->name('index');
+    Route::post('orders/bulk', [AdminOrderController::class, 'bulk'])->name('bulk');
     Route::get('orders/{order}', [AdminOrderController::class, 'show'])->whereNumber('order')->name('show');
     Route::patch('orders/{order}/status', [AdminOrderController::class, 'updateStatus'])->whereNumber('order')->name('status');
     Route::post('orders/{order}/cancel', [AdminOrderController::class, 'cancel'])->whereNumber('order')->name('cancel');

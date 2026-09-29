@@ -10,6 +10,7 @@ use App\Modules\Catalog\Models\Category;
 use App\Modules\Catalog\Services\CategoryService;
 use App\Modules\Cms\Support\CmsMedia;
 use App\Shared\Http\APIResponse;
+use App\Shared\Support\BulkOperation;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -43,6 +44,20 @@ final class CategoryController extends Controller
     public function update(Request $request, Category $category): JsonResponse
     {
         return APIResponse::success($this->presenter->category($this->categories->updateCategory($category, $request->all()), false), 'Category updated');
+    }
+
+    /**
+     * Body: action (activate | deactivate), ids[] (≤ 100)
+     */
+    public function bulk(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'action' => ['required', Rule::in(['activate', 'deactivate'])],
+            'ids' => ['required', 'array', 'min:1', 'max:'.BulkOperation::MAX_ITEMS],
+            'ids.*' => ['integer'],
+        ]);
+
+        return APIResponse::success($this->categories->bulk($validated['action'], $validated['ids']));
     }
 
     public function destroy(Category $category): JsonResponse

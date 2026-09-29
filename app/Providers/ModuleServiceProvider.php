@@ -67,6 +67,9 @@ final class ModuleServiceProvider extends ServiceProvider
                 ->where('notifiable_type', $c->getMorphClass())->where('notifiable_id', $c->id)->delete());
             $registry->registerEraser('notifications', static fn (Customer $c) => $c->notifications()->delete());
             $registry->registerEraser('custom_fields', static fn (Customer $c) => app(CustomFieldService::class)->forget($c, CustomerService::ENTITY));
+            $registry->registerEraser('social_accounts', static fn (Customer $c) => $c->socialAccounts()->delete());
+            $registry->registerSection('social_accounts', static fn (Customer $c): iterable => $c->socialAccounts()->get()
+                ->map(static fn ($s): array => ['provider' => $s->provider, 'email' => $s->provider_email, 'linked_at' => $s->created_at->toIso8601String()])->all());
 
             $registry->registerSection('account', static fn (Customer $c): iterable => [[
                 'name' => $c->name, 'email' => $c->email, 'phone' => $c->phone,

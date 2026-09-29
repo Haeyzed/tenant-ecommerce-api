@@ -6,13 +6,16 @@ namespace App\Modules\Customers\Services;
 
 use App\Modules\Customers\Models\Address;
 use App\Modules\Customers\Models\Customer;
+use App\Modules\Customers\Models\CustomerGroup;
 use App\Modules\Customers\Support\CustomerPrivacyRegistry;
 use App\Modules\CustomFields\Services\CustomFieldService;
 use App\Modules\Exports\Models\DataExport;
 use App\Modules\Exports\Services\DataExportService;
 use App\Shared\Activity\ActivityRecorder;
 use App\Shared\Exceptions\ApiException;
+use App\Shared\Support\BulkOperation;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -41,19 +44,54 @@ final readonly class CustomerService
      */
     public function listCustomers(array $filters): LengthAwarePaginator
     {
+        return $this->customersQuery($filters)->with(['group:id,name', 'socialAccounts:id,customer_id,provider'])->orderByDesc('id')->paginate((int) ($filters['per_page'] ?? 25));
+    }
+
+    /**
+     * The admin customer list's filters, shared by the list and the
+     * customers export (D-134). Anonymised customers are left out.
+     *
+     * @param  array<string, mixed>  $filters
+     * @return Builder<Customer>
+     */
+    public function customersQuery(array $filters): Builder
+    {
+        $search = isset($filters['search']) ? '%'.addcslashes((string) $filters['search'], '%_\\').'%' : null;
+
         return Customer::query()
-            ->with('group:id,name')
-            ->when($filters['search'] ?? null, static fn ($q, $v) => $q->where(static fn ($q) => $q
-                ->where('name', 'like', '%'.$v.'%')->orWhere('email', 'like', '%'.$v.'%')->orWhere('phone', 'like', '%'.$v.'%')))
+            ->when($search !== null, static fn ($q) => $q->where(static fn ($q) => $q
+                ->where('name', 'like', $search)->orWhere('email', 'like', $search)->orWhere('phone', 'like', $search)))
             ->when(array_key_exists('customer_group_id', $filters), static fn ($q) => $q->where('customer_group_id', $filters['customer_group_id']))
             ->when(array_key_exists('is_active', $filters), static fn ($q) => $q->where('is_active', (bool) $filters['is_active']))
-            ->orderByDesc('id')
-            ->paginate((int) ($filters['per_page'] ?? 25));
+            ->when(($filters['exclude_anonymized'] ?? false) === true, static fn ($q) => $q->whereNull('anonymized_at'));
+    }
+
+    /**
+     * Bulk actions (§70.12, D-133): activate, deactivate, assign_group
+     * (with customer_group_id). Each customer goes through the single-item
+     * method; anonymised customers fail individually.
+     *
+     * @param  list<int>  $ids
+     * @return array{operation_id: string, succeeded: int, failed: int, results: list<array{id: int, status: string, error: string|null, message: string|null}>}
+     */
+    public function bulk(string $action, array $ids, ?int $groupId, Model $by): array
+    {
+        $group = $action === 'assign_group' ? CustomerGroup::query()->findOrFail((int) $groupId) : null;
+
+        return BulkOperation::run('customers', $action, $ids, function (int $id) use ($action, $group, $by): void {
+            $customer = Customer::query()->findOrFail($id);
+
+            match ($action) {
+                'deactivate' => $this->deactivateCustomer($customer, $by),
+                'activate' => $this->activateCustomer($customer, $by),
+                'assign_group' => app(CustomerGroupService::class)->assignCustomerToGroup($customer, $group),
+            };
+        });
     }
 
     public function getCustomer(Customer $customer): Customer
     {
-        return $customer->load(['group:id,name', 'addresses']);
+        return $customer->load(['group:id,name', 'addresses', 'socialAccounts:id,customer_id,provider']);
     }
 
     /**
@@ -73,6 +111,32 @@ final readonly class CustomerService
         ], CustomFieldService::PUBLIC, true);
 
         return $this->persistNew([...$validated, 'name' => trim($validated['name'])], $custom);
+    }
+
+    /**
+     * A shopper signing up with Google or Facebook (D-132): no password,
+     * the store's public custom fields validated as at registration, and
+     * the email verified only when the provider vouched for it.
+     *
+     * @param  array<string, mixed>  $data  name, email, custom_fields?
+     */
+    public function registerFromSocial(array $data, bool $emailVerified): Customer
+    {
+        $data['email'] = strtolower(trim((string) ($data['email'] ?? '')));
+        $data['name'] = mb_substr(trim((string) ($data['name'] ?? '')), 0, 120) ?: 'Customer';
+
+        [$validated, $custom] = $this->validateWithCustomFields($data, [
+            'name' => ['required', 'string', 'max:120'],
+            'email' => ['required', 'string', 'email:rfc', 'max:255', Rule::unique('tenant.customers', 'email')],
+        ], CustomFieldService::PUBLIC, true);
+
+        $customer = $this->persistNew($validated, $custom);
+
+        if ($emailVerified) {
+            $customer->markEmailAsVerified();
+        }
+
+        return $customer;
     }
 
     /**
@@ -132,6 +196,18 @@ final readonly class CustomerService
         if ($by !== null) {
             ActivityRecorder::tenant('customers', 'Customer updated', $customer, ['fields' => array_keys($validated)], $by);
         }
+
+        return $customer;
+    }
+
+    /**
+     * Undoes a deactivation (D-133). An anonymised customer stays erased.
+     */
+    public function activateCustomer(Customer $customer, Model $by): Customer
+    {
+        $this->assertNotAnonymised($customer);
+        $customer->forceFill(['is_active' => true])->save();
+        ActivityRecorder::tenant('customers', 'Customer activated', $customer, [], $by);
 
         return $customer;
     }

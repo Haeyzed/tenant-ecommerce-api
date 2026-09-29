@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Settings\Services;
 
+use App\Modules\Auth\Services\Tenant\CustomerSocialAuthService;
 use App\Modules\Auth\Support\DisplayPreferences;
 use App\Modules\Cms\Http\CmsPresenter;
 use App\Modules\Cms\Models\CmsBanner;
@@ -99,6 +100,8 @@ final readonly class StorefrontConfigService
                 'payment_mode' => $settings->get('payment_mode'),
             ],
             'modules' => $modules,
+            // Sign-in methods beyond email and password (D-132).
+            'social_login_providers' => app(CustomerSocialAuthService::class)->providers(),
             // Live announcements (at most three), so the storefront needs no extra request (§24.5).
             'announcement_bar' => $this->banners->getAnnouncementBar()->map(static fn (CmsBanner $b): array => CmsPresenter::banner($b, true))->values()->all(),
         ];

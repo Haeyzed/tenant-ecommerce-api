@@ -97,6 +97,17 @@ final class CustomerAuthController extends Controller
     }
 
     /**
+     * Body: password, password_confirmation. Only for an account without a
+     * password (created through social sign-in).
+     */
+    public function setPassword(Request $request): JsonResponse
+    {
+        $this->auth->setPassword($this->customer($request), (string) $request->input('password', ''), (string) $request->input('password_confirmation', ''));
+
+        return APIResponse::success(null, 'Password set');
+    }
+
+    /**
      * @param  array{token: string, token_type: string, expires_at: string|null, customer: Customer}  $result
      * @return array<string, mixed>
      */

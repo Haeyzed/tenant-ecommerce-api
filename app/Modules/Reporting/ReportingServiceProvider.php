@@ -31,7 +31,7 @@ final class ReportingServiceProvider extends ServiceProvider
                     rules: $rules,
                     columns: [],
                     rows: static fn (array $parameters): iterable => $run($parameters)->stream(),
-                    formats: ['csv', 'pdf'],
+                    formats: ['csv', 'xlsx', 'pdf'],
                     permission: ReportService::permissionOf($key),
                     module: 'advanced_reporting',
                     requires: $feature === null ? [] : [$feature],

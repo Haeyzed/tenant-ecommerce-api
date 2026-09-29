@@ -38,7 +38,10 @@ final class CustomerResource extends JsonResource
             'phone' => $this->phone,
             'email_verified' => $this->email_verified_at !== null,
             'is_active' => $this->is_active,
-            'has_login' => $this->password !== null,
+            // A password or a linked Google / Facebook identity (D-132).
+            'has_login' => $this->password !== null || ($this->relationLoaded('socialAccounts') && $this->socialAccounts->isNotEmpty()),
+            'has_password' => $this->password !== null,
+            'social_providers' => $this->whenLoaded('socialAccounts', fn (): array => $this->socialAccounts->pluck('provider')->values()->all()),
             'customer_group' => $this->whenLoaded('group', fn (): ?array => $this->group === null ? null : ['id' => $this->group->id, 'name' => $this->group->name]),
             'addresses' => AddressResource::collection($this->whenLoaded('addresses')),
             'last_login_at' => $this->last_login_at?->toIso8601String(),

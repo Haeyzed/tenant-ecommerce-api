@@ -14,6 +14,7 @@ use App\Modules\Payments\Models\OrderPayment;
 use App\Modules\Payments\Services\OrderPaymentService;
 use App\Modules\Users\Models\User;
 use App\Shared\Http\APIResponse;
+use App\Shared\Support\BulkOperation;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -70,6 +71,20 @@ final class OrderController extends Controller
         $status = (string) $request->validate(['status' => ['required', Rule::in(Order::STATUSES)]])['status'];
 
         return APIResponse::success($this->present($this->orders->updateOrderStatus($order, $status)), 'Status updated');
+    }
+
+    /**
+     * Body: action (processing | delivered), ids[] (≤ 100). Each order must allow the move.
+     */
+    public function bulk(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'action' => ['required', Rule::in([Order::PROCESSING, Order::DELIVERED])],
+            'ids' => ['required', 'array', 'min:1', 'max:'.BulkOperation::MAX_ITEMS],
+            'ids.*' => ['integer'],
+        ]);
+
+        return APIResponse::success($this->orders->bulkUpdateStatus($validated['ids'], $validated['action'], $this->warehouses->visibleIds($this->actor($request))));
     }
 
     public function cancel(Request $request, Order $order): JsonResponse

@@ -90,9 +90,20 @@ class Customer extends Authenticatable implements AuditableContract, CanResetPas
         return $this->hasMany(Address::class);
     }
 
+    /**
+     * @return HasMany<CustomerSocialAccount, $this>
+     */
+    public function socialAccounts(): HasMany
+    {
+        return $this->hasMany(CustomerSocialAccount::class);
+    }
+
+    /**
+     * With a password or a linked social identity (D-132).
+     */
     public function canLogIn(): bool
     {
-        return $this->password !== null && $this->is_active && $this->anonymized_at === null;
+        return ($this->password !== null || $this->socialAccounts()->exists()) && $this->is_active && $this->anonymized_at === null;
     }
 
     /**

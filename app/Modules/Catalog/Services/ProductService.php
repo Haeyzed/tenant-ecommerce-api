@@ -29,7 +29,7 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
-use Throwable;
+use App\Shared\Support\BulkOperation;
 
 /**
  * Products and their type-specific parts (spec §27.3, §27.4, §28.5, §30.1,
@@ -62,7 +62,19 @@ final readonly class ProductService
      */
     public function listProducts(array $filters): LengthAwarePaginator
     {
-        $query = Product::query()->with(['brand:id,name', 'categories:id,name', 'media']);
+        return $this->productsQuery($filters)->with(['brand:id,name', 'categories:id,name', 'media'])->orderByDesc('id')->paginate((int) ($filters['per_page'] ?? 25));
+    }
+
+    /**
+     * The admin product list's filters, shared by the list and the product
+     * exports (D-134).
+     *
+     * @param  array<string, mixed>  $filters
+     * @return Builder<Product>
+     */
+    public function productsQuery(array $filters): Builder
+    {
+        $query = Product::query();
 
         if (filled($filters['search'] ?? null)) {
             $this->applySearch($query, (string) $filters['search']);
@@ -72,9 +84,7 @@ final readonly class ProductService
             ->when($filters['product_type'] ?? null, static fn ($q, $v) => $q->where('product_type', $v))
             ->when(array_key_exists('is_active', $filters), static fn ($q) => $q->where('is_active', (bool) $filters['is_active']))
             ->when($filters['brand_id'] ?? null, static fn ($q, $v) => $q->where('brand_id', $v))
-            ->when($filters['category_id'] ?? null, fn ($q, $v) => $q->whereHas('categories', fn ($c) => $c->whereIn('categories.id', $this->categories->withDescendants([(int) $v]))))
-            ->orderByDesc('id')
-            ->paginate((int) ($filters['per_page'] ?? 25));
+            ->when($filters['category_id'] ?? null, fn ($q, $v) => $q->whereHas('categories', fn ($c) => $c->whereIn('categories.id', $this->categories->withDescendants([(int) $v]))));
     }
 
     public function getProduct(Product $product): Product
@@ -196,28 +206,11 @@ final readonly class ProductService
      * transaction; one bad item never rolls back the others.
      *
      * @param  list<int>  $ids
-     * @return list<array{id: int, status: string, error: string|null, message: string|null}>
+     * @return array{operation_id: string, succeeded: int, failed: int, results: list<array{id: int, status: string, error: string|null, message: string|null}>}
      */
     public function bulk(string $action, array $ids): array
     {
-        $results = [];
-
-        foreach (array_values(array_unique(array_map('intval', $ids))) as $id) {
-            try {
-                $product = Product::query()->findOrFail($id);
-                $this->updateProduct($product, ['is_active' => $action === 'activate']);
-                $results[] = ['id' => $id, 'status' => 'ok', 'error' => null, 'message' => null];
-            } catch (Throwable $e) {
-                $results[] = [
-                    'id' => $id,
-                    'status' => 'error',
-                    'error' => $e instanceof ApiException ? $e->errorCode : ($e instanceof ValidationException ? 'validation_failed' : 'not_found'),
-                    'message' => $e instanceof ValidationException ? (string) collect($e->errors())->flatten()->first() : $e->getMessage(),
-                ];
-            }
-        }
-
-        return $results;
+        return BulkOperation::run('products', $action, $ids, fn (int $id) => $this->updateProduct(Product::query()->findOrFail($id), ['is_active' => $action === 'activate']));
     }
 
     // ---- Variants (§28.2) ----------------------------------------------

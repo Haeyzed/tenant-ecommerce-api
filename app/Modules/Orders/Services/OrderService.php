@@ -28,6 +28,7 @@ use App\Modules\Settings\Services\TenantSettingsService;
 use App\Modules\Tenancy\Models\Tenant;
 use App\Modules\Users\Models\User;
 use App\Shared\Exceptions\ApiException;
+use App\Shared\Support\BulkOperation;
 use App\Shared\Support\FrontendUrl;
 use App\Shared\Support\Money;
 use App\Shared\Support\UsageCounterRegistry;
@@ -384,6 +385,26 @@ final readonly class OrderService
     }
 
     /**
+     * Bulk status (§70.12, D-133): the staff moves pending → processing and
+     * shipped → delivered, one order at a time through updateOrderStatus().
+     * An order outside the viewer's warehouses fails as not found (§25.3).
+     *
+     * @param  list<int>  $ids
+     * @param  list<int>|null  $visibleWarehouseIds  null = every warehouse
+     * @return array{operation_id: string, succeeded: int, failed: int, results: list<array{id: int, status: string, error: string|null, message: string|null}>}
+     */
+    public function bulkUpdateStatus(array $ids, string $status, ?array $visibleWarehouseIds): array
+    {
+        return BulkOperation::run('orders', 'status:'.$status, $ids, function (int $id) use ($status, $visibleWarehouseIds): void {
+            $order = Order::query()
+                ->when($visibleWarehouseIds !== null, static fn ($q) => $q->whereHas('items', static fn ($i) => $i->whereIn('warehouse_id', $visibleWarehouseIds ?: [0])))
+                ->findOrFail($id);
+
+            $this->updateOrderStatus($order, $status);
+        });
+    }
+
+    /**
      * Sets a status and the completion timestamp; used by staff changes and
      * by shipments. The caller holds the order lock.
      */
@@ -635,11 +656,22 @@ final readonly class OrderService
      */
     public function listOrders(array $filters, ?User $viewer = null): LengthAwarePaginator
     {
+        return $this->ordersQuery($filters, $viewer)->withCount('items')->orderByDesc('id')->paginate((int) ($filters['per_page'] ?? 25));
+    }
+
+    /**
+     * The staff order list's filters and warehouse scope (§25.3), shared by
+     * the list and the orders export (D-134).
+     *
+     * @param  array<string, mixed>  $filters
+     * @return Builder<Order>
+     */
+    public function ordersQuery(array $filters, ?User $viewer = null): Builder
+    {
         $visible = $this->warehouses->visibleIds($viewer);
         $search = trim((string) ($filters['search'] ?? ''));
 
         return Order::query()
-            ->withCount('items')
             ->when($visible !== null, static fn (Builder $q) => $q->whereHas('items', static fn (Builder $i) => $i->whereIn('warehouse_id', $visible)))
             ->when($search !== '', static fn (Builder $q) => $q->where(static fn (Builder $w) => $w->where('order_number', $search)->orWhere('customer_email', strtolower($search))
                 ->orWhere('customer_name', 'like', '%'.addcslashes($search, '%_\\').'%')))
@@ -653,9 +685,7 @@ final readonly class OrderService
             ->when($filters['seller_id'] ?? null, static fn (Builder $q, $v) => $q->whereHas('items', static fn (Builder $i) => $i->where('seller_id', $v)))
             ->when(array_key_exists('is_test', $filters), static fn (Builder $q) => $q->where('is_test', (bool) $filters['is_test']))
             ->when($filters['from'] ?? null, static fn (Builder $q, $v) => $q->where('placed_at', '>=', $v))
-            ->when($filters['to'] ?? null, static fn (Builder $q, $v) => $q->where('placed_at', '<=', $v))
-            ->orderByDesc('id')
-            ->paginate((int) ($filters['per_page'] ?? 25));
+            ->when($filters['to'] ?? null, static fn (Builder $q, $v) => $q->where('placed_at', '<=', $v));
     }
 
     /**

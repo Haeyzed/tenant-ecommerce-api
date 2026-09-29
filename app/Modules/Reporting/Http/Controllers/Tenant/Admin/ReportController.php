@@ -64,7 +64,7 @@ final class ReportController extends Controller
     {
         $validated = $request->validate([
             'filters' => ['sometimes', 'array'],
-            'format' => ['required', Rule::in(['csv', 'pdf'])],
+            'format' => ['required', Rule::in(['csv', 'xlsx', 'pdf'])],
         ]);
 
         $export = $exports->request('report:'.$reportKey, (array) ($validated['filters'] ?? []), $validated['format'], $this->user($request));

@@ -38,7 +38,7 @@ final class DataExportController extends Controller
         $validated = $request->validate([
             'export_type' => ['required', 'string', 'max:64'],
             'parameters' => ['sometimes', 'array'],
-            'format' => ['required', 'string', 'in:csv,json,pdf'],
+            'format' => ['required', 'string', 'in:csv,xlsx,json,pdf'],
         ]);
 
         /** @var User $user */

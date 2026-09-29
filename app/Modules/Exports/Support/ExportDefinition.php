@@ -31,7 +31,7 @@ final readonly class ExportDefinition
         public array $rules,
         public array $columns,
         public Closure $rows,
-        public array $formats = ['csv', 'json'],
+        public array $formats = ['csv', 'xlsx', 'json'],
         public ?string $permission = null,
         public ?string $module = null,
         public array $requires = [],

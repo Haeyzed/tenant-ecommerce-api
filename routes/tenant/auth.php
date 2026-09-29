@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use App\Modules\Auth\Http\Controllers\Tenant\CustomerAuthController;
+use App\Modules\Auth\Http\Controllers\Tenant\CustomerSocialAuthController;
+use App\Modules\Customers\Models\CustomerSocialAccount;
 use App\Modules\Auth\Http\Controllers\Tenant\DriverAuthController;
 use App\Modules\Auth\Http\Controllers\Tenant\StaffAuthController;
 use Illuminate\Support\Facades\Route;
@@ -43,9 +45,27 @@ Route::middleware('tenant.public')->prefix('auth')->name('tenant.auth.customer.'
         Route::post('password/reset', [CustomerAuthController::class, 'resetPassword'])->name('password.reset');
         Route::post('email/resend', [CustomerAuthController::class, 'resendVerificationEmail'])->middleware('auth.as:customer')->name('email.resend');
         Route::patch('password', [CustomerAuthController::class, 'changePassword'])->middleware('auth.as:customer')->name('password.change');
+        Route::post('password/set', [CustomerAuthController::class, 'setPassword'])->middleware('auth.as:customer')->name('password.set');
     });
 
+    // Social sign-in (D-132): start, then complete with the provider's code and
+    // state. No password is guessed here and each state is single-use, so the
+    // group's per-IP limits apply instead of auth-sensitive's per-email one.
+    Route::get('social/providers', [CustomerSocialAuthController::class, 'providers'])->name('social.providers');
+    Route::post('social/{provider}/redirect', [CustomerSocialAuthController::class, 'redirect'])->whereIn('provider', CustomerSocialAccount::PROVIDERS)->name('social.redirect');
+    Route::post('social/{provider}/callback', [CustomerSocialAuthController::class, 'callback'])->whereIn('provider', CustomerSocialAccount::PROVIDERS)->middleware('guest.token')->name('social.callback');
     Route::post('logout', [CustomerAuthController::class, 'logout'])->middleware(['auth.as:customer', 'throttle:api'])->name('logout');
+});
+
+/*
+| Linked sign-in methods on the customer's account (D-132).
+*/
+
+Route::middleware('tenant.customer')->prefix('account/social-accounts')->name('tenant.customer.account.social-accounts.')->group(function (): void {
+    Route::get('/', [CustomerSocialAuthController::class, 'accounts'])->name('index');
+    Route::post('{provider}/redirect', [CustomerSocialAuthController::class, 'linkRedirect'])->whereIn('provider', CustomerSocialAccount::PROVIDERS)->name('redirect');
+    Route::post('{provider}/callback', [CustomerSocialAuthController::class, 'linkCallback'])->whereIn('provider', CustomerSocialAccount::PROVIDERS)->name('callback');
+    Route::delete('{provider}', [CustomerSocialAuthController::class, 'unlink'])->whereIn('provider', CustomerSocialAccount::PROVIDERS)->name('destroy');
 });
 
 /*

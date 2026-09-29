@@ -13,6 +13,7 @@ use App\Modules\Orders\Models\Order;
 use App\Modules\Reviews\Models\ProductReview;
 use App\Modules\Settings\Services\TenantSettingsService;
 use App\Shared\Exceptions\ApiException;
+use App\Shared\Support\BulkOperation;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -104,6 +105,20 @@ final readonly class ReviewService implements Approvable
         $this->approvals->assertNoPending($review);
 
         return $this->moderate($review, ProductReview::REJECTED, $reason);
+    }
+
+    /**
+     * Bulk moderation (§70.12, D-133): approve, or reject with one reason
+     * for all. A review awaiting an approval workflow fails individually.
+     *
+     * @param  list<int>  $ids
+     * @return array{operation_id: string, succeeded: int, failed: int, results: list<array{id: int, status: string, error: string|null, message: string|null}>}
+     */
+    public function bulk(string $action, array $ids, ?string $reason): array
+    {
+        return BulkOperation::run('reviews', $action, $ids, fn (int $id) => $action === 'approve'
+            ? $this->approveReview(ProductReview::query()->findOrFail($id))
+            : $this->rejectReview(ProductReview::query()->findOrFail($id), (string) $reason));
     }
 
     // ---- Approval workflow (§60.1) ---------------------------------------

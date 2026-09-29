@@ -15,6 +15,7 @@ use App\Shared\Exceptions\ApiException;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
+use Illuminate\Validation\Rules\Password as PasswordRule;
 use Illuminate\Validation\ValidationException;
 use Laravel\Sanctum\PersonalAccessToken;
 
@@ -128,6 +129,24 @@ final readonly class CustomerAuthService
         if ($status !== Password::PASSWORD_RESET) {
             throw ValidationException::withMessages(['token' => [__($status)]]);
         }
+    }
+
+    /**
+     * A first password for an account created through social sign-in
+     * (D-132). Refused once a password exists: that one changes only with
+     * the current password.
+     */
+    public function setPassword(Customer $customer, string $new, string $confirmation): void
+    {
+        $validated = validator(['password' => $new, 'password_confirmation' => $confirmation], [
+            'password' => ['required', 'string', 'confirmed', PasswordRule::defaults()],
+        ])->validate();
+
+        if ($customer->password !== null) {
+            throw ApiException::unprocessable('password_already_set', 'This account has a password. Change it with your current password.');
+        }
+
+        $customer->forceFill(['password' => $validated['password']])->save();
     }
 
     /**

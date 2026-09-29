@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Modules\Exports\Jobs;
 
-use App\Modules\Documents\Contracts\DocumentRenderer;
 use App\Modules\Exports\Models\DataExport;
 use App\Modules\Exports\Support\ExportContext;
 use App\Modules\Exports\Support\ExportRegistry;
+use App\Modules\Exports\Support\ExportWriter;
 use App\Modules\Notifications\Services\NotificationDispatchService;
 use App\Modules\Tenancy\Models\Tenant;
 use App\Shared\Support\FrontendUrl;
@@ -17,12 +17,12 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Support\Facades\URL;
-use RuntimeException;
 use Throwable;
 
 /**
- * Streams one export into a private file (spec §19.4). Rows are written as
- * they are read, so memory stays flat whatever the export size.
+ * Writes one tenant export into a private file (spec §19.4). The tenant
+ * comes from the queue tenancy bootstrapper (the job runs inside the
+ * tenant that dispatched it); the requester's scope from ExportContext.
  */
 final class GenerateExport implements ShouldBeUnique, ShouldQueue
 {
@@ -40,7 +40,7 @@ final class GenerateExport implements ShouldBeUnique, ShouldQueue
     public int $uniqueFor = 3600;
 
     /** Rows a PDF holds at most; the file notes when more were left out. */
-    public const int PDF_MAX_ROWS = 2000;
+    public const int PDF_MAX_ROWS = ExportWriter::PDF_MAX_ROWS;
 
     public function __construct(public readonly int $exportId)
     {
@@ -52,96 +52,30 @@ final class GenerateExport implements ShouldBeUnique, ShouldQueue
         return (string) tenant()?->getTenantKey().':'.$this->exportId;
     }
 
-    public function handle(ExportRegistry $registry, NotificationDispatchService $notifications): void
+    public function handle(ExportRegistry $registry, ExportWriter $writer, NotificationDispatchService $notifications): void
     {
         $export = DataExport::query()->find($this->exportId);
 
+        // A retry after completion (or expiry) does nothing twice.
         if ($export === null || in_array($export->status, [DataExport::COMPLETED, DataExport::EXPIRED], true)) {
             return;
         }
 
         $export->forceFill(['status' => DataExport::PROCESSING, 'error' => null])->save();
 
-        $definition = $registry->get($export->export_type);
         // Types that depend on who asks read the requester here, never from the parameters.
         app()->instance(ExportContext::class, new ExportContext($export->requestedBy));
-        $columns = $definition->columns((array) $export->parameters);
-        $path = tempnam(sys_get_temp_dir(), 'export');
-        $handle = fopen((string) $path, 'wb');
+        $file = $writer->write($registry->get($export->export_type), (array) $export->parameters, $export->format);
 
-        if ($handle === false) {
-            throw new RuntimeException('Could not open the export file.');
-        }
-
-        $rows = 0;
-        $pdfRows = [];
-        $truncated = false;
-
-        try {
-            if ($export->format === 'csv') {
-                fputcsv($handle, array_values($columns), escape: '');
-            } elseif ($export->format === 'json') {
-                fwrite($handle, '[');
-            }
-
-            foreach (($definition->rows)($export->parameters) as $row) {
-                $values = [];
-
-                foreach (array_keys($columns) as $key) {
-                    $values[$key] = $row[$key] ?? null;
-                }
-
-                if ($export->format === 'csv') {
-                    fputcsv($handle, array_map(self::csvCell(...), array_values($values)), escape: '');
-                } elseif ($export->format === 'json') {
-                    fwrite($handle, ($rows > 0 ? ',' : '').json_encode($values, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE));
-                } elseif ($rows < self::PDF_MAX_ROWS) {
-                    $pdfRows[] = array_map(static fn (mixed $v): string => is_scalar($v) || $v === null ? (string) $v : (string) json_encode($v), $values);
-                } else {
-                    // A PDF is for reading, not a data dump: CSV carries every row.
-                    $truncated = true;
-
-                    break;
-                }
-
-                $rows++;
-            }
-
-            if ($export->format === 'json') {
-                fwrite($handle, ']');
-            }
-
-            if ($export->format === 'pdf') {
-                fwrite($handle, app(DocumentRenderer::class)->pdf('exports.table', [
-                    'title' => $definition->label,
-                    'columns' => array_values($columns),
-                    'rows' => $pdfRows,
-                    'parameters' => (array) $export->parameters,
-                    'generatedAt' => now(),
-                    'truncated' => $truncated ? self::PDF_MAX_ROWS : null,
-                ], 'a4', count($columns) > 5 ? 'landscape' : 'portrait'));
-            }
-
-            fclose($handle);
-
-            // Types may hold ":" (a module prefix), which is not portable in
-            // file names (an NTFS stream separator).
-            $export->addMedia((string) $path)
-                ->usingFileName(preg_replace('/[^A-Za-z0-9_-]+/', '-', $export->export_type).'-'.$export->id.'.'.$export->format)
-                ->toMediaCollection('file');
-        } catch (Throwable $e) {
-            if (is_resource($handle)) {
-                fclose($handle);
-            }
-
-            @unlink((string) $path);
-
-            throw $e;
-        }
+        // Types may hold ":" (a module prefix), which is not portable in
+        // file names (an NTFS stream separator).
+        $export->addMedia($file['path'])
+            ->usingFileName(preg_replace('/[^A-Za-z0-9_-]+/', '-', $export->export_type).'-'.$export->id.'.'.$export->format)
+            ->toMediaCollection('file');
 
         $export->forceFill([
             'status' => DataExport::COMPLETED,
-            'row_count' => $rows,
+            'row_count' => $file['rows'],
             'completed_at' => now(),
             'expires_at' => now()->addDays(DataExport::RETENTION_DAYS),
         ])->save();
@@ -155,17 +89,6 @@ final class GenerateExport implements ShouldBeUnique, ShouldQueue
             'status' => DataExport::FAILED,
             'error' => $exception !== null ? mb_substr(class_basename($exception).': '.$exception->getMessage(), 0, 1000) : 'failed',
         ]);
-    }
-
-    /**
-     * Formulas are neutralised, so a spreadsheet never executes exported
-     * text (CSV injection).
-     */
-    private static function csvCell(mixed $value): string
-    {
-        $text = is_scalar($value) || $value === null ? (string) $value : (string) json_encode($value);
-
-        return $text !== '' && in_array($text[0], ['=', '+', '-', '@', "\t", "\r"], true) && ! is_numeric($text) ? "'".$text : $text;
     }
 
     private function notify(DataExport $export, NotificationDispatchService $notifications): void

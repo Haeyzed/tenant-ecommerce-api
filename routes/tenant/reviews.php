@@ -28,6 +28,7 @@ Route::middleware(['tenant.customer', 'module.notice:core'])->name('tenant.')->g
 
 Route::middleware(['tenant.admin', 'module.notice:core'])->prefix('admin')->name('tenant.reviews.admin.')->group(function (): void {
     Route::get('reviews', [AdminReviewController::class, 'index'])->name('index');
+    Route::post('reviews/bulk', [AdminReviewController::class, 'bulk'])->name('bulk');
     Route::post('reviews/{review}/approve', [AdminReviewController::class, 'approve'])->whereNumber('review')->name('approve');
     Route::post('reviews/{review}/reject', [AdminReviewController::class, 'reject'])->whereNumber('review')->name('reject');
     Route::delete('reviews/{review}', [AdminReviewController::class, 'destroy'])->whereNumber('review')->name('destroy');

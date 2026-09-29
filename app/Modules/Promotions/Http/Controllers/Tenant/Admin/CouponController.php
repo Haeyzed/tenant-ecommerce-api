@@ -69,7 +69,7 @@ final class CouponController extends Controller
             'ids.*' => ['integer'],
         ]);
 
-        return APIResponse::success(['results' => $this->coupons->bulk($validated['action'], $validated['ids'])]);
+        return APIResponse::success($this->coupons->bulk($validated['action'], $validated['ids']));
     }
 
     public function update(Request $request, Coupon $coupon): JsonResponse

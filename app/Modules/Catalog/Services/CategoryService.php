@@ -8,6 +8,7 @@ use App\Modules\Catalog\Models\Category;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Cms\Support\SitemapTrigger;
 use App\Shared\Exceptions\ApiException;
+use App\Shared\Support\BulkOperation;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -44,6 +45,17 @@ final readonly class CategoryService
         $category = Category::query()->create($validated);
 
         return $category;
+    }
+
+    /**
+     * Bulk activate / deactivate (§70.12, D-133), each through updateCategory().
+     *
+     * @param  list<int>  $ids
+     * @return array{operation_id: string, succeeded: int, failed: int, results: list<array{id: int, status: string, error: string|null, message: string|null}>}
+     */
+    public function bulk(string $action, array $ids): array
+    {
+        return BulkOperation::run('categories', $action, $ids, fn (int $id) => $this->updateCategory(Category::query()->findOrFail($id), ['is_active' => $action === 'activate']));
     }
 
     /**

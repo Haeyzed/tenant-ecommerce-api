@@ -8,8 +8,10 @@ use App\Http\Controllers\Controller;
 use App\Modules\Reviews\Models\ProductReview;
 use App\Modules\Reviews\Services\ReviewService;
 use App\Shared\Http\APIResponse;
+use App\Shared\Support\BulkOperation;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 /**
  * Review moderation (spec §42.3).
@@ -38,6 +40,21 @@ final class ReviewController extends Controller
     public function reject(Request $request, ProductReview $review): JsonResponse
     {
         return APIResponse::success($this->present($this->reviews->rejectReview($review, (string) $request->input('reason', ''))), 'Review rejected');
+    }
+
+    /**
+     * Body: action (approve | reject), ids[] (≤ 100), reason (reject)
+     */
+    public function bulk(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'action' => ['required', Rule::in(['approve', 'reject'])],
+            'ids' => ['required', 'array', 'min:1', 'max:'.BulkOperation::MAX_ITEMS],
+            'ids.*' => ['integer'],
+            'reason' => ['required_if:action,reject', 'nullable', 'string', 'max:255'],
+        ]);
+
+        return APIResponse::success($this->reviews->bulk($validated['action'], $validated['ids'], $validated['reason'] ?? null));
     }
 
     public function destroy(ProductReview $review): JsonResponse

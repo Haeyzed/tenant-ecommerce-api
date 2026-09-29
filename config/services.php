@@ -71,6 +71,25 @@ return [
         'timeout' => (int) env('FCM_HTTP_TIMEOUT', 10),
     ],
 
+    /*
+    | Customer social login (Socialite). One OAuth app per provider serves
+    | every tenant: the redirect is the platform's central relay page, which
+    | forwards the code and state to the tenant storefront (D-132). A
+    | provider without a client id is off.
+    */
+
+    'google' => [
+        'client_id' => env('GOOGLE_CLIENT_ID'),
+        'client_secret' => env('GOOGLE_CLIENT_SECRET'),
+        'redirect' => env('GOOGLE_REDIRECT_URI'),
+    ],
+
+    'facebook' => [
+        'client_id' => env('FACEBOOK_CLIENT_ID'),
+        'client_secret' => env('FACEBOOK_CLIENT_SECRET'),
+        'redirect' => env('FACEBOOK_REDIRECT_URI'),
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),
