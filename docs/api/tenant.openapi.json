@@ -679,6 +679,409 @@
                 }
             }
         },
+        "/admin/social-commerce/accounts": {
+            "get": {
+                "operationId": "tenant.admin.social-commerce.accounts.index",
+                "tags": [
+                    "Account"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "const": "OK"
+                                        },
+                                        "data": {
+                                            "type": "string"
+                                        },
+                                        "meta": {
+                                            "type": [
+                                                "object",
+                                                "array"
+                                            ]
+                                        },
+                                        "errors": {
+                                            "anyOf": [
+                                                {
+                                                    "type": "object"
+                                                },
+                                                {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    },
+                                                    "minItems": 0,
+                                                    "maxItems": 0
+                                                }
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "message",
+                                        "data",
+                                        "meta",
+                                        "errors"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "operationId": "tenant.admin.social-commerce.accounts.store",
+                "summary": "Body: channel, access_token, account_reference, order_account_reference?, sync_products?, sync_orders?, fulfilment_warehouse_id?, sync_interval_minutes?",
+                "tags": [
+                    "Account"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "channel": {
+                                        "type": "string",
+                                        "enum": [
+                                            "instagram",
+                                            "facebook_shop",
+                                            "tiktok_shop",
+                                            "whatsapp_catalog"
+                                        ]
+                                    },
+                                    "access_token": {
+                                        "type": "string",
+                                        "maxLength": 4000
+                                    },
+                                    "account_reference": {
+                                        "type": "string"
+                                    },
+                                    "order_account_reference": {
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ]
+                                    }
+                                },
+                                "required": [
+                                    "channel",
+                                    "access_token",
+                                    "account_reference"
+                                ]
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "const": "Channel connected"
+                                        },
+                                        "data": {
+                                            "type": "string"
+                                        },
+                                        "meta": {
+                                            "type": [
+                                                "object",
+                                                "array"
+                                            ]
+                                        },
+                                        "errors": {
+                                            "anyOf": [
+                                                {
+                                                    "type": "object"
+                                                },
+                                                {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    },
+                                                    "minItems": 0,
+                                                    "maxItems": 0
+                                                }
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "message",
+                                        "data",
+                                        "meta",
+                                        "errors"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/social-commerce/accounts/{account}": {
+            "patch": {
+                "operationId": "tenant.admin.social-commerce.accounts.update",
+                "summary": "Body: access_token? (replaces it), and the toggles",
+                "tags": [
+                    "Account"
+                ],
+                "parameters": [
+                    {
+                        "name": "account",
+                        "in": "path",
+                        "required": true,
+                        "description": "The account ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "access_token": {
+                                        "type": "string",
+                                        "maxLength": 4000
+                                    },
+                                    "order_account_reference": {
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ]
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "const": "Channel updated"
+                                        },
+                                        "data": {
+                                            "type": "string"
+                                        },
+                                        "meta": {
+                                            "type": [
+                                                "object",
+                                                "array"
+                                            ]
+                                        },
+                                        "errors": {
+                                            "anyOf": [
+                                                {
+                                                    "type": "object"
+                                                },
+                                                {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    },
+                                                    "minItems": 0,
+                                                    "maxItems": 0
+                                                }
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "message",
+                                        "data",
+                                        "meta",
+                                        "errors"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    }
+                }
+            },
+            "delete": {
+                "operationId": "tenant.admin.social-commerce.accounts.destroy",
+                "tags": [
+                    "Account"
+                ],
+                "parameters": [
+                    {
+                        "name": "account",
+                        "in": "path",
+                        "required": true,
+                        "description": "The account ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "const": "Channel disconnected"
+                                        },
+                                        "data": {
+                                            "type": "string"
+                                        },
+                                        "meta": {
+                                            "type": [
+                                                "object",
+                                                "array"
+                                            ]
+                                        },
+                                        "errors": {
+                                            "anyOf": [
+                                                {
+                                                    "type": "object"
+                                                },
+                                                {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    },
+                                                    "minItems": 0,
+                                                    "maxItems": 0
+                                                }
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "message",
+                                        "data",
+                                        "meta",
+                                        "errors"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    }
+                }
+            }
+        },
+        "/admin/social-commerce/accounts/{account}/test-connection": {
+            "post": {
+                "operationId": "tenant.admin.social-commerce.accounts.test-connection",
+                "tags": [
+                    "Account"
+                ],
+                "parameters": [
+                    {
+                        "name": "account",
+                        "in": "path",
+                        "required": true,
+                        "description": "The account ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "enum": [
+                                                "Connected",
+                                                "The channel refused this token or account id"
+                                            ]
+                                        },
+                                        "data": {
+                                            "type": "string"
+                                        },
+                                        "meta": {
+                                            "type": [
+                                                "object",
+                                                "array"
+                                            ]
+                                        },
+                                        "errors": {
+                                            "anyOf": [
+                                                {
+                                                    "type": "object"
+                                                },
+                                                {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    },
+                                                    "minItems": 0,
+                                                    "maxItems": 0
+                                                }
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "message",
+                                        "data",
+                                        "meta",
+                                        "errors"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    }
+                }
+            }
+        },
         "/admin/accounting/categories": {
             "get": {
                 "operationId": "tenant.accounting.categories.index",
@@ -39421,6 +39824,23 @@
                                             "null"
                                         ]
                                     },
+                                    "social_commerce_excluded_channels": {
+                                        "type": [
+                                            "array",
+                                            "null"
+                                        ],
+                                        "items": {
+                                            "type": "string",
+                                            "enum": [
+                                                "instagram",
+                                                "facebook_shop",
+                                                "tiktok_shop",
+                                                "whatsapp_catalog"
+                                            ]
+                                        },
+                                        "maxItems": 4,
+                                        "uniqueItems": true
+                                    },
                                     "is_bookable": {
                                         "type": "boolean"
                                     },
@@ -39869,6 +40289,23 @@
                                             "number",
                                             "null"
                                         ]
+                                    },
+                                    "social_commerce_excluded_channels": {
+                                        "type": [
+                                            "array",
+                                            "null"
+                                        ],
+                                        "items": {
+                                            "type": "string",
+                                            "enum": [
+                                                "instagram",
+                                                "facebook_shop",
+                                                "tiktok_shop",
+                                                "whatsapp_catalog"
+                                            ]
+                                        },
+                                        "maxItems": 4,
+                                        "uniqueItems": true
                                     },
                                     "is_bookable": {
                                         "type": "boolean"
@@ -67289,6 +67726,211 @@
                 }
             }
         },
+        "/admin/woocommerce/settings": {
+            "get": {
+                "operationId": "tenant.admin.woocommerce.settings.show",
+                "tags": [
+                    "Settings"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "const": "OK"
+                                        },
+                                        "data": {
+                                            "type": "string"
+                                        },
+                                        "meta": {
+                                            "type": [
+                                                "object",
+                                                "array"
+                                            ]
+                                        },
+                                        "errors": {
+                                            "anyOf": [
+                                                {
+                                                    "type": "object"
+                                                },
+                                                {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    },
+                                                    "minItems": 0,
+                                                    "maxItems": 0
+                                                }
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "message",
+                                        "data",
+                                        "meta",
+                                        "errors"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "put": {
+                "operationId": "tenant.admin.woocommerce.settings.update",
+                "summary": "Body: store_url?, consumer_key?, consumer_secret? (changing any pauses\nsync), and the toggles: is_active?, sync_*?, order_sync_direction?,\nimport_warehouse_id?, sync_interval_minutes?",
+                "tags": [
+                    "Settings"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "store_url": {
+                                        "type": "string",
+                                        "maxLength": 255
+                                    },
+                                    "consumer_key": {
+                                        "type": "string",
+                                        "pattern": "^ck_[A-Za-z0-9]{20,64}$"
+                                    },
+                                    "consumer_secret": {
+                                        "type": "string",
+                                        "pattern": "^cs_[A-Za-z0-9]{20,64}$"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "const": "WooCommerce settings saved"
+                                        },
+                                        "data": {
+                                            "type": "string"
+                                        },
+                                        "meta": {
+                                            "type": [
+                                                "object",
+                                                "array"
+                                            ]
+                                        },
+                                        "errors": {
+                                            "anyOf": [
+                                                {
+                                                    "type": "object"
+                                                },
+                                                {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    },
+                                                    "minItems": 0,
+                                                    "maxItems": 0
+                                                }
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "message",
+                                        "data",
+                                        "meta",
+                                        "errors"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/woocommerce/settings/test-connection": {
+            "post": {
+                "operationId": "tenant.admin.woocommerce.settings.test-connection",
+                "tags": [
+                    "Settings"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "enum": [
+                                                "Connected to WooCommerce",
+                                                "WooCommerce could not be reached with these details"
+                                            ]
+                                        },
+                                        "data": {
+                                            "type": "string"
+                                        },
+                                        "meta": {
+                                            "type": [
+                                                "object",
+                                                "array"
+                                            ]
+                                        },
+                                        "errors": {
+                                            "anyOf": [
+                                                {
+                                                    "type": "object"
+                                                },
+                                                {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    },
+                                                    "minItems": 0,
+                                                    "maxItems": 0
+                                                }
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "message",
+                                        "data",
+                                        "meta",
+                                        "errors"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/admin/shipments": {
             "get": {
                 "operationId": "tenant.shipping.admin.shipments.index",
@@ -75068,6 +75710,956 @@
                         "content": {
                             "application/json": {
                                 "schema": {}
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/social-commerce/accounts/{account}/sync/products": {
+            "post": {
+                "operationId": "tenant.admin.social-commerce.accounts.sync.products",
+                "tags": [
+                    "Sync"
+                ],
+                "parameters": [
+                    {
+                        "name": "account",
+                        "in": "path",
+                        "required": true,
+                        "description": "The account ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "const": "Sync started. Its result will appear in the sync log."
+                                        },
+                                        "data": {
+                                            "type": "string"
+                                        },
+                                        "meta": {
+                                            "type": [
+                                                "object",
+                                                "array"
+                                            ]
+                                        },
+                                        "errors": {
+                                            "anyOf": [
+                                                {
+                                                    "type": "object"
+                                                },
+                                                {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    },
+                                                    "minItems": 0,
+                                                    "maxItems": 0
+                                                }
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "message",
+                                        "data",
+                                        "meta",
+                                        "errors"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    }
+                }
+            }
+        },
+        "/admin/social-commerce/accounts/{account}/sync/orders": {
+            "post": {
+                "operationId": "tenant.admin.social-commerce.accounts.sync.orders",
+                "tags": [
+                    "Sync"
+                ],
+                "parameters": [
+                    {
+                        "name": "account",
+                        "in": "path",
+                        "required": true,
+                        "description": "The account ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "const": "Sync started. Its result will appear in the sync log."
+                                        },
+                                        "data": {
+                                            "type": "string"
+                                        },
+                                        "meta": {
+                                            "type": [
+                                                "object",
+                                                "array"
+                                            ]
+                                        },
+                                        "errors": {
+                                            "anyOf": [
+                                                {
+                                                    "type": "object"
+                                                },
+                                                {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    },
+                                                    "minItems": 0,
+                                                    "maxItems": 0
+                                                }
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "message",
+                                        "data",
+                                        "meta",
+                                        "errors"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    }
+                }
+            }
+        },
+        "/admin/social-commerce/accounts/{account}/products/{product}": {
+            "post": {
+                "operationId": "tenant.admin.social-commerce.accounts.products.push",
+                "tags": [
+                    "Sync"
+                ],
+                "parameters": [
+                    {
+                        "name": "account",
+                        "in": "path",
+                        "required": true,
+                        "description": "The account ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "product",
+                        "in": "path",
+                        "required": true,
+                        "description": "The product ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "const": "Product sent to the channel"
+                                        },
+                                        "data": {
+                                            "type": "string"
+                                        },
+                                        "meta": {
+                                            "type": [
+                                                "object",
+                                                "array"
+                                            ]
+                                        },
+                                        "errors": {
+                                            "anyOf": [
+                                                {
+                                                    "type": "object"
+                                                },
+                                                {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    },
+                                                    "minItems": 0,
+                                                    "maxItems": 0
+                                                }
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "message",
+                                        "data",
+                                        "meta",
+                                        "errors"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    }
+                }
+            },
+            "delete": {
+                "operationId": "tenant.admin.social-commerce.accounts.products.remove",
+                "tags": [
+                    "Sync"
+                ],
+                "parameters": [
+                    {
+                        "name": "account",
+                        "in": "path",
+                        "required": true,
+                        "description": "The account ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "product",
+                        "in": "path",
+                        "required": true,
+                        "description": "The product ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "const": "Product removed from the channel"
+                                        },
+                                        "data": {
+                                            "type": "string"
+                                        },
+                                        "meta": {
+                                            "type": [
+                                                "object",
+                                                "array"
+                                            ]
+                                        },
+                                        "errors": {
+                                            "anyOf": [
+                                                {
+                                                    "type": "object"
+                                                },
+                                                {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    },
+                                                    "minItems": 0,
+                                                    "maxItems": 0
+                                                }
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "message",
+                                        "data",
+                                        "meta",
+                                        "errors"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    }
+                }
+            }
+        },
+        "/admin/social-commerce/sync/logs": {
+            "get": {
+                "operationId": "tenant.admin.social-commerce.sync.logs",
+                "tags": [
+                    "Sync"
+                ],
+                "parameters": [
+                    {
+                        "name": "account_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "sync_type",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "product",
+                                "order"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "success",
+                                "failed",
+                                "partial"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 100
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "const": "OK"
+                                        },
+                                        "data": {
+                                            "type": "string"
+                                        },
+                                        "meta": {
+                                            "type": [
+                                                "object",
+                                                "array"
+                                            ]
+                                        },
+                                        "errors": {
+                                            "anyOf": [
+                                                {
+                                                    "type": "object"
+                                                },
+                                                {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    },
+                                                    "minItems": 0,
+                                                    "maxItems": 0
+                                                }
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "message",
+                                        "data",
+                                        "meta",
+                                        "errors"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/admin/social-commerce/sync/metrics": {
+            "get": {
+                "operationId": "tenant.admin.social-commerce.sync.metrics",
+                "tags": [
+                    "Sync"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "const": "OK"
+                                        },
+                                        "data": {
+                                            "type": "string"
+                                        },
+                                        "meta": {
+                                            "type": [
+                                                "object",
+                                                "array"
+                                            ]
+                                        },
+                                        "errors": {
+                                            "anyOf": [
+                                                {
+                                                    "type": "object"
+                                                },
+                                                {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    },
+                                                    "minItems": 0,
+                                                    "maxItems": 0
+                                                }
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "message",
+                                        "data",
+                                        "meta",
+                                        "errors"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/woocommerce/sync/categories": {
+            "post": {
+                "operationId": "tenant.admin.woocommerce.sync.categories",
+                "tags": [
+                    "Sync"
+                ],
+                "responses": {
+                    "202": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "const": "Sync started. Its result will appear in the sync log."
+                                        },
+                                        "data": {
+                                            "type": "string"
+                                        },
+                                        "meta": {
+                                            "type": [
+                                                "object",
+                                                "array"
+                                            ]
+                                        },
+                                        "errors": {
+                                            "anyOf": [
+                                                {
+                                                    "type": "object"
+                                                },
+                                                {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    },
+                                                    "minItems": 0,
+                                                    "maxItems": 0
+                                                }
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "message",
+                                        "data",
+                                        "meta",
+                                        "errors"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/woocommerce/sync/products": {
+            "post": {
+                "operationId": "tenant.admin.woocommerce.sync.products",
+                "tags": [
+                    "Sync"
+                ],
+                "responses": {
+                    "202": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "const": "Sync started. Its result will appear in the sync log."
+                                        },
+                                        "data": {
+                                            "type": "string"
+                                        },
+                                        "meta": {
+                                            "type": [
+                                                "object",
+                                                "array"
+                                            ]
+                                        },
+                                        "errors": {
+                                            "anyOf": [
+                                                {
+                                                    "type": "object"
+                                                },
+                                                {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    },
+                                                    "minItems": 0,
+                                                    "maxItems": 0
+                                                }
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "message",
+                                        "data",
+                                        "meta",
+                                        "errors"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/woocommerce/sync/tax-rates": {
+            "post": {
+                "operationId": "tenant.admin.woocommerce.sync.tax-rates",
+                "tags": [
+                    "Sync"
+                ],
+                "responses": {
+                    "202": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "const": "Sync started. Its result will appear in the sync log."
+                                        },
+                                        "data": {
+                                            "type": "string"
+                                        },
+                                        "meta": {
+                                            "type": [
+                                                "object",
+                                                "array"
+                                            ]
+                                        },
+                                        "errors": {
+                                            "anyOf": [
+                                                {
+                                                    "type": "object"
+                                                },
+                                                {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    },
+                                                    "minItems": 0,
+                                                    "maxItems": 0
+                                                }
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "message",
+                                        "data",
+                                        "meta",
+                                        "errors"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/woocommerce/sync/orders": {
+            "post": {
+                "operationId": "tenant.admin.woocommerce.sync.orders",
+                "tags": [
+                    "Sync"
+                ],
+                "responses": {
+                    "202": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "const": "Sync started. Its result will appear in the sync log."
+                                        },
+                                        "data": {
+                                            "type": "string"
+                                        },
+                                        "meta": {
+                                            "type": [
+                                                "object",
+                                                "array"
+                                            ]
+                                        },
+                                        "errors": {
+                                            "anyOf": [
+                                                {
+                                                    "type": "object"
+                                                },
+                                                {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    },
+                                                    "minItems": 0,
+                                                    "maxItems": 0
+                                                }
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "message",
+                                        "data",
+                                        "meta",
+                                        "errors"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/woocommerce/products/{product}/push": {
+            "post": {
+                "operationId": "tenant.admin.woocommerce.products.push",
+                "tags": [
+                    "Sync"
+                ],
+                "parameters": [
+                    {
+                        "name": "product",
+                        "in": "path",
+                        "required": true,
+                        "description": "The product ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "const": "Product pushed to WooCommerce"
+                                        },
+                                        "data": {
+                                            "type": "string"
+                                        },
+                                        "meta": {
+                                            "type": [
+                                                "object",
+                                                "array"
+                                            ]
+                                        },
+                                        "errors": {
+                                            "anyOf": [
+                                                {
+                                                    "type": "object"
+                                                },
+                                                {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    },
+                                                    "minItems": 0,
+                                                    "maxItems": 0
+                                                }
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "message",
+                                        "data",
+                                        "meta",
+                                        "errors"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    }
+                }
+            }
+        },
+        "/admin/woocommerce/sync/logs": {
+            "get": {
+                "operationId": "tenant.admin.woocommerce.sync.logs",
+                "tags": [
+                    "Sync"
+                ],
+                "parameters": [
+                    {
+                        "name": "sync_type",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "product",
+                                "category",
+                                "tax_rate",
+                                "order",
+                                "stock"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "success",
+                                "failed",
+                                "partial"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 100
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "const": "OK"
+                                        },
+                                        "data": {
+                                            "type": "string"
+                                        },
+                                        "meta": {
+                                            "type": [
+                                                "object",
+                                                "array"
+                                            ]
+                                        },
+                                        "errors": {
+                                            "anyOf": [
+                                                {
+                                                    "type": "object"
+                                                },
+                                                {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    },
+                                                    "minItems": 0,
+                                                    "maxItems": 0
+                                                }
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "message",
+                                        "data",
+                                        "meta",
+                                        "errors"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/admin/woocommerce/sync/metrics": {
+            "get": {
+                "operationId": "tenant.admin.woocommerce.sync.metrics",
+                "tags": [
+                    "Sync"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "const": "OK"
+                                        },
+                                        "data": {
+                                            "type": "string"
+                                        },
+                                        "meta": {
+                                            "type": [
+                                                "object",
+                                                "array"
+                                            ]
+                                        },
+                                        "errors": {
+                                            "anyOf": [
+                                                {
+                                                    "type": "object"
+                                                },
+                                                {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    },
+                                                    "minItems": 0,
+                                                    "maxItems": 0
+                                                }
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "message",
+                                        "data",
+                                        "meta",
+                                        "errors"
+                                    ]
+                                }
                             }
                         }
                     }

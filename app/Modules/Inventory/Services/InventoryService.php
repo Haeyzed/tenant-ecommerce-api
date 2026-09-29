@@ -7,6 +7,7 @@ namespace App\Modules\Inventory\Services;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\ProductBundleItem;
 use App\Modules\Catalog\Models\ProductVariant;
+use App\Modules\Inventory\Events\StockChanged;
 use App\Modules\Inventory\Exceptions\InsufficientStockException;
 use App\Modules\Inventory\Models\Inventory;
 use App\Modules\Inventory\Models\InventoryMovement;
@@ -419,6 +420,12 @@ final readonly class InventoryService
             foreach ($pairs as $pair) {
                 $after = $this->sumAvailable($pair['product']->id, $pair['variant']?->id ?? 0, null);
                 $this->alerts->evaluate($pair['product'], $pair['variant'], $pair['before'], $after);
+            }
+
+            // The integration hook (§68.3): after commit, once per change.
+            if (($tenantId = tenant()?->getTenantKey()) !== null) {
+                $productIds = array_values(array_unique(array_map(static fn (array $p): int => $p['product']->id, $pairs)));
+                DB::connection('tenant')->afterCommit(static fn () => event(new StockChanged((string) $tenantId, $productIds)));
             }
 
             return $results;

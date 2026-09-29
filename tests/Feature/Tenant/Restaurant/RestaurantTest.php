@@ -77,6 +77,9 @@ function tableStatus(): string
 }
 
 it('runs a table from the first round to the bill: modifiers, kitchen, settlement at the register', function (): void {
+    // Preparation times are exact only on a frozen clock.
+    $this->freezeSecond();
+
     [$mild, $hot] = array_column($this->spice['options'], 'id');
     [$plantain, $egg] = array_column($this->addOns['options'], 'id');
     $open = fn (array $lines) => $this->tenantJson('POST', "/api/admin/restaurant/tables/{$this->table['id']}/orders", ['lines' => $lines], $this->staff);

@@ -1487,7 +1487,60 @@ Then restart `php artisan queue:work`, which runs the reserved-table job, and re
 
 ---
 
-## 21. Troubleshooting
+## 21. WooCommerce and social selling ➡ you
+
+Both integrations need the **Premium** plan. Switch them on with `POST /admin/modules/woocommerce/enable` or `POST /admin/modules/social_commerce/enable`. Syncs run in the background, so keep `php artisan queue:work` running.
+
+### 21.1 WooCommerce
+
+In WooCommerce, go to **Settings → Advanced → REST API** and create a key with **Read/Write** access. Then:
+
+```http
+PUT  /admin/woocommerce/settings          { "store_url": "https://myshop.com", "consumer_key": "ck_…", "consumer_secret": "cs_…", "import_warehouse_id": 1 }
+POST /admin/woocommerce/settings/test-connection
+PUT  /admin/woocommerce/settings          { "is_active": true }          (checks the keys, then runs the first sync)
+POST /admin/woocommerce/sync/products     (or categories, tax-rates, orders; the result shows in the log)
+POST /admin/woocommerce/products/{product}/push
+GET  /admin/woocommerce/sync/logs
+GET  /admin/woocommerce/sync/metrics
+```
+
+- **Stock:** WooCommerce's stock is taken once, when a product is first imported. After that this platform owns stock, and every change is sent to WooCommerce about a minute later.
+- **Orders:** WooCommerce orders are imported every sync (every 15 minutes by default) and fulfilled from the import warehouse. Orders already paid in WooCommerce arrive paid. Set `"order_sync_direction": "export"` to send orders the other way instead.
+- **Skipped items:** grouped and external products, orders in another currency, and orders with extra fees are skipped. Each appears in the sync log with the reason.
+- **Keys** are never shown again after you save them. Changing one switches sync off until you switch it back on.
+- **Local testing:** the store address must be public `https://`. To test against a WooCommerce site on your own machine, set `INTEGRATIONS_ALLOW_PRIVATE_HOSTS=true` in `.env`, and never in production.
+
+### 21.2 Facebook Shop, Instagram, TikTok Shop and WhatsApp catalogue
+
+```http
+POST   /admin/social-commerce/accounts    { "channel": "facebook_shop", "access_token": "EAAB…", "account_reference": "<catalogue id>", "order_account_reference": "<commerce account id>", "fulfilment_warehouse_id": 1 }
+POST   /admin/social-commerce/accounts/{account}/sync/products
+POST   /admin/social-commerce/accounts/{account}/sync/orders
+POST   /admin/social-commerce/accounts/{account}/products/{product}       (list one product now)
+DELETE /admin/social-commerce/accounts/{account}/products/{product}       (take it down)
+DELETE /admin/social-commerce/accounts/{account}                          (disconnect)
+GET    /admin/social-commerce/sync/logs?account_id=1
+```
+
+- **Channels:** Facebook Shop, Instagram and the WhatsApp catalogue use a Meta catalogue (`account_reference` is the catalogue id). Only Facebook Shop imports orders; Instagram shoppers buy on your storefront.
+- **TikTok Shop:** the platform owner must first set `TIKTOK_SHOP_APP_KEY` and `TIKTOK_SHOP_APP_SECRET` in `.env`. For TikTok, `account_reference` is the shop cipher. List each product in TikTok Seller Center with the same SKU as here; the sync then keeps its price and stock up to date.
+- **Keeping a product off a channel:** set `social_commerce_excluded_channels` on the product, for example `["tiktok_shop"]`.
+- **Access tokens:** you paste a token from the channel for now. If it expires, the sync log says so: paste a new one with `PATCH /admin/social-commerce/accounts/{account} { "access_token": "…" }`.
+
+After pulling this step:
+
+```powershell
+php artisan tenants:migrate
+php artisan tenants:sync-defaults
+php artisan config:clear
+```
+
+Then restart `php artisan queue:work` and re-import the Postman collection.
+
+---
+
+## 22. Troubleshooting
 
 | Symptom | Cause / fix |
 |---|---|

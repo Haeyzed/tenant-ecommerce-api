@@ -221,6 +221,7 @@ final readonly class CatalogPresenter
             'has_warehouse_pricing' => (bool) $product->has_warehouse_pricing,
             'is_subscribable' => (bool) $product->is_subscribable,
             'subscription_discount_percent' => $product->subscription_discount_percent !== null ? (string) $product->subscription_discount_percent : null,
+            'social_commerce_excluded_channels' => $product->social_commerce_excluded_channels ?? [],
             'is_bookable' => (bool) $product->is_bookable,
             'duration_minutes' => $product->duration_minutes,
             'meta_title' => $product->meta_title,

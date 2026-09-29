@@ -16,6 +16,8 @@ use App\Modules\Exports\Services\DataExportService;
 use App\Modules\GiftCards\Jobs\ExpireGiftCards;
 use App\Modules\Installments\Jobs\ChargeDueInstallments;
 use App\Modules\Installments\Jobs\MarkOverdueInstallments;
+use App\Modules\Integrations\SocialCommerce\Services\SocialCommerceAccountService;
+use App\Modules\Integrations\WooCommerce\Services\WooCommerceSettingsService;
 use App\Modules\Inventory\Support\StockAlerts;
 use App\Modules\Orders\Services\OrderService;
 use App\Modules\Payments\Services\OrderPaymentService;
@@ -114,6 +116,9 @@ final class RunTenantDailyMaintenance implements ShouldBeUnique, ShouldQueue
                     ProcessProductSubscriptionRenewals::dispatch();
                 }
             });
+            // Integration sync chains that stalled restart (§68.3, §69.2).
+            $this->task('woocommerce_sync', static fn () => $enabled('woocommerce') ? app(WooCommerceSettingsService::class)->restartStaleChain() : null);
+            $this->task('social_commerce_sync', static fn () => $enabled('social_commerce') ? app(SocialCommerceAccountService::class)->restartStaleChains() : null);
             $this->task('exchange_rates', static function (): void {
                 if (app(CurrencyService::class)->enabled() && app(ExchangeRateProvider::class)->configured()) {
                     RefreshExchangeRates::dispatch();

@@ -648,6 +648,9 @@ final readonly class ProductService
             // Product subscriptions (§55): offered once plans exist for the product.
             'is_subscribable' => ['sometimes', 'boolean'],
             'subscription_discount_percent' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:100', 'decimal:0,4'],
+            // Social commerce (§69.2): channels this product is held back from.
+            'social_commerce_excluded_channels' => ['sometimes', 'nullable', 'array', 'max:4'],
+            'social_commerce_excluded_channels.*' => ['string', Rule::in(['instagram', 'facebook_shop', 'tiktok_shop', 'whatsapp_catalog']), 'distinct'],
             // Booking (§66): only service products are bookable, and they need a duration.
             'is_bookable' => [$type === Product::SERVICE ? 'sometimes' : 'prohibited', 'boolean'],
             'duration_minutes' => [$type === Product::SERVICE ? 'sometimes' : 'prohibited', 'nullable', 'integer', 'min:5', 'max:1440'],
