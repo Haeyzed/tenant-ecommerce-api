@@ -29,6 +29,9 @@ final class MarkTableReserved implements ShouldQueue
 
     public int $timeout = 60;
 
+    /** @var list<int> */
+    public array $backoff = [30, 120];
+
     public function __construct(
         public readonly string $tenantId,
         public readonly int $reservationId,
