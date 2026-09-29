@@ -1235,7 +1235,123 @@ Then restart `queue:work` and `schedule:work`.
 
 ---
 
-## 18. Troubleshooting
+## 18. Staff, customer support and projects ➡ you
+
+All three need the **Premium** plan. Each is switched on separately.
+
+### 18.1 HR: people, attendance and leave
+
+```http
+POST  /admin/modules/hr/enable
+POST  /admin/hr/departments                        { "name": "Sales" }
+POST  /admin/hr/employees                          { "user_id": 4, "department_id": 1, "employment_type": "full_time", "hire_date": "2026-01-05" }   (someone who logs in)
+POST  /admin/hr/employees                          { "first_name": "Chidi", "last_name": "Obi", "employment_type": "contract", "hire_date": "2026-03-01" }   (someone who doesn't)
+PUT   /admin/hr/settings                           { "expected_clock_in_time": "09:00", "late_grace_minutes": 10 }
+PUT   /admin/hr/departments/{id}/settings          { "expected_clock_in_time": "08:00" }   (this department's own hours)
+```
+
+- **Employees who have a login** are linked to their staff user, and their name and email come from that account. Everyone else is a standalone employee.
+- **The plan's employee limit** counts active employees only.
+- **Clocking in and out:** each person clocks themselves in and out with `POST /admin/hr/attendance/clock-in` and `/clock-out`. At a shared kiosk, a manager holding `hr.attendance.record` sends `{ "employee_id": 7 }` instead.
+- **Lateness and leaving early** are worked out from the department's hours, falling back to the store's hours, in the store's timezone.
+- **Leave:**
+  1. Create the leave types: `POST /admin/hr/leave-types { "name": "Annual", "days_per_year": 10 }`.
+  2. Staff ask for leave for themselves: `POST /admin/hr/leave-requests { "leave_type_id": 1, "start_date": "…", "end_date": "…" }`. Weekdays are counted; send `"days": 0.5` for a half day.
+  3. A manager approves or rejects it (`POST /admin/hr/leave-requests/{id}/approve`, `/reject { "reason": "…" }`).
+  4. To route long leave through someone else, create an approval workflow with `module_key: leave_request` and `trigger_conditions: { "min_days": 5 }`.
+- **Documents:** `POST /admin/hr/employees/{id}/documents` takes a multipart upload (`file`, `document_type_id`, `expiry_date`). See what expires soon with `GET /admin/hr/documents/expiring?within_days=30`.
+- **Appraisals:**
+  - A template's criteria weights must add up to 100.
+  - A manager scores each criterion, then submits, which gives an overall score out of 100.
+  - The employee acknowledges it with `POST /admin/hr/appraisals/{id}/acknowledge`.
+
+### 18.2 Payroll (the `hr_payroll` add-on)
+
+```http
+POST /admin/modules/hr_payroll/enable
+POST /admin/hr/employees/{id}/salary              { "base_salary": "350000", "effective_from": "2026-10-01" }   (the old salary ends the day before)
+POST /admin/hr/payroll-runs                       { "period_start": "2026-10-01", "period_end": "2026-10-31" }
+POST /admin/hr/payroll-runs/{run}/generate-items  (one payslip per active employee with a salary)
+POST /admin/hr/payroll-items/{item}/lines         { "type": "tax", "label": "PAYE", "amount": "10", "is_percentage": true }
+POST /admin/hr/payroll-runs/{run}/finalize        (locks the run; no more changes)
+POST /admin/hr/payroll-runs/{run}/mark-paid       (Idempotency-Key header)
+GET  /admin/hr/employees/{id}/payslips/{run}
+```
+
+- **Line types:** allowance, bonus and reimbursement add to gross pay; deduction and tax come off it. Net pay can't go below zero.
+- **Pay periods** can't overlap, so nobody is paid twice for the same days.
+- **With accounting on,** paying a run posts one entry: salaries and wages at gross, cash at net, and payroll liabilities for everything withheld.
+- **Switching payroll off** is blocked while a finalized run is still unpaid.
+
+### 18.3 Recruitment (the `hr_recruitment` add-on)
+
+```http
+POST /admin/modules/hr_recruitment/enable
+POST /admin/hr/job-postings                       { "title": "Store Manager", "description": "…", "employment_type": "full_time", "application_deadline": "2026-11-15" }
+POST /admin/hr/job-postings/{id}/publish
+GET  /careers/jobs                                 (public; no token)
+POST /careers/jobs/{slug}/apply                    (public, multipart: first_name, last_name, email, resume, cover_letter?)
+PATCH /admin/hr/applications/{id}/status          { "status": "hired" }
+POST /admin/hr/applications/{id}/convert-to-employee   { "hire_date": "2026-11-01" }
+```
+
+- **CVs** download with `GET /admin/hr/applications/{id}/resume`.
+- **Internal notes** on an application are never shown to the applicant.
+
+### 18.4 Customer support
+
+```http
+POST /admin/modules/support/enable
+```
+
+**Customers and guests** (no account needed; send the guest's `X-Guest-Token`):
+
+```http
+POST /support/conversations                       { "channel": "chat", "body": "Do you deliver to Abuja?" }
+POST /support/conversations                       { "channel": "ticket", "subject": "Refund", "body": "…", "guest_name": "…", "guest_email": "…" }
+POST /support/conversations/{id}/messages          (multipart: body, attachments[])
+```
+
+- **A guest without a token** gets one back as `guest_token`. When they sign in with it, their conversations move to their account.
+
+**Staff:**
+
+```http
+GET   /admin/support/conversations?assigned_to=unassigned   (or me, or a user id)
+PATCH /admin/support/conversations/{id}            { "assigned_to_user_id": 1, "status": "resolved", "priority": "high" }
+POST  /admin/support/conversations/{id}/messages   { "body": "…" }
+POST  /admin/support/conversations/{id}/notes      { "body": "…" }   (staff only)
+```
+
+- **Live updates** use Reverb.
+  - Staff authorise at `/api/broadcasting/auth`; customers and guests at `/api/support/broadcasting/auth`.
+  - The channels are `tenant.{id}.support-conversation.{id}`, `tenant.{id}.support-inbox` and the presence channel `tenant.{id}.support-agents-online`.
+  - Typing indicators are client whispers.
+- **When someone isn't online,** they're emailed at most once every 15 minutes per conversation.
+
+### 18.5 Projects
+
+```http
+POST  /admin/modules/project_management/enable
+POST  /admin/project-categories                   { "name": "Fit-outs" }
+POST  /admin/projects                             { "title": "Lekki shop fit-out", "project_category_id": 1, "customer_id": 5, "user_ids": [3, 4], "notify_assigned_employees_whatsapp": true }
+POST  /admin/projects/{id}/tasks                  { "title": "Order shelving", "assigned_user_id": 3, "end_date": "2026-10-20", "send_whatsapp_notification": true }
+PATCH /admin/projects/{id}/status                 { "status": "in_progress" }
+```
+
+- **Who can see what:** with `staff_data_access_scope` set to `own` or `warehouse`, staff other than owners and admins only see the projects they're on or created, and only their own tasks.
+- **Notifications:** the WhatsApp switches decide whether people are notified at all. Delivery follows your notification settings.
+
+After pulling this step:
+
+```powershell
+php artisan tenants:migrate
+php artisan tenants:sync-defaults
+```
+
+---
+
+## 19. Troubleshooting
 
 | Symptom | Cause / fix |
 |---|---|
