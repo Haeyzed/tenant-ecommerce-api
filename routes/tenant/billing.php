@@ -21,5 +21,6 @@ Route::middleware('tenant.admin')->prefix('admin/billing')->name('tenant.billing
     Route::post('subscription/swap-plan', [BillingController::class, 'swapPlan'])->middleware('idempotency')->name('subscription.swap-plan');
     Route::post('subscription/cancel', [BillingController::class, 'cancel'])->name('subscription.cancel');
     Route::get('transactions', [BillingController::class, 'transactions'])->name('transactions');
+    Route::get('commissions', [BillingController::class, 'commissions'])->name('commissions');
     Route::get('usage', [UsageController::class, 'index'])->name('usage');
 });

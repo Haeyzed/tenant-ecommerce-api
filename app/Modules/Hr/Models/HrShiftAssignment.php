@@ -9,32 +9,30 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * A salary, effective for a period (spec §58.5). Never edited: a new
- * structure closes the previous one.
+ * One rostered shift: an employee works a shift starting on a date
+ * (spec §58.3a). At most one per employee per date.
  *
  * @property int $id
  * @property int $employee_id
- * @property string $base_salary
- * @property string|null $hourly_rate null: base_salary ÷ standard_monthly_hours (§58.3a)
- * @property string $currency_code
- * @property Carbon $effective_from
- * @property Carbon|null $effective_to
+ * @property int $shift_id
+ * @property Carbon $work_date
+ * @property string|null $notes
+ * @property int|null $assigned_by_user_id
  * @property-read HrEmployee $employee
+ * @property-read HrShift $shift
  */
-class HrSalaryStructure extends Model
+class HrShiftAssignment extends Model
 {
     protected $connection = 'tenant';
 
-    protected $table = 'hr_salary_structures';
+    protected $table = 'hr_shift_assignments';
 
     protected $fillable = [];
 
     protected $casts = [
         'employee_id' => 'integer',
-        'base_salary' => 'decimal:4',
-        'hourly_rate' => 'decimal:4',
-        'effective_from' => 'date',
-        'effective_to' => 'date',
+        'shift_id' => 'integer',
+        'work_date' => 'date',
     ];
 
     /**
@@ -43,5 +41,13 @@ class HrSalaryStructure extends Model
     public function employee(): BelongsTo
     {
         return $this->belongsTo(HrEmployee::class, 'employee_id')->withTrashed();
+    }
+
+    /**
+     * @return BelongsTo<HrShift, $this>
+     */
+    public function shift(): BelongsTo
+    {
+        return $this->belongsTo(HrShift::class, 'shift_id');
     }
 }

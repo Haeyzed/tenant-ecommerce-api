@@ -25,6 +25,8 @@ use App\Modules\Hr\Models\HrPayrollItemLine;
 use App\Modules\Hr\Models\HrPayrollRun;
 use App\Modules\Hr\Models\HrSalaryStructure;
 use App\Modules\Hr\Models\HrSettings;
+use App\Modules\Hr\Models\HrShift;
+use App\Modules\Hr\Models\HrShiftAssignment;
 use App\Modules\Hr\Services\HrEmployeeService;
 
 /**
@@ -118,6 +120,10 @@ final readonly class HrPresenter
             'expected_clock_out_time' => substr($settings->expected_clock_out_time, 0, 5),
             'late_grace_minutes' => $settings->late_grace_minutes,
             'early_leave_grace_minutes' => $settings->early_leave_grace_minutes,
+            'overtime_enabled' => $settings->overtime_enabled,
+            'overtime_minimum_minutes' => $settings->overtime_minimum_minutes,
+            'overtime_rate_multiplier' => (string) $settings->overtime_rate_multiplier,
+            'standard_monthly_hours' => (string) $settings->standard_monthly_hours,
         ];
     }
 
@@ -126,15 +132,66 @@ final readonly class HrPresenter
      */
     public function attendance(HrAttendance $row): array
     {
+        $row->loadMissing('shift');
+
         return [
             'id' => $row->id,
             'employee_id' => $row->employee_id,
+            'employee_name' => $row->relationLoaded('employee') ? $row->employee->displayName() : null,
             'work_date' => $row->work_date->toDateString(),
+            'shift' => $row->shift === null ? null : ['id' => $row->shift->id, 'name' => $row->shift->name],
             'clock_in_at' => $row->clock_in_at->toIso8601String(),
             'clock_out_at' => $row->clock_out_at?->toIso8601String(),
             'is_late' => $row->is_late,
             'is_early_leave' => $row->is_early_leave,
+            'scheduled_minutes' => $row->scheduled_minutes,
+            'worked_minutes' => $row->worked_minutes,
+            'overtime' => [
+                'minutes' => $row->overtime_minutes,
+                'status' => $row->overtime_status,
+                'approved_minutes' => $row->overtime_approved_minutes,
+                'decided_by' => $row->relationLoaded('overtimeDecidedBy') && $row->overtimeDecidedBy !== null
+                    ? ['id' => $row->overtimeDecidedBy->id, 'name' => $row->overtimeDecidedBy->name] : null,
+                'decided_at' => $row->overtime_decided_at?->toIso8601String(),
+                'note' => $row->overtime_note,
+            ],
             'notes' => $row->notes,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function shift(HrShift $shift): array
+    {
+        return [
+            'id' => $shift->id,
+            'name' => $shift->name,
+            'start_time' => substr($shift->start_time, 0, 5),
+            'end_time' => substr($shift->end_time, 0, 5),
+            'is_overnight' => $shift->isOvernight(),
+            'break_minutes' => $shift->break_minutes,
+            'scheduled_minutes' => $shift->scheduledMinutes(),
+            'late_grace_minutes' => $shift->late_grace_minutes,
+            'early_leave_grace_minutes' => $shift->early_leave_grace_minutes,
+            'color' => $shift->color,
+            'is_active' => $shift->is_active,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function assignment(HrShiftAssignment $assignment): array
+    {
+        $assignment->loadMissing(['shift', 'employee.user:id,name']);
+
+        return [
+            'id' => $assignment->id,
+            'work_date' => $assignment->work_date->toDateString(),
+            'employee' => ['id' => $assignment->employee_id, 'name' => $assignment->employee->displayName()],
+            'shift' => $this->shift($assignment->shift),
+            'notes' => $assignment->notes,
         ];
     }
 
@@ -191,6 +248,7 @@ final readonly class HrPresenter
         return [
             'id' => $structure->id,
             'base_salary' => (string) $structure->base_salary,
+            'hourly_rate' => $structure->hourly_rate === null ? null : (string) $structure->hourly_rate,
             'currency_code' => $structure->currency_code,
             'effective_from' => $structure->effective_from->toDateString(),
             'effective_to' => $structure->effective_to?->toDateString(),

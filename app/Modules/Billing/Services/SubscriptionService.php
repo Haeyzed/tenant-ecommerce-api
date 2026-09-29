@@ -54,6 +54,9 @@ final readonly class SubscriptionService
 
     public const string PURPOSE_PRORATION = 'proration';
 
+    /** The monthly platform commission on tenant sales (D-138); no subscription effect. */
+    public const string PURPOSE_COMMISSION = 'commission';
+
     public function __construct(
         private PlanService $plans,
         private PlatformSettingsService $settings,
@@ -67,6 +70,7 @@ final readonly class SubscriptionService
         private ModuleActivationService $activation,
         private NotificationDispatchService $notifications,
         private AffiliateCommissionService $affiliateCommissions,
+        private PlatformCommissionService $platformCommissions,
     ) {}
 
     public function getCurrentSubscription(Tenant $tenant): ?Subscription
@@ -680,6 +684,56 @@ final readonly class SubscriptionService
     }
 
     /**
+     * Charges a tenant's net pending platform commission through the saved
+     * authorization (D-138). The reference is fixed per tenant and month, so
+     * a rerun never charges twice; rows are claimed with the charge, so a
+     * row is never billed twice either.
+     */
+    public function chargeCommission(Subscription $subscription, string $month): ?PaymentTransaction
+    {
+        $subscription->loadMissing('tenant');
+        $reference = 'COM-'.$subscription->tenant_id.'-'.$month;
+        $existing = PaymentTransaction::query()->where('reference', $reference)->first();
+
+        if ($existing !== null) {
+            if ($existing->status === PaymentTransaction::PENDING) {
+                $this->verifyPendingCharge($existing);
+            }
+
+            return $existing->refresh();
+        }
+
+        if ($subscription->authorization_reference === null || $subscription->gateway === null || $subscription->gateway_mode !== 'live') {
+            return null;
+        }
+
+        $charge = DB::connection('landlord')->transaction(function () use ($subscription, $reference): ?PaymentTransaction {
+            $claimed = $this->platformCommissions->claimBillable($subscription);
+
+            if ($claimed === null) {
+                return null;
+            }
+
+            $charge = $this->createCharge($subscription, (string) $subscription->gateway, [
+                'lines' => [['type' => 'platform_commission', 'key' => 'commission', 'label' => 'Platform commission on sales', 'amount' => $claimed['amount']]],
+                'total' => $claimed['amount'],
+                'currency_code' => $subscription->currency_code,
+            ], self::PURPOSE_COMMISSION, $reference, ['commission_rows' => count($claimed['ids'])]);
+            $this->platformCommissions->markBilled($claimed['ids'], $charge);
+
+            return $charge;
+        });
+
+        if ($charge === null) {
+            return null;
+        }
+
+        $this->chargeSaved($subscription, $charge);
+
+        return $charge->refresh();
+    }
+
+    /**
      * Resolves a charge that stayed pending (lost webhook, timeout).
      */
     public function verifyPendingCharge(PaymentTransaction $charge): void
@@ -775,13 +829,30 @@ final readonly class SubscriptionService
      */
     private function completeCharge(PaymentTransaction $charge, ?string $providerReference, ?string $fee, ?string $authorizationToken, array $raw = [], ?string $fingerprint = null): void
     {
-        $effects = DB::connection('landlord')->transaction(function () use ($charge, $providerReference, $fee, $authorizationToken, $raw, $fingerprint): ?array {
+        $commissionCharged = null;
+
+        $effects = DB::connection('landlord')->transaction(function () use ($charge, $providerReference, $fee, $authorizationToken, $raw, $fingerprint, &$commissionCharged): ?array {
             /** @var Tenant $tenant */
             $tenant = Tenant::query()->whereKey($charge->tenant_id)->lockForUpdate()->firstOrFail();
             /** @var PaymentTransaction $locked */
             $locked = PaymentTransaction::query()->whereKey($charge->id)->lockForUpdate()->firstOrFail();
 
             if ($locked->status !== PaymentTransaction::PENDING) {
+                return null;
+            }
+
+            // Commission is platform revenue, not a subscription payment: no
+            // renewal, MRR, coupon or affiliate effect (D-138).
+            if (($locked->meta['purpose'] ?? null) === self::PURPOSE_COMMISSION) {
+                $locked->forceFill([
+                    'status' => PaymentTransaction::SUCCESSFUL,
+                    'provider_reference' => $providerReference ?? $locked->provider_reference,
+                    'fee' => $fee,
+                    'paid_at' => now(),
+                ])->save();
+                $this->platformCommissions->markCollected($locked);
+                $commissionCharged = $locked;
+
                 return null;
             }
 
@@ -888,6 +959,10 @@ final readonly class SubscriptionService
             ];
         });
 
+        if ($commissionCharged instanceof PaymentTransaction) {
+            $this->notifyCommission('subscription.commission_charged', $commissionCharged);
+        }
+
         if ($effects === null) {
             return;
         }
@@ -913,7 +988,9 @@ final readonly class SubscriptionService
 
     private function failCharge(PaymentTransaction $charge, string $reason, ?string $providerReference = null): void
     {
-        $subscription = DB::connection('landlord')->transaction(function () use ($charge, $reason, $providerReference): ?Subscription {
+        $failedCommission = null;
+
+        $subscription = DB::connection('landlord')->transaction(function () use ($charge, $reason, $providerReference, &$failedCommission): ?Subscription {
             /** @var PaymentTransaction $locked */
             $locked = PaymentTransaction::query()->whereKey($charge->id)->lockForUpdate()->firstOrFail();
 
@@ -927,12 +1004,39 @@ final readonly class SubscriptionService
                 'provider_reference' => $locked->provider_reference ?? $providerReference,
             ])->save();
 
+            // Unpaid commission waits for the next monthly run; the store is not restricted (D-138).
+            if (($locked->meta['purpose'] ?? null) === self::PURPOSE_COMMISSION) {
+                $this->platformCommissions->release($locked);
+                $failedCommission = $locked;
+            }
+
             return ($locked->meta['purpose'] ?? null) === self::PURPOSE_RENEWAL ? $locked->subscription : null;
         });
+
+        if ($failedCommission instanceof PaymentTransaction) {
+            $this->notifyCommission('subscription.commission_charge_failed', $failedCommission);
+        }
 
         if ($subscription !== null) {
             $this->markPastDue($subscription, $reason);
         }
+    }
+
+    private function notifyCommission(string $key, PaymentTransaction $charge): void
+    {
+        /** @var Tenant|null $tenant */
+        $tenant = Tenant::query()->find($charge->tenant_id);
+
+        if ($tenant === null) {
+            return;
+        }
+
+        $this->notifications->dispatch($key, $tenant, [
+            'owner_name' => $tenant->owner_name,
+            'amount' => $this->formatMoney((string) $charge->amount, $charge->currency_code),
+            'reference' => $charge->reference,
+            'failure_reason' => (string) ($charge->failure_reason ?? ''),
+        ]);
     }
 
     /**

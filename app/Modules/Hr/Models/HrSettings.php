@@ -16,6 +16,10 @@ use Illuminate\Database\Eloquent\Model;
  * @property string $expected_clock_out_time
  * @property int $late_grace_minutes
  * @property int $early_leave_grace_minutes
+ * @property bool $overtime_enabled
+ * @property int $overtime_minimum_minutes
+ * @property string $overtime_rate_multiplier
+ * @property string $standard_monthly_hours
  */
 class HrSettings extends Model
 {
@@ -31,5 +35,9 @@ class HrSettings extends Model
         'department_id' => 'integer',
         'late_grace_minutes' => 'integer',
         'early_leave_grace_minutes' => 'integer',
+        'overtime_enabled' => 'boolean',
+        'overtime_minimum_minutes' => 'integer',
+        'overtime_rate_multiplier' => 'decimal:2',
+        'standard_monthly_hours' => 'decimal:2',
     ];
 }

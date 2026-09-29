@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Modules\Billing\Http\Controllers\Landlord\Admin\PaymentGatewayController;
 use App\Modules\Billing\Http\Controllers\Landlord\Admin\PaymentTransactionController;
+use App\Modules\Billing\Http\Controllers\Landlord\Admin\PlatformCommissionController;
 use App\Modules\Billing\Http\Controllers\Landlord\Admin\PlatformCouponController as AdminPlatformCouponController;
 use App\Modules\Billing\Http\Controllers\Landlord\Admin\PlatformCouponRedemptionController;
 use App\Modules\Billing\Http\Controllers\Landlord\Admin\SubscriptionController;
@@ -38,6 +39,9 @@ Route::middleware('landlord.admin')->prefix('admin')->name('landlord.billing.')-
     Route::post('payment-transactions/{transaction}/refund', [PaymentTransactionController::class, 'refund'])
         ->middleware('idempotency')
         ->name('payment-transactions.refund');
+
+    Route::get('platform-commissions', [PlatformCommissionController::class, 'index'])->name('platform-commissions.index');
+    Route::post('platform-commissions/{commission}/waive', [PlatformCommissionController::class, 'waive'])->whereNumber('commission')->name('platform-commissions.waive');
 
     Route::get('platform-coupons', [AdminPlatformCouponController::class, 'index'])->name('platform-coupons.index');
     Route::get('platform-coupons/metrics', [AdminPlatformCouponController::class, 'metrics'])->name('platform-coupons.metrics');

@@ -226,11 +226,14 @@ final readonly class CurrencyService
         }
 
         $stored = 0;
+        // The store's buffer against currency swings (UD-19): 1 base buys
+        // margin% more of the target, so prices in it come out higher.
+        $factor = bcadd('1', bcdiv(Money::normalize((string) $this->settings->get('exchange_rate_margin_percent', '0')), '100', 12), 12);
 
         foreach ($this->provider->fetch($base, array_values($targets)) as $target => $rate) {
             ExchangeRate::query()->updateOrCreate(
                 ['base_currency_code' => $base, 'target_currency_code' => $target],
-                ['rate' => $rate, 'source' => ExchangeRate::PROVIDER, 'fetched_at' => now()],
+                ['rate' => bcmul($rate, $factor, 12), 'source' => ExchangeRate::PROVIDER, 'fetched_at' => now()],
             );
             $stored++;
         }

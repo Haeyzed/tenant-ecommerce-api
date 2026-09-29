@@ -17,6 +17,14 @@ use Illuminate\Support\Facades\Validator;
  */
 final readonly class HrSettingsService
 {
+    /** Overtime is off until enabled (§58.3a). */
+    public const array OVERTIME_DEFAULTS = [
+        'overtime_enabled' => false,
+        'overtime_minimum_minutes' => 30,
+        'overtime_rate_multiplier' => '1.50',
+        'standard_monthly_hours' => '173.33',
+    ];
+
     public function getDefaultSettings(): HrSettings
     {
         $row = HrSettings::query()->whereNull('department_id')->first();
@@ -28,7 +36,7 @@ final readonly class HrSettingsService
         try {
             $row = new HrSettings;
             $row->forceFill(['department_id' => null, 'expected_clock_in_time' => '09:00:00', 'expected_clock_out_time' => '17:00:00',
-                'late_grace_minutes' => 0, 'early_leave_grace_minutes' => 0])->save();
+                'late_grace_minutes' => 0, 'early_leave_grace_minutes' => 0, ...self::OVERTIME_DEFAULTS])->save();
 
             return $row;
         } catch (UniqueConstraintViolationException) {
@@ -72,6 +80,10 @@ final readonly class HrSettingsService
                 'expected_clock_out_time' => $defaults->expected_clock_out_time,
                 'late_grace_minutes' => $defaults->late_grace_minutes,
                 'early_leave_grace_minutes' => $defaults->early_leave_grace_minutes,
+                'overtime_enabled' => $defaults->overtime_enabled,
+                'overtime_minimum_minutes' => $defaults->overtime_minimum_minutes,
+                'overtime_rate_multiplier' => $defaults->overtime_rate_multiplier,
+                'standard_monthly_hours' => $defaults->standard_monthly_hours,
             ]);
         }
 
@@ -106,6 +118,10 @@ final readonly class HrSettingsService
             'expected_clock_out_time' => [$creating ? 'required' : 'sometimes', 'date_format:H:i'],
             'late_grace_minutes' => ['sometimes', 'integer', 'min:0', 'max:720'],
             'early_leave_grace_minutes' => ['sometimes', 'integer', 'min:0', 'max:720'],
+            'overtime_enabled' => ['sometimes', 'boolean'],
+            'overtime_minimum_minutes' => ['sometimes', 'integer', 'min:0', 'max:720'],
+            'overtime_rate_multiplier' => ['sometimes', 'numeric', 'min:1', 'max:5', 'decimal:0,2'],
+            'standard_monthly_hours' => ['sometimes', 'numeric', 'min:1', 'max:744', 'decimal:0,2'],
         ])->validate();
 
         foreach (['expected_clock_in_time', 'expected_clock_out_time'] as $key) {

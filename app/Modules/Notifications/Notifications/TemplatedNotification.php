@@ -7,8 +7,10 @@ namespace App\Modules\Notifications\Notifications;
 use App\Modules\Messaging\Channels\PushChannel;
 use App\Modules\Messaging\Channels\SmsChannel;
 use App\Modules\Messaging\Channels\TemplatedMailChannel;
+use App\Modules\Messaging\Channels\TenantStaffInboxChannel;
 use App\Modules\Messaging\Channels\WhatsAppChannel;
 use App\Modules\Notifications\Enums\NotificationScope;
+use App\Modules\Tenancy\Models\Tenant;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
@@ -53,7 +55,8 @@ final class TemplatedNotification extends Notification implements ShouldQueue
     public function via(object $notifiable): array
     {
         return array_values(array_map(static fn (string $channel): string => match ($channel) {
-            'database' => 'database',
+            // A tenant's inbox is its staff's rows in the tenant database (UD-10).
+            'database' => $notifiable instanceof Tenant ? TenantStaffInboxChannel::class : 'database',
             'email' => TemplatedMailChannel::class,
             'sms' => SmsChannel::class,
             'whatsapp' => WhatsAppChannel::class,

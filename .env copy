@@ -147,5 +147,66 @@ VITE_APP_NAME="${APP_NAME}"
 
 PLATFORM_WEBSITE_URL=http://localhost:3002
 
-sk_test_6aabb873734f2dd0eec9271338be66252d6a64e3
-pk_test_e361e1227b8abc0a1ed80d38e25e92c7696e4baa
+# Paystack test keys (for testing only; live keys are refused unless PAYMENTS_LIVE_ALLOWED=true)
+# sk_test_6aabb873734f2dd0eec9271338be66252d6a64e3
+# pk_test_e361e1227b8abc0a1ed80d38e25e92c7696e4baa
+# PUT /admin/payment-gateways/paystack/test
+# {
+#   "public_key": "pk_test_e361e1227b8abc0a1ed80d38e25e92c7696e4baa",
+#   "secret_key": "sk_test_6aabb873734f2dd0eec9271338be66252d6a64e3",
+#   "supported_currencies": ["USD", "NGN"]
+# }
+
+# Flutterwave test keys (for testing only; live keys are refused unless PAYMENTS_LIVE_ALLOWED=true)
+# FLW_PUBLIC_KEY=FLWPUBK_TEST-5dafcbf1882ccf5a75fb328467da299c-X
+# FLW_SECRET_KEY=FLWSECK_TEST-11d46b0608ee8b1038cb7431f6068e32-X
+# FLW_ENCRYPTION_KEY=FLWSECK_TESTa8a212aeb220
+
+# --- Added from .env.example (2026-09-30) -------------------------------------------
+
+# Multi-currency reference rates (D-139). To use Open Exchange Rates, set
+# FX_PROVIDER=openexchangerates and paste your App ID.
+FX_PROVIDER=openexchangerates
+OPENEXCHANGERATES_APP_ID=
+OPENEXCHANGERATES_URL=https://openexchangerates.org/api
+OPENEXCHANGERATES_CACHE_MINUTES=60
+FX_OPEN_ER_API_URL=https://open.er-api.com/v6
+FX_HTTP_TIMEOUT=10
+
+# Point of sale card terminals (spec §51)
+POS_MONIEPOINT_BASE_URL=https://channel.moniepoint.com
+POS_OPAY_BASE_URL=https://liveapi.opaycheckout.com
+POS_OPAY_COUNTRY=NG
+POS_OFFLINE_SALE_MAX_AGE_HOURS=72
+
+# Storage (spec §6.3): local folders under storage/app; empty = defaults
+MEDIA_DRIVER=local
+MEDIA_PUBLIC_ROOT=
+MEDIA_PRIVATE_ROOT=
+MEDIA_PUBLIC_URL=
+MEDIA_PUBLIC_BUCKET=
+MEDIA_PRIVATE_BUCKET=
+AWS_ENDPOINT=
+AWS_URL=
+
+# Customer social login (D-132): leave a client id empty to hide that provider
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+GOOGLE_REDIRECT_URI=
+FACEBOOK_CLIENT_ID=
+FACEBOOK_CLIENT_SECRET=
+FACEBOOK_REDIRECT_URI=
+
+# Store integrations (spec §68, §69): empty TikTok keys leave TikTok Shop off
+TIKTOK_SHOP_APP_KEY=
+TIKTOK_SHOP_APP_SECRET=
+INTEGRATIONS_ALLOW_PRIVATE_HOSTS=false
+# META_GRAPH_URL=https://graph.facebook.com/v21.0
+# TIKTOK_SHOP_API_URL=https://open-api.tiktokglobalshop.com
+
+# Optional (the defaults shown apply when unset)
+# SCRAMBLE_DEV_TOOLS=false
+# API_VERSION=0.0.1
+# IMAGE_DRIVER=gd
+# WORLD_CACHE_ENABLED=true
+# MAXMIND_LICENSE_KEY=

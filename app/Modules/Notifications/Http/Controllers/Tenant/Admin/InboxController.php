@@ -31,6 +31,8 @@ final class InboxController extends Controller
                 'subject' => $n->data['subject'] ?? null,
                 'body' => $n->data['body'] ?? null,
                 'data' => $n->data['data'] ?? [],
+                // "platform" for messages from the platform (UD-10), else "store".
+                'source' => $n->data['source'] ?? 'store',
                 'read_at' => $n->read_at?->toIso8601String(),
                 'created_at' => $n->created_at?->toIso8601String(),
             ]);

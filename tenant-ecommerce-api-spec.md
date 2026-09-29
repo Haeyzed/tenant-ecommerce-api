@@ -2451,6 +2451,7 @@ The key list below is authoritative. A key not listed here MUST NOT be read by a
 | `installments_fulfillment_policy` | enum(on_full_payment, on_first_payment) | `on_full_payment` | §47 |
 | `installments_default_after_overdue_count` | int | 2 | §47 |
 | `default_purchase_order_currency` | char(3), nullable | null | §49. Falls back to `default_currency`. |
+| `exchange_rate_margin_percent` | decimal 0–10 | 0 | §48.2, D-139. Added to provider exchange rates only. |
 | `pos_cash_variance_threshold` | money, nullable | null | §51 |
 | `allow_quotation_without_stock` | bool | true | §53 |
 | `default_seller_commission_rate` | percent | 0 | §50 (tenant-to-seller commission) |
@@ -3083,8 +3084,16 @@ unique(mode, provider, provider_event_id), index(provider, provider_reference), 
 ### 15.8 Platform Commission on Tenant Sales
 
 - Controlled by `platform_settings.commission_enabled`, with the rate from `TenantPlatformSettingsService::getEffectiveCommissionRate()`.
-- `OrderPaymentService::applyPlatformCommission(OrderPayment $payment)` is the single hook point. It is called after every successful **live** online gateway payment. It is a no-op when commission is disabled and for test orders (§40.8).
-- **How** commission is collected (a split payment at charge time versus a post-transaction ledger entry), where the owed commission is recorded, and how it posts to tenant accounting, are UD-07. Interim: the hook computes the amount and records it only in `order_payments.meta.platform_commission`. Nothing is collected.
+- `PlatformCommissionService::assess()` is the single hook point. It runs in the transaction that makes a **live** online gateway payment successful, including a late success, and snapshots `{rate, amount, currency_code}` into `order_payments.meta.platform_commission`. It is a no-op when commission is disabled, for test orders (§40.8) and for other payment methods.
+- **Collection (D-138).** Tenants take payments with their own gateway keys, so there is no split payment.
+  - **Recording.** After the tenant commit, the snapshot is copied into the landlord `platform_commissions` ledger, idempotently per payment.
+  - **Refunds.** A refund or lost chargeback adds a pro-rata negative row.
+  - **Safety net.** The tenant's daily maintenance re-records the last seven days.
+  - **Monthly charge.** On the 1st at 05:00 UTC, `ChargePlatformCommissions` charges each tenant's net pending commission in its subscription currency. It uses the saved subscription authorization, with a `commission` charge whose reference is `COM-{tenant}-{YYYY-MM}`.
+  - **Row states.** Rows move from pending to billed to collected. A failed charge returns them to pending and does not restrict the store.
+  - **Isolation.** A commission charge has no renewal, MRR, coupon or affiliate effect.
+  - **Other currencies.** Commission in a currency other than the subscription's stays pending, visible to platform admins, who can waive it.
+  - **Accounting.** Posting to tenant accounting is not automatic.
 
 ### 15.9 Payment Modes: Test and Live
 
@@ -3322,7 +3331,7 @@ index(tokenable_type, tokenable_id)
 
 Both scopes use the **same table shapes** (§17.2). The landlord tables are platform-wide. The tenant tables live in each tenant database.
 
-In-app (`database` channel) delivery of **landlord** notifications to tenant staff is UD-10. Interim: landlord notifications to tenants use `email` and `sms` only.
+In-app (`database` channel) delivery of **landlord** notifications to tenant staff (D-137): `TenantStaffInboxChannel` writes one row into the **tenant** database's `notifications` table for every active owner and admin. The tenant must be provisioned and `active` or `suspended`. The rows appear in the staff inbox (§17.7) with `source = platform`. Nothing is stored in the landlord database.
 
 ### 17.2 Tables
 
@@ -3489,6 +3498,8 @@ This is the authoritative list of keys. "Trigger" names the service call that di
 | `subscription.plan_downgraded` | tenant | `swapTenantPlan()` |
 | `subscription.plan_limit_approaching` | tenant | `usage.limit` middleware at 80% (§11.10) |
 | `subscription.plan_limit_reached` | tenant | `usage.limit` middleware on a block |
+| `subscription.commission_charged` | tenant | The monthly commission charge succeeds (D-138) |
+| `subscription.commission_charge_failed` | tenant | The monthly commission charge fails (D-138). Mandatory |
 | `module_notice.published` | tenant | `ModuleNoticeService::createNotice()`, sent to tenants with the module's feature enabled |
 | `platform_user.invited` | platform_user | `PlatformUserService::createPlatformUser()` and `InitialPlatformAdminSeeder` (mandatory; carries the password-set link) |
 | `platform_user.password_reset` | platform_user | `AuthService::forgotPassword()` (landlord) (mandatory) |
@@ -8104,7 +8115,7 @@ The tenant's admin dashboard and the KPI strips on its list screens. Everything 
 | `reward_points` | `reward_points` | `reward-points.settings.view` | Points issued, redeemed and expired (range), outstanding points | |
 | `installments` | `installments` | `installment-plans.view` | Active plans, outstanding balance, overdue installments, defaulted plans | |
 | `product_subscriptions` | `product_subscriptions` | `product-subscriptions.view` | Active, paused, failed renewals, recurring value per month | |
-| `hr` | `hr` | `hr.employees.view` | Headcount, on leave today, pending leave requests, open postings and applications (`hr_recruitment`) | |
+| `hr` | `hr` | `hr.employees.view` | Headcount, on leave today, pending leave requests. From attendance and the roster (§58.3a): clocked in now, rostered today, absent today (rostered, shift started, not clocked in, not on leave), late arrivals (range), overtime awaiting approval, approved overtime minutes (range). Overtime pay (`hr_payroll`; runs starting in the range). Open postings and applications (`hr_recruitment`). "Today" is the store's day in its timezone. | |
 | `projects` | `project_management` | `projects.view` | Active projects, overdue tasks, completed (range) | |
 | `support` | `support` | `support.conversations.view` | Open, unassigned, resolved (range) | |
 | `booking` | `booking` | `bookings.view` | Today's bookings, upcoming (7 days), no-show rate (range) | |
@@ -8522,7 +8533,7 @@ Provisioning seeds the base `tenant_currencies` row even when the feature is off
 - **Currency-bound instruments.** Gift cards (§46), installment plans (§47) and product subscriptions (§55) stay in the currency of their originating order, and are never converted automatically.
 - **Accounting.** Every journal entry is posted in the base currency. Postings from non-base records use `convertToBaseCurrency()` with the rate already captured on the record, never a fresh lookup (§57.3).
 - **Base currency changes.** `setBaseCurrency()` is blocked once any order, purchase order or journal entry exists, because historical base amounts would otherwise become ambiguous (Assumption A-31).
-- **Exchange-rate source.** The FX rate provider is UD-19. The `RefreshExchangeRates` job runs daily and fetches only the pairs between the base currency and the tenant's active currencies.
+- **Exchange-rate source.** The provider is set by `FX_PROVIDER` (D-139). `openexchangerates` is recommended; `open_er_api` is free; `none` means rates are entered by hand. The `RefreshExchangeRates` job runs daily and fetches only the pairs between the base currency and the tenant's active currencies. Manual rates are never overwritten. Provider rates are multiplied by (1 + `exchange_rate_margin_percent` / 100).
 
 ### 48.3 Service
 
@@ -9919,7 +9930,7 @@ Only `PostAccountingEntry` and manual journal entries invoke `AccountingService`
 
 **Update and delete of manual source records.** When a manual order payment or supplier payment is edited or deleted, the calling service reverses its original entry through `reverseEntry()`, and for an edit, posts a fresh one. The `posting_key` of a re-post carries a version suffix (for example `order_payment:88:v2`).
 
-**Not posted in v1:** stock transfers (they move value between locations of the same Inventory Asset account, so there is nothing to post), manufacturing (a work order moves component value into finished goods at cost, inside Inventory Asset), sales-agent commissions, and platform commission (UD-07). See [Appendix C](#appendix-c-deferred-and-out-of-scope-items).
+**Not posted in v1:** stock transfers (they move value between locations of the same Inventory Asset account, so there is nothing to post), manufacturing (a work order moves component value into finished goods at cost, inside Inventory Asset), sales-agent commissions, and platform commission (collected by the platform's monthly charge, D-138; the tenant books it as an expense). See [Appendix C](#appendix-c-deferred-and-out-of-scope-items).
 
 ### 57.4 Billers, Expenses and Income
 
@@ -10244,6 +10255,50 @@ unique(employee_id, work_date)
 - `is_late` and `is_early_leave` are computed against `HrSettingsService::getApplicableSettings()`: the employee's department row if it exists, otherwise the tenant-wide row.
 - **Self-service clock-in and clock-out** act on the employee linked to the authenticated user. A user with no linked employee gets 422. A user holding the `hr.attendance.record` permission may pass `employee_id` to record for someone else, for example at a shared kiosk.
 
+`hr_settings` also carries the overtime policy (§58.3a): `overtime_enabled` (bool, default false), `overtime_minimum_minutes` (default 30), `overtime_rate_multiplier` (default 1.50) and `standard_monthly_hours` (default 173.33).
+
+### 58.3a Shifts, Roster and Overtime
+
+```
+hr_shifts  [DB: tenant]
+id
+name                       string(80)
+start_time                 time
+end_time                   time               earlier than start_time = ends the next day (a night shift)
+break_minutes              int      default 0 unpaid
+late_grace_minutes         int      nullable  null = the applicable hr_settings grace
+early_leave_grace_minutes  int      nullable  likewise
+color                      string(7) nullable #RRGGBB for the roster view
+is_active                  bool     default true
+```
+
+```
+hr_shift_assignments  [DB: tenant]
+id
+employee_id          fk -> hr_employees
+shift_id             fk -> hr_shifts
+work_date            date              the day the shift starts, in the tenant timezone
+notes                string   nullable
+assigned_by_user_id  fk -> users  nullable
+unique(employee_id, work_date)
+```
+
+`hr_attendance` gains `shift_id` (nullable), `scheduled_minutes`, `worked_minutes`, `overtime_minutes` (default 0), `overtime_status` (`none`, `pending`, `approved`, `rejected`), `overtime_approved_minutes`, `overtime_decided_by_user_id`, `overtime_decided_at` and `overtime_note`.
+
+- **Shifts.** A shift's scheduled time is its window less the break, and must be positive. A shift that was ever rostered or worked can only be deactivated, never deleted (409 `shift_in_use`).
+- **Roster.** `assign` rosters the employees on an active shift for every date in `from`–`to` on the chosen ISO weekdays. That is at most 5,000 entries in one call, and all the employees must be active. An existing entry is skipped unless `replace` is true. `unassign` removes entries; recorded attendance keeps its shift. Staff read their own schedule at `GET my-shifts` without an HR permission.
+- **Clock-in.** The work date comes from the roster entry in force:
+  - today's entry;
+  - otherwise yesterday's night shift, while it is still running (clocking in after midnight).
+  Lateness is measured against the shift start plus the shift's grace, falling back to the settings grace. With no roster entry, the settings' fixed hours apply as before. One row per employee per work date still holds (A-48).
+- **Clock-out.** It closes the employee's latest open row from the last 24 hours, so a night shift is one row. The measurements are:
+  - worked time: the time on the clock less the break;
+  - scheduled time: the shift's scheduled time, or the settings' hours;
+  - early leave: measured against the shift end.
+- **Overtime.** When `overtime_enabled` is on and worked time exceeds scheduled time by at least `overtime_minimum_minutes`, the whole excess is recorded as `pending`. A reviewer approves it, optionally fewer minutes, or rejects it, once. Only approved minutes are paid.
+- **Pay.** `generatePayrollItemsForRun()` adds one editable `overtime` line per employee, computed as approved minutes ÷ 60 × hourly rate × `overtime_rate_multiplier`. The hourly rate is the salary structure's `hourly_rate`, else `base_salary ÷ standard_monthly_hours`. The line is rounded to the currency and labelled with the hours and multiplier. Overtime approved after a run's items were generated is not added to that run.
+- **Summary.** The attendance summary adds `worked_minutes`, `overtime_pending_minutes` and `overtime_approved_minutes`.
+
 ### 58.4 Leave
 
 ```
@@ -10301,6 +10356,7 @@ hr_salary_structures  [DB: tenant]
 id
 employee_id          fk -> hr_employees
 base_salary          money
+hourly_rate          money    nullable  overtime pay rate; null = base_salary ÷ standard_monthly_hours (§58.3a)
 currency_code        char(3)           the base currency (Assumption A-50)
 effective_from       date
 effective_to         date     nullable  null = current
@@ -10329,7 +10385,7 @@ id
 payroll_run_id       fk -> hr_payroll_runs
 employee_id          fk -> hr_employees
 base_salary          money             snapshot from the salary structure
-total_allowances     money    default 0  Σ allowance, bonus and reimbursement lines
+total_allowances     money    default 0  Σ allowance, bonus, reimbursement and overtime lines
 gross_pay            money    default 0  base_salary + total_allowances
 total_deductions     money    default 0  Σ deduction lines
 tax_amount           money    default 0  Σ tax lines
@@ -10343,7 +10399,7 @@ unique(payroll_run_id, employee_id)
 hr_payroll_item_lines  [DB: tenant]
 id
 payroll_item_id      fk -> hr_payroll_items
-type                 enum(allowance, deduction, tax, bonus, reimbursement)
+type                 enum(allowance, deduction, tax, bonus, reimbursement, overtime)
 label                string            e.g. "Housing Allowance", "PAYE Tax"
 amount               money             the computed amount
 is_percentage        bool     default false  true = computed as a percentage of base_salary
@@ -10354,7 +10410,7 @@ percentage           percent  nullable  set when is_percentage
 
 | From | Action | To |
 |---|---|---|
-| `draft` | `generatePayrollItemsForRun()`: one item per active employee with a current salary structure | `processing` |
+| `draft` | `generatePayrollItemsForRun()`: one item per active employee with a current salary structure, plus an `overtime` line for overtime approved with a work date in the period (§58.3a) | `processing` |
 | `processing` | Lines are added or removed. Each change calls `recalculatePayrollItem()`, then the run totals are recalculated. | `processing` |
 | `processing` | `finalizePayrollRun()`: locks the run. No line edits after this ([§5.2](#52-timestamps-soft-deletes-and-immutability)). | `finalized` |
 | `finalized` | `markPayrollRunPaid()`: marks every item paid, and posts `postPayroll()` when `accounting` is enabled | `paid` |
@@ -12188,7 +12244,7 @@ The scheduler (`routes/console.php`) runs every minute on exactly one server ([�
 | Sitemap rebuild, when anything was published since the last build | `GenerateSitemapForTenant` | core | [§30.2](#302-seo) |
 | Gift card expiry | `ExpireGiftCards` | `gift_cards` | [§46.3](#463-redemption-rules) |
 | Installment charges, then overdue and default tracking | `ChargeDueInstallments`, `MarkOverdueInstallments` | `installments` | [§47.3](#473-flow) |
-| Exchange-rate refresh (provider: UD-19) | `RefreshExchangeRates` | `multi_currency` | [§48.2](#482-rules) |
+| Exchange-rate refresh (provider: D-139) | `RefreshExchangeRates` | `multi_currency` | [§48.2](#482-rules) |
 | Supplier quotation expiry | `ExpireSupplierQuotations` | `purchasing` | [§49.3](#493-supplier-quotations) |
 | Sales quotation expiry | `ExpireSalesQuotations` | `sales_quotations` | [§53.2](#532-rules) |
 | Reward point expiry | `ExpireRewardPoints` | `reward_points` | [§54.2](#542-rules) |
@@ -12878,6 +12934,7 @@ Migrations in `database/migrations/`, in this order:
 | 14a | `platform_daily_metrics`, `tenant_usage_snapshots` | §22.6 |
 | 15 | `jobs`, `job_batches`, `failed_jobs`; `cache`, `cache_locks` (local database cache driver only) | §72, §74 |
 | 16 | `platform_exports` | §19.4, D-134 |
+| 17 | `platform_commissions` | §15.8, D-138 |
 
 Version 3.2 adds no tenant table. It adds columns to existing tenant tables, each defined in its owning section: `users.preferences` (§25.1), `tenant_payment_settings.mode` and `credentials_verified_at` (§15.4), `orders.is_test` (§39.1) and `order_payments.mode` (§40.1). They ship as expand-only migrations (§6.8); existing rows receive `mode = live`, `is_test = false`, and existing tenants receive `tenant_settings.payment_mode = live`, so no running store changes behaviour.
 
@@ -12915,7 +12972,7 @@ Migrations in `database/migrations/tenant/`, run in every tenant database, in th
 | 24 | Reward points | `reward_point_settings`, `customer_reward_points`, `reward_point_transactions` | §54 |
 | 25 | Product subscriptions and alerts | `product_subscription_plans`, `customer_subscriptions`, `customer_subscription_orders`, `back_in_stock_subscriptions` | §55, §56 |
 | 26 | Accounting and expenses | `account_categories`, `chart_of_accounts`, `fiscal_years`, `fiscal_periods`, `journal_entries`, `journal_entry_lines`, `account_balances`, `accounting_posting_requests` (feature `accounting`); `billers`, `expense_categories`, `expenses`, `income_categories`, `income_entries` (feature `expenses`) | §57 |
-| 27 | HR | `hr_departments`, `hr_employees`, `hr_document_types`, `hr_employee_documents`, `hr_settings`, `hr_attendance`, `hr_leave_types`, `hr_leave_balances`, `hr_leave_requests`, `hr_salary_structures`, `hr_payroll_runs`, `hr_payroll_items`, `hr_payroll_item_lines`, `hr_appraisal_templates`, `hr_appraisal_template_criteria`, `hr_appraisals`, `hr_appraisal_scores`, `hr_job_postings`, `hr_candidates`, `hr_job_applications` | §58 |
+| 27 | HR | `hr_departments`, `hr_employees`, `hr_document_types`, `hr_employee_documents`, `hr_settings`, `hr_attendance`, `hr_shifts`, `hr_shift_assignments`, `hr_leave_types`, `hr_leave_balances`, `hr_leave_requests`, `hr_salary_structures`, `hr_payroll_runs`, `hr_payroll_items`, `hr_payroll_item_lines`, `hr_appraisal_templates`, `hr_appraisal_template_criteria`, `hr_appraisals`, `hr_appraisal_scores`, `hr_job_postings`, `hr_candidates`, `hr_job_applications` | §58 |
 | 29 | Support | `support_conversations`, `support_messages`, `support_message_attachments` | §59 |
 | 30 | Approvals | `approval_workflows`, `approval_steps`, `approval_step_approvers`, `approval_requests`, `approval_actions` | §60 |
 | 31 | AI assistant | `ai_assistant_intents`, `ai_assistant_query_logs` | §62 |
@@ -12956,6 +13013,20 @@ Routes that exist in the code but are described only in prose or in Appendix D, 
 
 | Method | URI | Group | Owning section |
 |---|---|---|---|
+| GET | `/api/admin/hr/shifts` | `tenant.admin`, `feature:hr` | §58.3a |
+| POST | `/api/admin/hr/shifts` | `tenant.admin`, `feature:hr` | §58.3a |
+| PATCH | `/api/admin/hr/shifts/{shift}` | `tenant.admin`, `feature:hr` | §58.3a |
+| DELETE | `/api/admin/hr/shifts/{shift}` | `tenant.admin`, `feature:hr` | §58.3a |
+| GET | `/api/admin/hr/roster` | `tenant.admin`, `feature:hr` | §58.3a |
+| POST | `/api/admin/hr/roster/assign` | `tenant.admin`, `feature:hr` | §58.3a |
+| POST | `/api/admin/hr/roster/unassign` | `tenant.admin`, `feature:hr` | §58.3a |
+| GET | `/api/admin/hr/my-shifts` | `tenant.admin`, `feature:hr`; self-service (`hr.roster.view` to pass another `employee_id`) | §58.3a |
+| GET | `/api/admin/hr/overtime` | `tenant.admin`, `feature:hr` | §58.3a |
+| POST | `/api/admin/hr/attendance/{attendance}/overtime/approve` | `tenant.admin`, `feature:hr` | §58.3a |
+| POST | `/api/admin/hr/attendance/{attendance}/overtime/reject` | `tenant.admin`, `feature:hr` | §58.3a |
+| GET | `/api/admin/billing/commissions` | `tenant.admin` | D-138 |
+| GET | `/api/admin/platform-commissions` | `landlord.admin` | D-138 |
+| POST | `/api/admin/platform-commissions/{commission}/waive` | `landlord.admin` | D-138 |
 | GET | `/api/account/social-accounts` | `tenant.customer` | D-132 |
 | POST | `/api/account/social-accounts/{provider}/redirect` | `tenant.customer` | D-132 |
 | POST | `/api/account/social-accounts/{provider}/callback` | `tenant.customer` | D-132 |
@@ -13109,9 +13180,6 @@ These need the product owner's decision. Until one is made, implement the **inte
 
 | ID | Decision needed | Interim position | Owning section |
 |---|---|---|---|
-| UD-07 | How platform commission is collected (split payment at charge time or a ledger entry afterwards), recorded and posted. This is a commercial and legal choice (who is the merchant of record), not an architectural one. | Computed and stored in `order_payments.meta.platform_commission` only. Nothing is collected or posted. | §15.8, §57.3 |
-| UD-10 | In-app (`database`) delivery of landlord notifications to tenant staff. It needs a cross-database inbox design, and should be decided together with the tenant admin frontend. | Landlord-to-tenant notifications use `email` and `sms` only. | §17.1 |
-| UD-19 | The FX rate provider. A vendor and contract choice. | `RefreshExchangeRates` stores nothing until a provider is chosen. Without a stored rate, a non-base currency can be offered only for products that have an explicit `product_prices` row. | §48.2 |
 | UD-23 | OAuth connection flows for social commerce channels. Each channel needs an approved app registration by the platform. | The tenant supplies an access token directly. Expired-token failures are logged. | §69.2 |
 
 ### B.2 Decisions Made in This Revision
@@ -13121,6 +13189,9 @@ These were open in earlier revisions. They are now decided in their owning secti
 | ID | Decision | Owning section |
 |---|---|---|
 | UD-01 | dompdf, picqer barcode generator and bacon QR, behind `DocumentRenderer`. | §4.5, §43 |
+| UD-07 | Commission is a ledger entry afterwards, collected by a monthly charge on the saved subscription authorization. A split payment is impossible because tenants use their own gateway keys. The tenant stays merchant of record. | §15.8, D-138 |
+| UD-10 | Landlord notifications to a tenant are also delivered to its staff inbox, as rows in the tenant database for every active owner and admin. | §17.1, D-137 |
+| UD-19 | Open Exchange Rates (`openexchangerates`) is the recommended provider. The free `open_er_api` remains available. Each store can add a margin to provider rates. | §48.2, D-139 |
 | UD-02 | `platform_settings.past_due_restriction` (`none`, `read_only`, `blocked`; default `read_only`) after `past_due_grace_days`. A cancelled subscription past `ends_at` is blocked. | §6.5 |
 | UD-03 | Payment-first onboarding. A paid price without an eligible trial creates an `incomplete` subscription and a tenant in `awaiting_payment`, with no database. The first successful payment triggers provisioning. Unpaid tenants close after `unpaid_registration_expiry_days`. | §9.1, §9.3, §14.3 |
 | UD-24 | Plans and modules are separate. Plans grant entitlement through `plan_features`; tenants activate entitled modules through `tenant_modules`. Disabling or losing a module never deletes its data. | §11 |
@@ -13395,3 +13466,8 @@ Decisions and corrections made while building steps 1 to 7 of §78. Where a deci
 | D-133 | Bulk actions and customer activation. A shared `BulkOperation` runner applies an action to at most 100 ids through the single-item service method, each independently, and writes one `bulk_actions` activity row (operation id, resource, action, succeeded and failed ids). New: `POST /api/admin/customers/bulk` (activate, deactivate, assign_group), `POST /api/admin/categories/bulk`, `POST /api/admin/orders/bulk` (processing, delivered; orders outside the viewer's warehouses fail as not found), `POST /api/admin/reviews/bulk` (approve, reject with one reason); product and coupon bulk responses now also carry `operation_id`, `succeeded` and `failed`. Customer re-activation was missing: `POST /api/admin/customers/{customer}/activate` (refused for an anonymised customer). The customer list search now escapes LIKE wildcards. |
 | D-134 | Exports extended. File writing moved into `ExportWriter`, shared by tenant and platform exports. XLSX through Laravel Excel (`SpreadsheetExport`: FromGenerator with a value binder that writes every text cell as text and plain decimal strings as numbers, keeping leading zeros as text; at most 50,000 rows, beyond which the export fails asking for CSV). Core list exports (`CoreListExports`) reuse `CustomerService::customersQuery`, `ProductService::productsQuery` and `OrderService::ordersQuery` (the list endpoints now use the same builders) and take the requester's staff warehouse scope from `ExportContext` only; each needs its list's view permission. Platform exports: `platform_exports` (landlord), `GET/POST /api/admin/exports`, `GET …/{export}`, `GET …/{export}/download` on the platform host, `GeneratePlatformExport` on `landlord-default`, `platform.export_ready` notification, 7-day retention swept by the landlord daily maintenance; affiliate payout details, passwords and gateway credentials are never exported. |
 | D-135 | Spreadsheet imports (Laravel Excel). `POST /api/admin/imports` (multipart `import_type`, `file` CSV/XLSX ≤ 10 MB with MIME sniffing, `mode`), `GET /api/admin/imports`, `GET …/{import}`, `GET …/{import}/errors`, `GET …/types` and `GET …/types/{type}/template`. Types: categories (key slug; parents before children), products (key SKU; creates simple, digital or service products; variable products are not updated by import), customers (key email; no passwords, nothing emailed; erased customers refused), stock (SKU + warehouse code; modes `adjust` or `set`, applied as adjustment movements referencing the import). Master-data modes: `upsert` (default), `create`, `update`. Each row goes through the owning service, so the API's validation and rules apply. `ProcessImport` (tenant-bulk, 3 tries) reads the file in chunks of 500 (`OnEachRow`, `WithHeadingRow`, `WithChunkReading`, `SkipsEmptyRows`) inside one tracked job — Laravel Excel's own queued chunks are not used, because a retried chunk could not be checkpointed; each row commits together with `data_imports.last_row`, so a retry resumes after the last committed row and never applies a row twice. Rejected rows go to `data_import_errors` (row, field, message, value; sensitive columns' values omitted) and the other rows carry on; a missing required column, more than 50,000 rows or an empty file fails the import. Cells starting with "=" are rejected, never evaluated. Status: queued → processing → completed, completed_with_errors or failed; the requester receives `import.completed`. Uploads are private media deleted after 30 days by the daily tenant maintenance; import rows and errors stay. Each type needs its own permission (`categories.create`, `products.create`, `customers.create`, `stock-adjustments.create`) besides `imports.*`; a user sees only their own imports. Starter role `manager` gains `imports.*`. |
+| D-136 | Final integration audit. Two gaps between the spec and the code were closed. (1) The §9.6 onboarding checklist is now served by `GET /api/admin/onboarding`, which any staff user can call without a permission. It is computed on each request from the store's data and is never stored. The steps are store_details, payment_gateway, shipping (needed only when a physical product exists), tax (`tax_setup_confirmed` or a tax rate), first_product, policies (privacy, terms and refund pages published), and custom_domain (optional, so it is not counted in `total`). (2) Customers now have the §17.7 inbox and preferences at `/api/notifications` and `/api/notification-preferences`, served by the same controllers as staff and scoped to the signed-in actor. The registry architecture test is no longer skipped. The routes that the spec described only in prose are listed in §79.4. |
+| D-137 | UD-10 is resolved: landlord notifications also reach the staff inbox of a tenant. For a `Tenant` notifiable, the `database` channel maps to `TenantStaffInboxChannel`. The channel runs in the tenant's context and inserts, in one tenant transaction, one `notifications` row for every active `owner` and `admin`. The row uses the standard inbox shape (`key`, `subject`, `body`, `data`) plus `source: platform`. Delivery happens only while the tenant is provisioned and `active` or `suspended`. Every landlord template with the `tenant` audience now defaults to `database` on. Re-running the landlord `NotificationTemplateSeeder` adds the missing channel row to existing templates, keeping customised ones. Unseeded keys use the catalog default in the meantime. The staff inbox returns `source` (`platform` or `store`). |
+| D-138 | UD-07 is resolved. Platform commission is recorded as a ledger entry and collected monthly; split payments are not possible because tenants charge with their own gateway keys. See §15.8.<br>**Ledger.** Landlord `platform_commissions` holds `tenant_id`, a `source_reference` unique per tenant (`payment:{id}` or `refund:{id}`), `kind`, `order_number`, `base_amount`, `rate`, a signed `amount`, `currency_code`, `status` (`pending`, `billed`, `collected`, `waived`), `payment_transaction_id`, `waived_by`, `waived_reason` and `collected_at`.<br>**Charge.** `SubscriptionService::chargeCommission()` claims the pending rows under lock and creates the charge in one landlord transaction. It charges only when the net amount is positive and the subscription is live with a saved authorization.<br>**Notices.** The new landlord templates are `subscription.commission_charged` and `subscription.commission_charge_failed` (mandatory).<br>**Routes.** `GET /api/admin/billing/commissions` returns the tenant's own rows, with `meta.outstanding` per currency. `GET /api/admin/platform-commissions` lists rows for platform admins, filtered by tenant, status and currency. `POST …/{commission}/waive` takes a required `reason` and applies to pending rows only.<br>**Limitations.** Commission is off by default (`commission_enabled = false`). Commission in a currency other than the subscription's is not converted automatically. |
+| D-139 | UD-19 is resolved. Open Exchange Rates is the recommended FX provider (`FX_PROVIDER=openexchangerates`, `OPENEXCHANGERATES_APP_ID`).<br>**Fetching.** Rates are fetched against USD, which every plan allows, and crossed to the store's base currency (1 base = usd[target] ÷ usd[base]). The response is cached in the shared landlord cache for `OPENEXCHANGERATES_CACHE_MINUTES` (default 60), so the API quota does not grow with the number of tenants. A failed call is not cached, and only its HTTP status is logged. Without an App ID, the provider counts as not configured.<br>**Margin.** The new tenant setting `exchange_rate_margin_percent` (0–10, default 0) multiplies provider rates only, protecting the store against currency swings. Manual rates are stored as entered.<br>**Fallback.** `open_er_api` stays available as a free alternative. |
+| D-140 | HR shifts, a roster and overtime (§58.3a), added at the owner's request.<br>**Model.** Shift templates are rostered per employee per work date. A night shift keeps its start date, so attendance stays one row per work date (A-48 unchanged). Clock-out closes the latest open row instead of today's row, which fixes shifts that cross midnight.<br>**Overtime.** It is measured at clock-out and is off by default. It is recorded as pending and needs approval, which may cover fewer minutes than recorded, so nobody is paid for a forgotten clock-out without review.<br>**Pay.** Payroll generation adds an editable `overtime` earning line: approved minutes ÷ 60 × hourly rate × multiplier. The hourly rate is the new optional `hr_salary_structures.hourly_rate`, else base ÷ `standard_monthly_hours`.<br>**Permissions.** They are derived as usual: `hr.shifts.*`, `hr.roster.view`, `hr.roster.assign`, `hr.roster.unassign`, `hr.overtime.view`, `hr.attendance.overtime.approve` and `hr.attendance.overtime.reject`. Staff read their own schedule at `GET /api/admin/hr/my-shifts`.<br>**Migration.** `2026_10_02_000057` is expand-only.<br>**Dashboard.** The HR dashboard section (§44.3) adds clocked in now, rostered today, absent today, late arrivals, overtime awaiting approval, approved overtime minutes and overtime pay. "On leave today" now uses the store's timezone instead of UTC. |

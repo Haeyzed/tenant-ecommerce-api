@@ -115,7 +115,7 @@ it('dispatches landlord keys from the landlord templates even inside a tenant co
     ]);
 
     Notification::assertSentTo($tenant, TemplatedNotification::class, fn (TemplatedNotification $n) => $n->scope === NotificationScope::Landlord
-        && $n->channels === ['email']
+        && collect($n->channels)->sort()->values()->all() === ['database', 'email']
         && str_contains($n->body, 'Owner A'));
 });
 

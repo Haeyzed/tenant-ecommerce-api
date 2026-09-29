@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Messaging\Support;
 
+use App\Modules\Messaging\Channels\TenantStaffInboxChannel;
 use App\Modules\Messaging\Services\PushDeviceTokenService;
 use App\Modules\Messaging\Services\WhatsAppSettingsService;
 use App\Modules\Notifications\Enums\NotificationScope;
@@ -72,13 +73,16 @@ final class ChannelTransports
 
     /**
      * In-app delivery needs a notifiable model with a notifications table.
-     * Tenants have no landlord inbox yet (UD-10).
+     * A tenant's inbox is its staff's inbox in the tenant database (UD-10),
+     * so the tenant must be provisioned and its staff able to sign in.
      */
     private function hasInbox(object $recipient): bool
     {
-        return $recipient instanceof Model
-            && ! $recipient instanceof Tenant
-            && method_exists($recipient, 'notifications');
+        if ($recipient instanceof Tenant) {
+            return TenantStaffInboxChannel::canDeliver($recipient);
+        }
+
+        return $recipient instanceof Model && method_exists($recipient, 'notifications');
     }
 
     private function smsConfigured(NotificationScope $scope): bool

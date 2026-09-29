@@ -22,10 +22,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class HrPayrollItemLine extends Model
 {
-    public const array TYPES = ['allowance', 'deduction', 'tax', 'bonus', 'reimbursement'];
+    /** Generated from approved overtime (§58.3a); also addable by hand. */
+    public const string OVERTIME = 'overtime';
+
+    public const array TYPES = ['allowance', 'deduction', 'tax', 'bonus', 'reimbursement', self::OVERTIME];
 
     /** Lines that add to gross pay. */
-    public const array EARNINGS = ['allowance', 'bonus', 'reimbursement'];
+    public const array EARNINGS = ['allowance', 'bonus', 'reimbursement', self::OVERTIME];
 
     protected $connection = 'tenant';
 

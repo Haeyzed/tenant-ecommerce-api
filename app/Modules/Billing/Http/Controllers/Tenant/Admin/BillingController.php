@@ -6,8 +6,10 @@ namespace App\Modules\Billing\Http\Controllers\Tenant\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Billing\Http\Resources\PaymentTransactionResource;
+use App\Modules\Billing\Http\Resources\PlatformCommissionResource;
 use App\Modules\Billing\Http\Resources\SubscriptionResource;
 use App\Modules\Billing\Models\PaymentTransaction;
+use App\Modules\Billing\Models\PlatformCommission;
 use App\Modules\Billing\Services\PlatformCouponService;
 use App\Modules\Billing\Services\PlatformPaymentGatewayService;
 use App\Modules\Billing\Services\SubscriptionBillingService;
@@ -16,6 +18,7 @@ use App\Modules\Plans\Models\Plan;
 use App\Modules\Plans\Services\PlanService;
 use App\Modules\Tenancy\Models\Tenant;
 use App\Shared\Http\APIResponse;
+use App\Shared\Support\Money;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -165,6 +168,30 @@ final class BillingController extends Controller
             ->paginate(min(100, max(1, $request->integer('per_page', 25))));
 
         return APIResponse::success(PaymentTransactionResource::collection($page));
+    }
+
+    /**
+     * The platform commission on this store's online sales (D-138), with
+     * the amount still to be charged per currency. The tenant comes from
+     * the domain, never from the request.
+     */
+    public function commissions(Request $request): JsonResponse
+    {
+        $status = $request->validate(['status' => ['sometimes', Rule::in([PlatformCommission::PENDING, PlatformCommission::BILLED, PlatformCommission::COLLECTED, PlatformCommission::WAIVED])]])['status'] ?? null;
+        $tenantId = $this->tenant()->getTenantKey();
+
+        $page = PlatformCommission::query()
+            ->where('tenant_id', $tenantId)
+            ->when($status, static fn ($q, $v) => $q->where('status', $v))
+            ->orderByDesc('id')
+            ->paginate(min(100, max(1, $request->integer('per_page', 25))));
+
+        $outstanding = PlatformCommission::query()->where('tenant_id', $tenantId)
+            ->whereIn('status', [PlatformCommission::PENDING, PlatformCommission::BILLED])
+            ->groupBy('currency_code')->selectRaw('currency_code, SUM(amount) as total')->pluck('total', 'currency_code')
+            ->map(static fn ($total): string => Money::normalize((string) $total))->all();
+
+        return APIResponse::success(PlatformCommissionResource::collection($page), meta: ['outstanding' => $outstanding]);
     }
 
     /**

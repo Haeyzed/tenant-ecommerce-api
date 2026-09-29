@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Jobs;
 
 use App\Modules\Accounting\Services\AccountingService;
+use App\Modules\Billing\Services\PlatformCommissionService;
 use App\Modules\Cart\Services\CartService;
 use App\Modules\Catalog\Services\ProductViewService;
 use App\Modules\Cms\Services\ContactSubmissionService;
@@ -137,6 +138,7 @@ final class RunTenantDailyMaintenance implements ShouldBeUnique, ShouldQueue
             });
             $this->task('export_files', static fn () => $exports->expireFiles());
             $this->task('import_files', static fn () => app(DataImportService::class)->expireFiles());
+            $this->task('platform_commissions', static fn () => app(PlatformCommissionService::class)->reconcile());
 
             $this->task('idempotency_keys', fn () => $this->chunkedDelete('idempotency_keys', IdempotencyKey::query()->where('expires_at', '<', now())->toBase()));
             $this->task('webhook_logs', fn () => $this->chunkedDelete('webhook_logs', WebhookLog::on('tenant')

@@ -34,10 +34,10 @@ final class SalaryController extends Controller
     }
 
     /**
-     * Body: base_salary, effective_from (after the current structure's start).
+     * Body: base_salary, hourly_rate? (overtime pay; default base ÷ standard monthly hours), effective_from (after the current structure's start).
      */
     public function store(Request $request, HrEmployee $employee): JsonResponse
     {
-        return APIResponse::created($this->presenter->salary($this->payroll->createSalaryStructure($employee, $request->only(['base_salary', 'effective_from']))), 'Salary saved');
+        return APIResponse::created($this->presenter->salary($this->payroll->createSalaryStructure($employee, $request->only(['base_salary', 'hourly_rate', 'effective_from']))), 'Salary saved');
     }
 }

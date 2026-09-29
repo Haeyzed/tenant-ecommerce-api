@@ -15,6 +15,7 @@ use App\Modules\Affiliates\Models\AffiliateReferral;
 use App\Modules\Approvals\Models\ApprovalRequest;
 use App\Modules\Approvals\Models\ApprovalWorkflow;
 use App\Modules\Billing\Models\PaymentTransaction;
+use App\Modules\Billing\Models\PlatformCommission;
 use App\Modules\Billing\Models\PlatformCoupon;
 use App\Modules\Billing\Models\PlatformPaymentGateway;
 use App\Modules\Billing\Models\Subscription;
@@ -225,6 +226,7 @@ final class MorphMap
         'data_export' => DataExport::class,
         'data_import' => DataImport::class,
         'platform_export' => PlatformExport::class,
+        'platform_commission' => PlatformCommission::class,
         'custom_field_definition' => CustomFieldDefinition::class,
         'tenant_payment_setting' => TenantPaymentSetting::class,
         'sms_gateway_setting' => SmsGatewaySetting::class,

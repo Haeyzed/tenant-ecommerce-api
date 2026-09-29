@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Payments\Services;
 
+use App\Modules\Billing\Services\PlatformCommissionService;
 use App\Modules\GiftCards\Services\GiftCardService;
 use App\Modules\Installments\Models\InstallmentPayment;
 use App\Modules\Installments\Services\InstallmentPlanService;
@@ -316,7 +317,7 @@ final readonly class OrderPaymentService
                     'status' => OrderPayment::SUCCESSFUL,
                     'paid_at' => now(),
                     'provider_reference' => $verified['provider_reference'] ?? $locked->provider_reference,
-                    'meta' => [...(array) $locked->meta, 'fee' => $verified['fee'] ?? null],
+                    'meta' => [...(array) $locked->meta, 'fee' => $verified['fee'] ?? null, ...self::commissionMeta($locked)],
                 ])->save();
                 $this->postings->payment($locked);
                 $outcome = 'successful';
@@ -346,6 +347,16 @@ final readonly class OrderPaymentService
                 $this->orders->recalculatePaymentStatus($locked->order);
             }
         });
+
+        if ($outcome === 'successful') {
+            // After the tenant commit: the landlord ledger is another database (D-138).
+            $succeeded = $payment->status === OrderPayment::SUCCESSFUL ? $payment
+                : OrderPayment::query()->where('order_id', $payment->order_id)->where('meta->late_success_of', $payment->id)->first();
+
+            if ($succeeded !== null) {
+                app(PlatformCommissionService::class)->record($succeeded);
+            }
+        }
 
         $order = $payment->order()->first();
 
@@ -572,9 +583,27 @@ final readonly class OrderPaymentService
             return $status === OrderPayment::SUCCESSFUL;
         });
 
+        if ($done) {
+            // The platform's commission on the refunded share is reversed (D-138).
+            app(PlatformCommissionService::class)->record($refund);
+        }
+
         if ($done && $refund->kind === OrderPayment::REFUND) {
             $this->notifyRefunded($refund);
         }
+    }
+
+    /**
+     * The platform commission snapshot for a payment becoming successful,
+     * as a meta fragment (§15.8).
+     *
+     * @return array<string, mixed>
+     */
+    private static function commissionMeta(OrderPayment $payment): array
+    {
+        $commission = app(PlatformCommissionService::class)->assess($payment);
+
+        return $commission === null ? [] : ['platform_commission' => $commission];
     }
 
     /**
@@ -749,7 +778,8 @@ final readonly class OrderPaymentService
             'currency_code' => $failed->currency_code,
             'paid_at' => now(),
             'meta' => ['late_success_of' => $failed->id, 'fee' => $verified['fee'] ?? null],
-        ])->save();
+        ]);
+        $row->forceFill(['meta' => [...(array) $row->meta, ...self::commissionMeta($row)]])->save();
 
         $this->postings->payment($row);
 

@@ -117,6 +117,8 @@ return [
     'plans.prices.view',
     'plans.update',
     'plans.view',
+    'platform-commissions.view',
+    'platform-commissions.waive',
     'platform-coupons.create',
     'platform-coupons.deactivate',
     'platform-coupons.redemptions.view',

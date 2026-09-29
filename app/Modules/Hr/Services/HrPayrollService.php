@@ -32,18 +32,21 @@ final readonly class HrPayrollService
     public function __construct(
         private CurrencyService $currencies,
         private AccountingOutbox $outbox,
+        private HrAttendanceService $attendance,
+        private HrSettingsService $settings,
     ) {}
 
     /**
      * Closes the current structure the day before the new one starts;
      * history is never rewritten, so the new date must be later.
      *
-     * @param  array<string, mixed>  $data  base_salary, effective_from
+     * @param  array<string, mixed>  $data  base_salary, hourly_rate? (overtime), effective_from
      */
     public function createSalaryStructure(HrEmployee $employee, array $data): HrSalaryStructure
     {
         $validated = Validator::make($data, [
             'base_salary' => ['required', 'numeric', 'gt:0', 'decimal:0,4', 'max:99999999999999'],
+            'hourly_rate' => ['sometimes', 'nullable', 'numeric', 'gt:0', 'decimal:0,4', 'max:99999999999999'],
             'effective_from' => ['required', 'date_format:Y-m-d'],
         ])->validate();
 
@@ -65,6 +68,7 @@ final readonly class HrPayrollService
             $structure->forceFill([
                 'employee_id' => $employee->id,
                 'base_salary' => Money::normalize((string) $validated['base_salary']),
+                'hourly_rate' => isset($validated['hourly_rate']) ? Money::normalize((string) $validated['hourly_rate']) : null,
                 'currency_code' => $this->currencies->baseCurrency(),
                 'effective_from' => $from->toDateString(),
             ])->save();
@@ -136,7 +140,8 @@ final readonly class HrPayrollService
 
     /**
      * draft → processing: one item per active employee with a salary in
-     * force at the end of the period.
+     * force at the end of the period, plus an overtime line for the
+     * overtime approved in the period (§58.3a).
      */
     public function generatePayrollItemsForRun(HrPayrollRun $run): HrPayrollRun
     {
@@ -148,26 +153,31 @@ final readonly class HrPayrollService
             }
 
             $created = 0;
+            $employees = HrEmployee::query()->where('status', HrEmployee::ACTIVE)->orderBy('id')->get();
+            $overtime = $this->attendance->approvedOvertimeMinutes($employees->modelKeys(), $locked->period_start->toDateString(), $locked->period_end->toDateString());
 
-            HrEmployee::query()->where('status', HrEmployee::ACTIVE)->orderBy('id')->get()
-                ->each(function (HrEmployee $employee) use ($locked, &$created): void {
-                    $salary = $this->getCurrentSalary($employee, CarbonImmutable::parse($locked->period_end));
+            $employees->each(function (HrEmployee $employee) use ($locked, $overtime, &$created): void {
+                $salary = $this->getCurrentSalary($employee, CarbonImmutable::parse($locked->period_end));
 
-                    if ($salary === null) {
-                        return;
-                    }
+                if ($salary === null) {
+                    return;
+                }
 
-                    $item = new HrPayrollItem;
-                    $item->forceFill([
-                        'payroll_run_id' => $locked->id,
-                        'employee_id' => $employee->id,
-                        'base_salary' => (string) $salary->base_salary,
-                        'gross_pay' => (string) $salary->base_salary,
-                        'net_pay' => (string) $salary->base_salary,
-                        'status' => HrPayrollItem::PENDING,
-                    ])->save();
-                    $created++;
-                });
+                $item = new HrPayrollItem;
+                $item->forceFill([
+                    'payroll_run_id' => $locked->id,
+                    'employee_id' => $employee->id,
+                    'base_salary' => (string) $salary->base_salary,
+                    'gross_pay' => (string) $salary->base_salary,
+                    'net_pay' => (string) $salary->base_salary,
+                    'status' => HrPayrollItem::PENDING,
+                ])->save();
+                $created++;
+
+                if (($overtime[$employee->id] ?? 0) > 0) {
+                    $this->addOvertimeLine($item, $employee, $salary, $overtime[$employee->id]);
+                }
+            });
 
             if ($created === 0) {
                 throw ApiException::unprocessable('no_payable_employees', 'No active employee has a salary for this period.');
@@ -178,6 +188,19 @@ final readonly class HrPayrollService
 
             return $locked;
         });
+    }
+
+    /**
+     * The hourly rate for overtime: the structure's own, else the base
+     * salary over the applicable standard monthly hours.
+     */
+    public function hourlyRate(HrEmployee $employee, HrSalaryStructure $salary): string
+    {
+        if ($salary->hourly_rate !== null) {
+            return (string) $salary->hourly_rate;
+        }
+
+        return bcdiv((string) $salary->base_salary, (string) $this->settings->getApplicableSettings($employee)->standard_monthly_hours, 10);
     }
 
     /**
@@ -366,8 +389,34 @@ final readonly class HrPayrollService
     }
 
     /**
-     * gross = base + allowances, bonuses and reimbursements; net = gross −
-     * deductions − tax, never negative.
+     * minutes ÷ 60 × hourly rate × the applicable multiplier, as an
+     * editable earning line (§58.3a).
+     */
+    private function addOvertimeLine(HrPayrollItem $item, HrEmployee $employee, HrSalaryStructure $salary, int $minutes): void
+    {
+        $multiplier = (string) $this->settings->getApplicableSettings($employee)->overtime_rate_multiplier;
+        $hours = bcdiv((string) $minutes, '60', 4);
+        $amount = Money::round(bcmul(bcmul($hours, $this->hourlyRate($employee, $salary), 10), $multiplier, 10), $this->currencies->baseCurrency());
+
+        if (! Money::isPositive($amount)) {
+            return;
+        }
+
+        $line = new HrPayrollItemLine;
+        $line->forceFill([
+            'payroll_item_id' => $item->id,
+            'type' => HrPayrollItemLine::OVERTIME,
+            'label' => mb_substr('Overtime '.rtrim(rtrim($hours, '0'), '.').' h × '.rtrim(rtrim($multiplier, '0'), '.'), 0, 120),
+            'amount' => $amount,
+            'is_percentage' => false,
+        ])->save();
+
+        $this->recalculate($item);
+    }
+
+    /**
+     * gross = base + allowances, bonuses, reimbursements and overtime; net =
+     * gross − deductions − tax, never negative.
      */
     private function recalculate(HrPayrollItem $item): void
     {

@@ -1581,12 +1581,64 @@ GET  /admin/imports/{id}/errors                    (rejected rows: row, field, m
 - **Types:** categories, products, customers, and stock (mode `adjust` or `set`).
 - **Rejected rows:** bad rows are listed and the rest of the file is still applied. If the queue worker restarts mid-file, the import carries on where it stopped and never applies a row twice.
 
+### 22.5 Platform messages in the staff inbox
+
+Platform notices to a store also appear in its staff inbox (`GET /admin/notifications`), not only by email. Examples are trial ending, payment failed, plan limits, support replies and module notices. Every active owner and admin gets their own copy with its own read state. Platform notices carry `"source": "platform"`, and the store's own messages carry `"source": "store"`.
+
+### 22.6 Exchange rates (Open Exchange Rates)
+
+1. Create an account at openexchangerates.org. The Developer plan is enough.
+2. Copy your App ID.
+3. In `.env`, set:
+   ```env
+   FX_PROVIDER=openexchangerates
+   OPENEXCHANGERATES_APP_ID=your-app-id
+   ```
+4. Run `php artisan config:clear`.
+5. Each store with `multi_currency` enabled refreshes its rates daily. To refresh now, call `POST /admin/currencies/refresh-rates`.
+
+Every store shares one response per hour, so adding stores does not use more of your quota. A store can add a safety margin to the rates:
+
+```http
+PATCH /admin/settings   { "exchange_rate_margin_percent": "2" }
+```
+
+Rates entered by hand are never changed.
+
+### 22.7 Platform commission on store sales
+
+Commission is **off** until you turn it on (platform settings `commission_enabled` and `default_commission_rate`). A tenant can also be given its own rate.
+
+- **Which payments count.** Every successful **live** online payment records the commission; refunds reverse their share.
+- **Charging.** On the 1st of each month at 05:00 UTC, the platform charges each store's net commission to the card saved for its subscription, and emails the owner.
+- **Failed charges.** A failed charge is retried the next month and never restricts the store.
+- **Where to see it.** The store owner sees it at `GET /admin/billing/commissions`. Platform admins see `GET /admin/platform-commissions` and can waive a pending row with `POST /admin/platform-commissions/{id}/waive { "reason": "…" }`.
+- **Other currencies.** Commission is charged in the subscription's currency. Commission in any other currency stays pending for an admin to handle.
+
+### 22.8 HR shifts, roster and overtime
+
+```http
+POST /admin/hr/shifts          { "name": "Night", "start_time": "22:00", "end_time": "06:00", "break_minutes": 30 }
+POST /admin/hr/roster/assign   { "employee_ids": [1, 2], "shift_id": 1, "from": "2026-11-02", "to": "2026-11-15", "weekdays": [1,2,3,4,5] }
+GET  /admin/hr/roster?from=2026-11-02&to=2026-11-08
+GET  /admin/hr/my-shifts                       (any staff user: their own schedule)
+PUT  /admin/hr/settings        { "overtime_enabled": true, "overtime_minimum_minutes": 30, "overtime_rate_multiplier": "1.5" }
+GET  /admin/hr/overtime                        (pending overtime to review)
+POST /admin/hr/attendance/{id}/overtime/approve   { "minutes": 45, "note": "Stock count" }
+POST /admin/hr/attendance/{id}/overtime/reject
+```
+
+- **Night shifts:** an end time earlier than the start time means the shift ends the next day. The clock-in and clock-out stay on one attendance row, dated the day the shift started.
+- **Overtime:** it is recorded at clock-out as `pending`. Only approved minutes are paid.
+- **Payroll:** when you generate a payroll run's items, each employee gets an `overtime` line. It is worked out as hours × hourly rate × multiplier. The hourly rate is the salary's `hourly_rate` if set, otherwise the monthly salary ÷ 173.33 hours.
+
 After pulling this change:
 
 ```powershell
-php artisan migrate                 (the landlord platform_exports table)
+php artisan migrate                 (the landlord platform_exports and platform_commissions tables)
 php artisan tenants:migrate
 php artisan tenants:sync-defaults
+php artisan db:seed --class="Database\Seeders\Landlord\NotificationTemplateSeeder"
 php artisan config:clear
 ```
 

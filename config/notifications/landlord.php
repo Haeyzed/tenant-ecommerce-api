@@ -12,7 +12,9 @@ declare(strict_types=1);
 | {{name}}; {{platform_name}} is always available. Seeding inserts missing
 | rows only; resetToDefault() restores an entry.
 |
-| Landlord notifications to tenants use email and sms only (UD-10 interim).
+| Landlord notifications to a tenant can also reach its staff inbox
+| (`database`, UD-10): every active owner and admin gets a row in the
+| tenant database.
 |
 */
 
@@ -24,7 +26,7 @@ $n = static fn (array $audience, array $channels, string $subject, string $body,
     'mandatory' => $mandatory,
 ];
 
-$tenantEmail = ['email' => true, 'sms' => false];
+$toTenant = ['email' => true, 'sms' => false, 'database' => true];
 $staffInbox = ['email' => true, 'database' => true];
 
 return [
@@ -33,14 +35,14 @@ return [
         'Verify your email for {{platform_name}}',
         "Hello {{owner_name}},\n\nYour verification code is {{code}}. It expires in {{expires_in_hours}} hours.\n\nYou can also verify by opening this link: {{verification_url}}\n\nIf you did not sign up, ignore this email.",
         true),
-    'tenant.provisioning_complete' => $n(['tenant'], $tenantEmail,
+    'tenant.provisioning_complete' => $n(['tenant'], $toTenant,
         'Your store {{tenant_name}} is ready',
         "Hello {{owner_name}},\n\nYour store {{tenant_name}} is ready. Sign in to your dashboard at {{admin_url}} with the email you registered.\n\nWelcome to {{platform_name}}."),
-    'tenant.legal_reacceptance_required' => $n(['tenant'], $tenantEmail,
+    'tenant.legal_reacceptance_required' => $n(['tenant'], $toTenant,
         'Please review the updated {{document_title}}',
         "Hello {{owner_name}},\n\nWe have published version {{document_version}} of the {{document_title}}. Please review and accept it from your dashboard to keep full access.",
         true),
-    'tenant.custom_domain_misconfigured' => $n(['tenant'], $tenantEmail,
+    'tenant.custom_domain_misconfigured' => $n(['tenant'], $toTenant,
         'Action needed: {{domain}} is not reaching your store',
         "Hello {{owner_name}},\n\nThe domain {{domain}} has a problem: {{problem}}.\n\nPlease check its DNS records. Your store remains reachable at {{fallback_domain}}.",
         true),
@@ -77,41 +79,48 @@ return [
         "{{count}} live subscription charges failed on {{date}}, totalling {{amount}}.\n\nReview them in the billing dashboard."),
 
     // Subscription
-    'subscription.trial_ending_soon' => $n(['tenant'], $tenantEmail,
+    'subscription.trial_ending_soon' => $n(['tenant'], $toTenant,
         'Your trial ends on {{trial_ends_at}}',
         "Hello {{owner_name}},\n\nYour {{plan_name}} trial ends on {{trial_ends_at}}. Add a payment method from your billing page to keep your store running without interruption."),
-    'subscription.payment_succeeded' => $n(['tenant'], $tenantEmail,
+    'subscription.payment_succeeded' => $n(['tenant'], $toTenant,
         'Payment received: {{amount}}',
         "Hello {{owner_name}},\n\nWe received your payment of {{amount}} for the {{plan_name}} plan. Reference: {{reference}}.\n\nThank you."),
-    'subscription.payment_failed' => $n(['tenant'], $tenantEmail,
+    'subscription.payment_failed' => $n(['tenant'], $toTenant,
         'Payment failed for your {{plan_name}} subscription',
         "Hello {{owner_name}},\n\nWe could not charge {{amount}} for your {{plan_name}} subscription: {{failure_reason}}.\n\nPlease update your payment method from your billing page before {{grace_ends_at}} to avoid restrictions.",
         true),
-    'subscription.renewing_soon' => $n(['tenant'], $tenantEmail,
+    'subscription.renewing_soon' => $n(['tenant'], $toTenant,
         'Your subscription renews on {{renews_at}}',
         "Hello {{owner_name}},\n\nYour {{plan_name}} subscription renews on {{renews_at}} for {{amount}}."),
-    'subscription.renewed' => $n(['tenant'], $tenantEmail,
+    'subscription.renewed' => $n(['tenant'], $toTenant,
         'Your subscription has been renewed',
         "Hello {{owner_name}},\n\nYour {{plan_name}} subscription has been renewed until {{renews_at}}. Amount charged: {{amount}}."),
-    'subscription.cancelled' => $n(['tenant'], $tenantEmail,
+    'subscription.cancelled' => $n(['tenant'], $toTenant,
         'Your subscription has been cancelled',
         "Hello {{owner_name}},\n\nYour {{plan_name}} subscription has been cancelled. Your store stays fully available until {{ends_at}}.\n\nYou can resubscribe from your billing page at any time.",
         true),
-    'subscription.plan_upgraded' => $n(['tenant'], $tenantEmail,
+    'subscription.plan_upgraded' => $n(['tenant'], $toTenant,
         'You are now on {{plan_name}}',
         "Hello {{owner_name}},\n\nYour plan has changed from {{previous_plan_name}} to {{plan_name}}. The new features are available now."),
-    'subscription.plan_downgraded' => $n(['tenant'], $tenantEmail,
+    'subscription.plan_downgraded' => $n(['tenant'], $toTenant,
         'Your plan changes to {{plan_name}} on {{effective_at}}',
         "Hello {{owner_name}},\n\nYour plan will change from {{previous_plan_name}} to {{plan_name}} on {{effective_at}}.\n\nModules that become read-only: {{locked_modules}}.\nLimits your current usage exceeds: {{exceeded_limits}}.\n\nNo data is deleted."),
-    'subscription.plan_limit_approaching' => $n(['tenant'], $tenantEmail,
+    'subscription.plan_limit_approaching' => $n(['tenant'], $toTenant,
         'You have used {{percent}}% of your {{limit_label}}',
         "Hello {{owner_name}},\n\nYour store uses {{used}} of {{limit_value}} {{limit_label}} on the {{plan_name}} plan. Upgrade from your billing page for more room."),
-    'subscription.plan_limit_reached' => $n(['tenant'], $tenantEmail,
+    'subscription.plan_limit_reached' => $n(['tenant'], $toTenant,
         'Limit reached: {{limit_label}}',
         "Hello {{owner_name}},\n\nYour store has reached its limit of {{limit_value}} {{limit_label}}. Creating more is blocked until you upgrade or reduce usage."),
+    'subscription.commission_charged' => $n(['tenant'], $toTenant,
+        'Platform commission charged: {{amount}}',
+        "Hello {{owner_name}},\n\nWe charged {{amount}} to your saved payment method for the platform commission on last month's online sales. Reference: {{reference}}.\n\nThe breakdown by order is on your billing page."),
+    'subscription.commission_charge_failed' => $n(['tenant'], $toTenant,
+        'We could not charge the platform commission of {{amount}}',
+        "Hello {{owner_name}},\n\nWe could not charge {{amount}} for the platform commission on your online sales: {{failure_reason}}.\n\nPlease update your payment method from your billing page. We will try again next month.",
+        true),
 
     // Module notices
-    'module_notice.published' => $n(['tenant'], $tenantEmail,
+    'module_notice.published' => $n(['tenant'], $toTenant,
         '{{notice_title}}',
         "Hello {{owner_name}},\n\n{{notice_message}}\n\nModule: {{module_name}}. From {{starts_at}} to {{ends_at}}."),
 
@@ -130,7 +139,7 @@ return [
         true),
 
     // Platform support
-    'platform_support.reply_received' => $n(['tenant'], $tenantEmail,
+    'platform_support.reply_received' => $n(['tenant'], $toTenant,
         'New reply on "{{subject}}"',
         "Hello {{owner_name}},\n\nThe {{platform_name}} support team replied to your conversation \"{{subject}}\":\n\n{{message_excerpt}}"),
     'platform_support.message_received' => $n(['platform_user'], $staffInbox,

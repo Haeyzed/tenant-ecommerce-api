@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Currency\Models\ExchangeRate;
 use App\Modules\Currency\Services\CurrencyService;
+use App\Modules\Currency\Support\ExchangeRateProvider;
 use App\Modules\Inventory\Models\Warehouse;
 use App\Modules\Inventory\Services\InventoryService;
 use App\Modules\Inventory\Services\WarehouseService;
@@ -16,6 +17,7 @@ use App\Modules\Shipping\Services\ShippingMethodService;
 use App\Modules\Shipping\Services\ShippingZoneService;
 use App\Modules\Users\Models\User;
 use App\Shared\Support\Money;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Notification;
@@ -137,4 +139,28 @@ it('changes the base currency only before the first order, and refreshes rates w
         ->and(ExchangeRate::query()->count())->toBe(0);
     $this->tenantJson('PATCH', "/api/admin/currencies/{$eur['id']}/deactivate", [], $this->auth)->assertStatus(422)->assertJsonPath('meta.error_code', 'currency_is_base');
     expect($gbp['currency_code'])->toBe('GBP');
+});
+
+it('crosses Open Exchange Rates USD rates to the base, adds the store margin and shares one response', function (): void {
+    $this->tenantJson('POST', '/api/admin/currencies', ['currency_code' => 'USD'], $this->auth)->assertCreated();
+    $this->tenantJson('POST', '/api/admin/currencies', ['currency_code' => 'EUR'], $this->auth)->assertCreated();
+    $this->tenantJson('PATCH', '/api/admin/settings', ['exchange_rate_margin_percent' => '2'], $this->auth)->assertOk();
+
+    config(['currency.fx_provider' => 'openexchangerates', 'currency.providers.openexchangerates.app_id' => null]);
+    Cache::store('landlord')->forget(ExchangeRateProvider::OXR_CACHE_KEY);
+    Http::fake(['openexchangerates.org/*' => Http::response(['base' => 'USD', 'rates' => ['USD' => 1, 'NGN' => 1600, 'EUR' => 0.92]])]);
+
+    // Without an app id the provider counts as not configured.
+    $this->tenantJson('POST', '/api/admin/currencies/refresh-rates', [], $this->auth)->assertOk()->assertJsonPath('data.stored', 0);
+
+    config(['currency.providers.openexchangerates.app_id' => 'test-app-id']);
+    $this->tenantJson('POST', '/api/admin/currencies/refresh-rates', [], $this->auth)->assertOk()->assertJsonPath('data.stored', 2);
+    $this->tenantJson('POST', '/api/admin/currencies/refresh-rates', [], $this->auth)->assertOk()->assertJsonPath('data.stored', 2);
+
+    tenancy()->initialize($this->tenant);
+    // 1 NGN = 1/1600 USD and 0.92/1600 EUR, each plus 2 %.
+    $rates = ExchangeRate::query()->pluck('rate', 'target_currency_code')->map(fn ($r): string => (string) $r)->all();
+    expect($rates)->toEqualCanonicalizing(['USD' => '0.000637500000', 'EUR' => '0.000586500000']);
+    Http::assertSentCount(1);
+    Http::assertSent(fn ($request): bool => str_contains($request->url(), 'latest.json') && $request['app_id'] === 'test-app-id');
 });

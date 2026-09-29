@@ -27,7 +27,8 @@ final class HrSettingsController extends Controller
     }
 
     /**
-     * Body: expected_clock_in_time? (HH:MM), expected_clock_out_time?, late_grace_minutes?, early_leave_grace_minutes?
+     * Body: expected_clock_in_time? (HH:MM), expected_clock_out_time?, late_grace_minutes?, early_leave_grace_minutes?,
+     * overtime_enabled?, overtime_minimum_minutes?, overtime_rate_multiplier?, standard_monthly_hours?
      */
     public function update(Request $request): JsonResponse
     {

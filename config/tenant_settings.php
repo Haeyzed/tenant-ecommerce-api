@@ -96,6 +96,8 @@ return [
     'installments_fulfillment_policy' => $s('string', 'on_full_payment', ['required', 'in:on_full_payment,on_first_payment']),
     'installments_default_after_overdue_count' => $s('int', 2, ['required', 'integer', 'min:1', 'max:24']),
     'default_purchase_order_currency' => $s('string', null, ['nullable', 'string', 'size:3']),
+    // Added to provider rates only (UD-19); manual rates are stored as entered.
+    'exchange_rate_margin_percent' => $s('decimal', '0', ['required', 'numeric', 'min:0', 'max:10']),
     'pos_cash_variance_threshold' => $s('decimal', null, ['nullable', 'numeric', 'min:0']),
     'allow_quotation_without_stock' => $s('bool', true, ['required', 'boolean']),
     'default_seller_commission_rate' => $s('decimal', '0', ['required', 'numeric', 'min:0', 'max:100']),

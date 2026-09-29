@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Modules\Affiliates\Jobs\ApproveEligibleAffiliateCommissions;
 use App\Modules\Affiliates\Jobs\GenerateAffiliatePayouts;
+use App\Modules\Billing\Jobs\ChargePlatformCommissions;
 use App\Modules\Billing\Jobs\ProcessSubscriptionRenewal;
 use App\Modules\Dashboard\Jobs\RecordPlatformDailyMetrics;
 use App\Modules\Tenancy\Jobs\DispatchTenantDailyMaintenance;
@@ -28,6 +29,14 @@ Schedule::job(new ProcessSubscriptionRenewal)
     ->onOneServer()
     ->withoutOverlapping()
     ->name('billing:process-renewals');
+
+// The platform commission on tenant sales (D-138), once a month.
+Schedule::job(new ChargePlatformCommissions)
+    ->monthlyOn(1, '05:00')
+    ->timezone('UTC')
+    ->onOneServer()
+    ->withoutOverlapping()
+    ->name('billing:charge-platform-commissions');
 
 Schedule::job(new RunLandlordDailyMaintenance)
     ->dailyAt('02:00')

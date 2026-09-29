@@ -18,10 +18,13 @@ use App\Modules\Hr\Http\Controllers\Tenant\Admin\JobPostingController;
 use App\Modules\Hr\Http\Controllers\Tenant\Admin\LeaveBalanceController;
 use App\Modules\Hr\Http\Controllers\Tenant\Admin\LeaveRequestController;
 use App\Modules\Hr\Http\Controllers\Tenant\Admin\LeaveTypeController;
+use App\Modules\Hr\Http\Controllers\Tenant\Admin\OvertimeController;
 use App\Modules\Hr\Http\Controllers\Tenant\Admin\PayrollItemController;
 use App\Modules\Hr\Http\Controllers\Tenant\Admin\PayrollRunController;
 use App\Modules\Hr\Http\Controllers\Tenant\Admin\PayslipController;
+use App\Modules\Hr\Http\Controllers\Tenant\Admin\RosterController;
 use App\Modules\Hr\Http\Controllers\Tenant\Admin\SalaryController;
+use App\Modules\Hr\Http\Controllers\Tenant\Admin\ShiftController;
 use App\Modules\Hr\Http\Controllers\Tenant\CareerController;
 use Illuminate\Support\Facades\Route;
 
@@ -84,9 +87,22 @@ Route::middleware(['tenant.admin', 'feature:hr', 'module.notice:hr'])->prefix('a
             ->defaults(RoutePermissions::ACTING_PERMISSION, LeaveRequestController::CANCEL)->name('leave-requests.cancel');
         Route::post('appraisals/{appraisal}/acknowledge', [AppraisalController::class, 'acknowledge'])->whereNumber('appraisal')
             ->defaults(RoutePermissions::ACTING_PERMISSION, AppraisalController::ACKNOWLEDGE)->name('appraisals.acknowledge');
+        Route::get('my-shifts', [RosterController::class, 'mine'])->defaults(RoutePermissions::ACTING_PERMISSION, RosterController::VIEW)->name('roster.mine');
     });
     Route::get('attendance/summary', [AttendanceController::class, 'summary'])->name('attendance.summary');
     Route::get('employees/{employee}/attendance', [AttendanceController::class, 'forEmployee'])->whereNumber('employee')->name('employees.attendance');
+
+    // Shifts, the roster and overtime (§58.3a).
+    Route::get('shifts', [ShiftController::class, 'index'])->name('shifts.index');
+    Route::post('shifts', [ShiftController::class, 'store'])->name('shifts.store');
+    Route::patch('shifts/{shift}', [ShiftController::class, 'update'])->whereNumber('shift')->name('shifts.update');
+    Route::delete('shifts/{shift}', [ShiftController::class, 'destroy'])->whereNumber('shift')->name('shifts.destroy');
+    Route::get('roster', [RosterController::class, 'index'])->name('roster.index');
+    Route::post('roster/assign', [RosterController::class, 'assign'])->name('roster.assign');
+    Route::post('roster/unassign', [RosterController::class, 'unassign'])->name('roster.unassign');
+    Route::get('overtime', [OvertimeController::class, 'index'])->name('overtime.index');
+    Route::post('attendance/{attendance}/overtime/approve', [OvertimeController::class, 'approve'])->whereNumber('attendance')->name('overtime.approve');
+    Route::post('attendance/{attendance}/overtime/reject', [OvertimeController::class, 'reject'])->whereNumber('attendance')->name('overtime.reject');
 
     Route::get('leave-types', [LeaveTypeController::class, 'index'])->name('leave-types.index');
     Route::post('leave-types', [LeaveTypeController::class, 'store'])->name('leave-types.store');
