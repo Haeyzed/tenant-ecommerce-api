@@ -32,7 +32,7 @@ Route::middleware(['tenant.admin', 'module.notice:core'])->prefix('admin')->name
     Route::get('customers/{customer}', [CustomerController::class, 'show'])->whereNumber('customer')->name('show');
     Route::patch('customers/{customer}', [CustomerController::class, 'update'])->whereNumber('customer')->name('update');
     Route::post('customers/{customer}/activate', [CustomerController::class, 'activate'])->whereNumber('customer')->name('activate');
-    Route::post('customers/{customer}/deactivate',[CustomerController::class, 'deactivate'])->whereNumber('customer')->name('deactivate');
+    Route::post('customers/{customer}/deactivate', [CustomerController::class, 'deactivate'])->whereNumber('customer')->name('deactivate');
     Route::delete('customers/{customer}', [CustomerController::class, 'destroy'])->whereNumber('customer')->name('destroy');
     Route::post('customers/{customer}/export', [CustomerController::class, 'export'])->whereNumber('customer')->name('export');
     Route::post('customers/{customer}/assign-group', [CustomerController::class, 'assignGroup'])->whereNumber('customer')->name('assign-group');

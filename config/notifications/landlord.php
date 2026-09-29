@@ -46,6 +46,9 @@ return [
         true),
 
     // Platform-internal
+    'platform.export_ready' => $n(['platform_user'], $staffInbox,
+        'Your {{export_type}} export is ready',
+        "Your {{export_type}} export is ready: {{download_url}}\n\nThe link expires on {{expires_at}}."),
     'platform.contact_submission_received' => $n(['platform_user'], $staffInbox,
         'New contact submission from {{name}}',
         "{{name}} ({{email}}) wrote:\n\n{{message}}"),

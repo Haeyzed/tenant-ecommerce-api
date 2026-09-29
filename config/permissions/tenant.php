@@ -47,7 +47,7 @@ return [
             'return-reasons.*', 'customers.*', 'customer-groups.*', 'promotions.*', 'coupons.*', 'flash-sales.*',
             'reviews.*', 'cms.*', 'reports.*', 'dashboard.view', 'exports.*', 'lookups.*', 'product-subscriptions.*', 'ai-assistant.ask',
             'bill-of-materials.*', 'work-orders.*', 'restaurant.*', 'booking-staff.*', 'bookings.*', 'repair-jobs.*',
-            'woocommerce.*', 'social-commerce.*',
+            'woocommerce.*', 'social-commerce.*', 'imports.*',
         ],
         'staff' => [
             'orders.view', 'orders.status', 'orders.invoice', 'orders.packing-slip', 'orders.shipments.*',

@@ -14,6 +14,7 @@ use App\Modules\Currency\Services\CurrencyService;
 use App\Modules\Currency\Support\ExchangeRateProvider;
 use App\Modules\Exports\Services\DataExportService;
 use App\Modules\GiftCards\Jobs\ExpireGiftCards;
+use App\Modules\Imports\Services\DataImportService;
 use App\Modules\Installments\Jobs\ChargeDueInstallments;
 use App\Modules\Installments\Jobs\MarkOverdueInstallments;
 use App\Modules\Integrations\SocialCommerce\Services\SocialCommerceAccountService;
@@ -135,6 +136,7 @@ final class RunTenantDailyMaintenance implements ShouldBeUnique, ShouldQueue
                 }
             });
             $this->task('export_files', static fn () => $exports->expireFiles());
+            $this->task('import_files', static fn () => app(DataImportService::class)->expireFiles());
 
             $this->task('idempotency_keys', fn () => $this->chunkedDelete('idempotency_keys', IdempotencyKey::query()->where('expires_at', '<', now())->toBase()));
             $this->task('webhook_logs', fn () => $this->chunkedDelete('webhook_logs', WebhookLog::on('tenant')

@@ -9,6 +9,7 @@ use App\Modules\Catalog\CatalogServiceProvider;
 use App\Modules\Documents\DocumentsServiceProvider;
 use App\Modules\GiftCards\GiftCardsServiceProvider;
 use App\Modules\Hr\HrServiceProvider;
+use App\Modules\Imports\ImportsServiceProvider;
 use App\Modules\Installments\InstallmentsServiceProvider;
 use App\Modules\Integrations\WooCommerce\WooCommerceServiceProvider;
 use App\Modules\Inventory\InventoryServiceProvider;
@@ -65,5 +66,6 @@ return [
     BookingServiceProvider::class,
     RepairServiceProvider::class,
     WooCommerceServiceProvider::class,
+    ImportsServiceProvider::class,
     ApiDocsServiceProvider::class,
 ];

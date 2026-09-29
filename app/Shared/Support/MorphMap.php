@@ -39,12 +39,14 @@ use App\Modules\Documents\Models\InvoiceTemplate;
 use App\Modules\Expenses\Models\Expense;
 use App\Modules\Expenses\Models\IncomeEntry;
 use App\Modules\Exports\Models\DataExport;
+use App\Modules\Exports\Models\PlatformExport;
 use App\Modules\GiftCards\Models\GiftCard;
 use App\Modules\Hr\Models\HrCandidate;
 use App\Modules\Hr\Models\HrEmployee;
 use App\Modules\Hr\Models\HrEmployeeDocument;
 use App\Modules\Hr\Models\HrLeaveRequest;
 use App\Modules\Hr\Models\HrPayrollRun;
+use App\Modules\Imports\Models\DataImport;
 use App\Modules\Installments\Models\InstallmentPlan;
 use App\Modules\Inventory\Models\StockAdjustment;
 use App\Modules\Inventory\Models\StockTransfer;
@@ -221,6 +223,8 @@ final class MorphMap
         'income_entry' => IncomeEntry::class,
         'storefront_setting' => StorefrontSetting::class,
         'data_export' => DataExport::class,
+        'data_import' => DataImport::class,
+        'platform_export' => PlatformExport::class,
         'custom_field_definition' => CustomFieldDefinition::class,
         'tenant_payment_setting' => TenantPaymentSetting::class,
         'sms_gateway_setting' => SmsGatewaySetting::class,

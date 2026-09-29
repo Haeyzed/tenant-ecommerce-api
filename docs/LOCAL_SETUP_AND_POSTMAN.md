@@ -1540,7 +1540,61 @@ Then restart `php artisan queue:work` and re-import the Postman collection.
 
 ---
 
-## 22. Troubleshooting
+## 22. Social login, bulk actions, imports and exports ➡ you
+
+### 22.1 Sign in with Google or Facebook
+
+Create one OAuth app with each provider for the whole platform. Its redirect URI is a page on your platform frontend (the "relay"). Set these in `.env`, and leave a client id empty to switch that provider off:
+
+```
+GOOGLE_CLIENT_ID=…      GOOGLE_CLIENT_SECRET=…      GOOGLE_REDIRECT_URI=https://app.yourplatform.com/oauth/google
+FACEBOOK_CLIENT_ID=…    FACEBOOK_CLIENT_SECRET=…    FACEBOOK_REDIRECT_URI=https://app.yourplatform.com/oauth/facebook
+```
+
+The storefront flow:
+
+1. `POST /auth/social/google/redirect` returns `authorization_url` and `state`. Send the shopper to `authorization_url`.
+2. Google sends them to the relay page with `code` and `state`. The relay reads the storefront address from the part of `state` before the first dot (base64url) and forwards `code` and `state` to that storefront.
+3. The storefront calls `POST /auth/social/google/callback { "code": "…", "state": "…" }` and receives a token, as with a password login.
+
+- **Existing accounts:** a customer who already has an account is linked only when Google confirms the email. A Facebook email never takes over an existing account; that customer signs in with their password and links Facebook from `/account/social-accounts`.
+- **No password:** a customer who signed up with Google or Facebook can add one with `POST /auth/password/set`.
+
+### 22.2 Bulk actions
+
+`POST /admin/customers/bulk`, `/admin/categories/bulk`, `/admin/orders/bulk`, `/admin/reviews/bulk`, `/admin/products/bulk` and `/admin/coupons/bulk` take `{ "action": "…", "ids": [ … ] }` with at most 100 ids. The answer lists each id as `ok` or `error` with the reason, so one bad record never stops the others.
+
+### 22.3 Exports
+
+`POST /admin/exports { "export_type": "orders", "format": "xlsx", "parameters": { "status": "processing", "from": "2026-10-01" } }`. The types are `customers`, `products`, `product_variants`, `categories`, `inventory`, `orders`, `order_items`, `order_payments`, `shipments`, `returns`, `coupons` and the reports. The formats are `csv`, `xlsx` (up to 50,000 rows) and `json`. On the platform admin, `POST /admin/exports` offers `tenants`, `subscriptions`, `payment_transactions`, `affiliates` and `affiliate_payouts`.
+
+### 22.4 Imports
+
+```http
+GET  /admin/imports/types                          (what you may import, with the columns)
+GET  /admin/imports/types/products/template        (a CSV with the headings)
+POST /admin/imports     multipart: import_type=products, file=@products.xlsx, mode=upsert
+GET  /admin/imports/{id}                           (status and counts)
+GET  /admin/imports/{id}/errors                    (rejected rows: row, field, message)
+```
+
+- **Types:** categories, products, customers, and stock (mode `adjust` or `set`).
+- **Rejected rows:** bad rows are listed and the rest of the file is still applied. If the queue worker restarts mid-file, the import carries on where it stopped and never applies a row twice.
+
+After pulling this change:
+
+```powershell
+php artisan migrate                 (the landlord platform_exports table)
+php artisan tenants:migrate
+php artisan tenants:sync-defaults
+php artisan config:clear
+```
+
+Then restart `php artisan queue:work`.
+
+---
+
+## 23. Troubleshooting
 
 | Symptom | Cause / fix |
 |---|---|

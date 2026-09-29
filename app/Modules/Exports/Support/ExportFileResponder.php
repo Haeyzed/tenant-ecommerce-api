@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Exports\Support;
 
 use App\Modules\Exports\Models\DataExport;
+use App\Modules\Exports\Models\PlatformExport;
 use App\Shared\Exceptions\ApiException;
 use App\Shared\Media\MediaDisks;
 use Illuminate\Support\Facades\Storage;
@@ -18,7 +19,7 @@ use Throwable;
  */
 final class ExportFileResponder
 {
-    public function respond(DataExport $export): Response
+    public function respond(DataExport|PlatformExport $export): Response
     {
         if (! $export->isDownloadable()) {
             throw new ApiException('export_unavailable', 'This export is not ready or has expired.', 410);

@@ -52,8 +52,9 @@ final class GenerateExport implements ShouldBeUnique, ShouldQueue
         return (string) tenant()?->getTenantKey().':'.$this->exportId;
     }
 
-    public function handle(ExportRegistry $registry, ExportWriter $writer, NotificationDispatchService $notifications): void
+    public function handle(ExportRegistry $registry, NotificationDispatchService $notifications): void
     {
+        $writer = app(ExportWriter::class);
         $export = DataExport::query()->find($this->exportId);
 
         // A retry after completion (or expiry) does nothing twice.

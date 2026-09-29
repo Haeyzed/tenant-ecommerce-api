@@ -12,6 +12,7 @@ use App\Modules\Customers\Support\CustomerPrivacyRegistry;
 use App\Modules\CustomFields\Models\CustomFieldDefinition;
 use App\Modules\CustomFields\Services\CustomFieldService;
 use App\Modules\CustomFields\Support\CustomFieldEntityRegistry;
+use App\Modules\Exports\Support\CoreListExports;
 use App\Modules\Exports\Support\ExportDefinition;
 use App\Modules\Exports\Support\ExportRegistry;
 use App\Modules\Plans\Services\FeatureAccessService;
@@ -53,6 +54,9 @@ final class ModuleServiceProvider extends ServiceProvider
                     ->export(Customer::query()->findOrFail((int) $parameters['customer_id'])),
                 formats: ['json'],
             ));
+
+            // Core-commerce list exports (D-134).
+            CoreListExports::register($registry);
 
             return $registry;
         });

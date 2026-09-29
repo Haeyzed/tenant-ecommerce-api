@@ -9,6 +9,7 @@ use App\Modules\Affiliates\Models\AffiliateReferral;
 use App\Modules\Affiliates\Services\AffiliateAttributionService;
 use App\Modules\Billing\Models\PaymentTransaction;
 use App\Modules\Cms\Services\ContactSubmissionService;
+use App\Modules\Exports\Services\PlatformExportService;
 use App\Modules\Plans\Models\TenantFeature;
 use App\Modules\Plans\Models\TenantLimitOverride;
 use App\Modules\Settings\Services\PlatformSettingsService;
@@ -85,6 +86,7 @@ final class RunLandlordDailyMaintenance implements ShouldBeUnique, ShouldQueue
 
         $this->run('usage_snapshots', fn () => $this->chunkedDelete(TenantUsageSnapshot::query()->where('date', '<', now()->subDays(400)->toDateString())));
 
+        $this->run('platform_export_files', static fn () => app(PlatformExportService::class)->expireFiles());
         $this->run('activity_log', fn () => $this->chunkedDelete(LandlordActivity::query()->where('created_at', '<', now()->subDays(365))));
 
         $this->run('unknown_refunds', static function (): void {

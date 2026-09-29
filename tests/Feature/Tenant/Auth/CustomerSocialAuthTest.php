@@ -7,6 +7,7 @@ use App\Modules\Customers\Models\CustomerSocialAccount;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Testing\TestResponse;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\User as SocialiteUser;
 
@@ -35,7 +36,7 @@ function socialUser(string $provider, string $id, ?string $email, array $raw = [
  *
  * @param  array<string, mixed>  $start
  */
-function socialSignIn(string $provider, string $key = 'a', array $start = []): Illuminate\Testing\TestResponse
+function socialSignIn(string $provider, string $key = 'a', array $start = []): TestResponse
 {
     $state = test()->tenantJson('POST', "/api/auth/social/{$provider}/redirect", $start, [], $key)->assertOk()->json('data.state');
 

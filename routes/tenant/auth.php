@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 use App\Modules\Auth\Http\Controllers\Tenant\CustomerAuthController;
 use App\Modules\Auth\Http\Controllers\Tenant\CustomerSocialAuthController;
-use App\Modules\Customers\Models\CustomerSocialAccount;
 use App\Modules\Auth\Http\Controllers\Tenant\DriverAuthController;
 use App\Modules\Auth\Http\Controllers\Tenant\StaffAuthController;
+use App\Modules\Customers\Models\CustomerSocialAccount;
 use Illuminate\Support\Facades\Route;
 
 /*
