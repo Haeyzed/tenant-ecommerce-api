@@ -12877,6 +12877,7 @@ Migrations in `database/migrations/`, in this order:
 | 14 | Shared CMS migrations (`database/migrations/shared/cms/`): `cms_pages`, `cms_page_sections`, `cms_menus`, `cms_menu_items`, `cms_banners`, `cms_blog_categories`, `cms_blog_posts`, `cms_tags`, `cms_blog_post_tag`, `cms_faq_categories`, `cms_faqs`, `cms_testimonials`, `contact_submissions` | §24 |
 | 14a | `platform_daily_metrics`, `tenant_usage_snapshots` | §22.6 |
 | 15 | `jobs`, `job_batches`, `failed_jobs`; `cache`, `cache_locks` (local database cache driver only) | §72, §74 |
+| 16 | `platform_exports` | §19.4, D-134 |
 
 Version 3.2 adds no tenant table. It adds columns to existing tenant tables, each defined in its owning section: `users.preferences` (§25.1), `tenant_payment_settings.mode` and `credentials_verified_at` (§15.4), `orders.is_test` (§39.1) and `order_payments.mode` (§40.1). They ship as expand-only migrations (§6.8); existing rows receive `mode = live`, `is_test = false`, and existing tenants receive `tenant_settings.payment_mode = live`, so no running store changes behaviour.
 
@@ -12887,23 +12888,23 @@ Migrations in `database/migrations/tenant/`, run in every tenant database, in th
 | # | Group | Tables | Owning section |
 |---|---|---|---|
 | 1 | Framework and packages | `personal_access_tokens`, spatie permission tables (guard `staff`), `notifications`, `activity_log`, `audits`, `media`, `password_reset_tokens`, `customer_password_reset_tokens`, `seller_password_reset_tokens` | §8.1, §10.4 |
-| 2 | Platform infrastructure | `idempotency_keys`, `data_exports`, `webhook_logs` | §70.11, §19.4, §15.6 |
+| 2 | Platform infrastructure | `idempotency_keys`, `data_exports`, `webhook_logs`; later `data_imports`, `data_import_errors` (D-135) | §70.11, §19.4, §15.6 |
 | 3 | Settings | `tenant_settings`, `storefront_settings`, `tenant_payment_settings`, `sms_gateway_settings`, `whatsapp_settings` | §13.4, §13.5, §15.4, §16.3, §16.4 |
 | 3a | Custom fields | `custom_field_definitions`, `custom_field_values` | §23 |
 | 3b | CMS (the shared migrations, also run in every tenant database) | `cms_pages`, `cms_page_sections`, `cms_menus`, `cms_menu_items`, `cms_banners`, `cms_blog_categories`, `cms_blog_posts`, `cms_tags`, `cms_blog_post_tag`, `cms_faq_categories`, `cms_faqs`, `cms_testimonials`, `contact_submissions` | §24 |
 | 4 | Notifications | `notification_templates`, `notification_template_channels`, `notification_preferences`, `push_device_tokens` | §17, §16.5 |
-| 5 | People | `users`, `customer_groups`, `customers`, `addresses` | §25, §26 |
+| 5 | People | `users`, `customer_groups`, `customers`, `addresses`; later `customer_social_accounts` (D-132) | §25, §26 |
 | 6 | Warehouses | `warehouses`, `warehouse_user` | §32.2, §32.3 |
 | 7 | Catalogue | `units_of_measure`, `categories`, `brands`, `products`, `product_categories`, `product_options`, `product_option_values`, `product_variants`, `product_variant_option_values`, `product_bundle_items`, `digital_product_files`, `product_relations`, `product_specifications`, `tags`, `product_tag`, `product_badges`, `product_views`, `product_questions`, `product_answers` | §27 to §29 |
 | 8 | Inventory | `inventory`, `inventory_movements`, `stock_transfers`, `stock_transfer_items`, `stock_adjustments`, `stock_adjustment_items`, `warehouse_product_prices` | §32 to §34 |
 | 9 | Tax and shipping | `tax_rates`, `shipping_zones`, `shipping_zone_regions`, `shipping_methods`, `drivers` | §35, §36 |
-| 10 | Promotions | `promotions`, `promotion_targets`, `coupons`, `flash_sales`, `flash_sale_products` | §37 |
+| 10 | Promotions | `promotions`, `promotion_targets`, `coupons`, `flash_sales`, `flash_sale_products`, `flash_sale_claims` | §37 |
 | 11 | Multi-currency | `tenant_currencies`, `product_prices`, `currency_exchange_rates` | §48 |
 | 12 | Marketplace and agents | `seller_groups`, `sellers`, `sales_agents` | §50, §52 |
-| 13 | POS | `pos_registers`, `pos_sessions`, `pos_settings` | §51 |
+| 13 | POS | `pos_registers`, `pos_sessions`, `pos_settings`, `pos_terminal_charges` (D-108) | §51 |
 | 14 | Restaurant (referenced by orders) | `restaurant_floors`, `restaurant_tables` | §65 |
 | 15 | Cart | `carts`, `cart_items` | §38 |
-| 16 | Orders and fulfilment | `orders`, `order_items`, `order_payments`, `promotion_redemptions`, `shipments`, `shipment_items`, `delivery_assignments`, `digital_download_grants` | §39, §40, §37.5, §36, §28.4 |
+| 16 | Orders and fulfilment | `sequences` (locked counters for order, invoice and document numbers), `orders`, `order_items`, `order_payments`, `promotion_redemptions`, `shipments`, `shipment_items`, `delivery_assignments`, `digital_download_grants` | §39, §40, §37.5, §36, §28.4 |
 | 17 | Returns | `return_reasons`, `order_returns`, `order_return_items` | §41 |
 | 18 | Reviews and wishlist | `product_reviews`, `wishlist_items` | §42 |
 | 19 | Documents | `invoice_templates`, `barcode_settings`, `receipt_printers` | §43 |
@@ -12948,6 +12949,51 @@ These tables have no model ([§73.4](#734-models)):
 | `product_booking_staff` | `Product` ↔ `BookingStaff` | §66 |
 | `project_user` | `Project` ↔ `User` | §63 |
 | `cms_blog_post_tag` | `CmsBlogPost` ↔ `CmsTag` (both databases) | §24.4 |
+
+### 79.4 Route Addenda
+
+Routes that exist in the code but are described only in prose or in Appendix D, listed here so every route appears in a route table. Permissions are derived as usual (§12.4) unless stated.
+
+| Method | URI | Group | Owning section |
+|---|---|---|---|
+| GET | `/api/account/social-accounts` | `tenant.customer` | D-132 |
+| POST | `/api/account/social-accounts/{provider}/redirect` | `tenant.customer` | D-132 |
+| POST | `/api/account/social-accounts/{provider}/callback` | `tenant.customer` | D-132 |
+| DELETE | `/api/account/social-accounts/{provider}` | `tenant.customer` | D-132 |
+| GET | `/api/admin/imports` | `tenant.admin` | D-135 |
+| POST | `/api/admin/imports` | `tenant.admin` | D-135 |
+| GET | `/api/admin/imports/types` | `tenant.admin` | D-135 |
+| GET | `/api/admin/imports/types/{type}/template` | `tenant.admin` | D-135 |
+| GET | `/api/admin/imports/{import}` | `tenant.admin` | D-135 |
+| GET | `/api/admin/imports/{import}/errors` | `tenant.admin` | D-135 |
+| POST | `/api/admin/brands/{brand}/image` | `tenant.admin` | §27, §19.3 |
+| POST | `/api/admin/categories/{category}/image` | `tenant.admin` | §27, §19.3 |
+| POST | `/api/admin/cms/banners/{banner}/image` | `tenant.admin` | §24, §19.3 |
+| POST | `/api/admin/cms/blog-posts/{post}/image` | `tenant.admin` | §24, §19.3 |
+| POST | `/api/admin/cms/pages/{page}/image` | `tenant.admin` | §24, §19.3 |
+| POST | `/api/admin/cms/testimonials/{testimonial}/image` | `tenant.admin` | §24, §19.3 |
+| GET | `/api/admin/hr/applications/{application}/resume` | `tenant.admin` | §58 (private file) |
+| GET | `/api/admin/hr/employees/{employee}/documents/{document}/download` | `tenant.admin` | §58 (private file) |
+| GET | `/api/admin/lookups/{lookup}` | `tenant.admin` | §45 |
+| GET | `/api/lookups/{lookup}` | `tenant.public` | §45 |
+| PATCH | `/api/admin/purchase-returns/{return}/close` | `tenant.admin` | §49 |
+| GET | `/api/admin/supplier-payments/outstanding` | `tenant.admin` | §49 |
+| GET | `/api/admin/suppliers/by-product/{product}` | `tenant.admin` | §49 |
+| GET | `/api/admin/support/conversations/{conversation}/attachments/{attachment}` | `tenant.admin` | §59, D-122 |
+| GET | `/api/support/conversations/{conversation}/attachments/{attachment}` | `tenant.storefront` | §59, D-122 |
+| POST | `/api/broadcasting/auth` | `tenant.storefront` (customers and guests) | §59, D-122 |
+| GET | `/api/seller/product-options`, `/api/seller/units` | `tenant.seller` | §50 |
+| GET, POST | `/api/seller/products/{product}/variants` | `tenant.seller` | §50 |
+| PATCH, DELETE | `/api/seller/products/{product}/variants/{variant}` | `tenant.seller` | §50 |
+| POST | `/api/seller/products/{product}/media` | `tenant.seller` | §50, §30 |
+| POST | `/api/seller/products/{product}/media/reorder` | `tenant.seller` | §50, §30 |
+| POST | `/api/seller/products/{product}/media/{media}/featured` | `tenant.seller` | §50, §30 |
+| DELETE | `/api/seller/products/{product}/media/{media}` | `tenant.seller` | §50, §30 |
+| POST | `/api/seller/products/{product}/bundle-items` | `tenant.seller` | §50, §28 |
+| DELETE | `/api/seller/products/{product}/bundle-items/{item}` | `tenant.seller` | §50, §28 |
+| POST | `/api/seller/products/{product}/digital-files` | `tenant.seller` | §50, §28 |
+| DELETE | `/api/seller/products/{product}/digital-files/{file}` | `tenant.seller` | §50, §28 |
+| PUT | `/api/seller/products/{product}/specifications` | `tenant.seller` | §50, §27 |
 
 ---
 

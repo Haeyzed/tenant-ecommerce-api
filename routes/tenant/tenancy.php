@@ -3,7 +3,16 @@
 declare(strict_types=1);
 
 use App\Modules\Tenancy\Http\Controllers\Tenant\Admin\DomainController;
+use App\Modules\Tenancy\Http\Controllers\Tenant\Admin\OnboardingController;
 use Illuminate\Support\Facades\Route;
+
+/*
+| The onboarding checklist (spec §9.6): any staff user, no permission.
+*/
+
+Route::middleware('tenant.admin')->withoutMiddleware('permission.derived')->prefix('admin')->name('tenant.onboarding.')->group(function (): void {
+    Route::get('onboarding', [OnboardingController::class, 'show'])->name('show');
+});
 
 /*
 | The tenant's domains (spec §7.5). Always available.

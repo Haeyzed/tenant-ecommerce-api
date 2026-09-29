@@ -21,7 +21,7 @@ it('has a consistent module registry: known requirements, no cycles, valid lifec
 
 it('has a code module folder for every registry key', function (): void {
     expect(app(ModuleRegistry::class)->problems())->toBe([]);
-})->skip('Optional module folders are created as build steps 17-28 are implemented.');
+});
 
 it('has a consistent notification catalog', function (): void {
     expect(app(NotificationCatalog::class)->problems())->toBe([]);

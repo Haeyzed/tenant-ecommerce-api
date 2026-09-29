@@ -170,6 +170,7 @@ it('exports a report as CSV and PDF through the export mechanism', function (): 
 
     // The report's own permission is required, whichever route asks.
     $this->tenantJson('POST', '/api/admin/exports', ['export_type' => 'report:profit-loss', 'format' => 'csv', 'parameters' => []], $this->clerkAuth)->assertForbidden();
-    $this->tenantJson('POST', '/api/admin/reports/profit-loss/export', ['format' => 'xlsx'], $this->staff)->assertStatus(422);
+    // Reports export as CSV, XLSX or PDF (D-134); JSON is not offered.
+    $this->tenantJson('POST', '/api/admin/reports/profit-loss/export', ['format' => 'json'], $this->staff)->assertStatus(422);
     expect(DB::connection('tenant')->table('data_exports')->count())->toBe(2);
 });
