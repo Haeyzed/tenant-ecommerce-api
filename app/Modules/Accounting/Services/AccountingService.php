@@ -18,6 +18,8 @@ use App\Modules\Expenses\Models\Expense;
 use App\Modules\Expenses\Models\IncomeEntry;
 use App\Modules\Inventory\Models\StockAdjustment;
 use App\Modules\Inventory\Models\StockAdjustmentItem;
+use App\Modules\Marketplace\Models\SellerLedgerEntry;
+use App\Modules\Marketplace\Models\SellerPayout;
 use App\Modules\Notifications\Services\NotificationDispatchService;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Models\OrderItem;
@@ -164,6 +166,9 @@ final class AccountingService
             'postPurchaseOrderReceived' => $this->postPurchaseOrderReceived($record, $request, $date),
             'postSupplierPayment' => $this->postSupplierPayment($record, $request, $date),
             'postPurchaseReturn' => $this->postPurchaseReturn($record, $request, $date),
+            'postSellerCommission' => $this->postSellerCommission($record, $request, $date),
+            'postSellerReversal' => $this->postSellerReversal($record, $request, $date),
+            'postSellerPayout' => $this->postSellerPayout($record, $request, $date),
             default => throw new PostingException("Unknown posting method [{$request->method}]."),
         };
     }
@@ -462,6 +467,76 @@ final class AccountingService
         return $this->write($request, $date, 'Purchase return '.$return->number(), $return, [
             [$this->system('accounts_payable'), JournalEntryLine::DEBIT, $value, null],
             [$this->system('inventory_asset'), JournalEntryLine::CREDIT, $value, null],
+        ]);
+    }
+
+    /**
+     * §50.5: the seller lines of a confirmed order move out of Sales
+     * Revenue: the tenant's cut to Commission Revenue, the seller's net to
+     * Accounts Payable – Sellers. Ledger amounts are already in the base
+     * currency.
+     */
+    private function postSellerCommission(Model $order, AccountingPostingRequest $request, Carbon $date): ?JournalEntry
+    {
+        if (! $order instanceof Order) {
+            return null;
+        }
+
+        $row = SellerLedgerEntry::query()->where('order_id', $order->id)->where('entry_type', SellerLedgerEntry::SALE)
+            ->selectRaw('COALESCE(SUM(gross_amount), 0) as gross, COALESCE(SUM(commission_amount), 0) as commission, COALESCE(SUM(net_payable), 0) as net')->toBase()->first();
+        $gross = Money::normalize((string) $row->gross);
+
+        if (! Money::isPositive($gross)) {
+            return null;
+        }
+
+        return $this->write($request, $date, 'Seller share of order '.$order->order_number, $order, array_values(array_filter([
+            [$this->system('sales_revenue'), JournalEntryLine::DEBIT, $gross, null],
+            Money::isPositive(Money::normalize((string) $row->commission)) ? [$this->system('commission_revenue'), JournalEntryLine::CREDIT, Money::normalize((string) $row->commission), null] : null,
+            Money::isPositive(Money::normalize((string) $row->net)) ? [$this->system('accounts_payable_sellers'), JournalEntryLine::CREDIT, Money::normalize((string) $row->net), null] : null,
+        ])));
+    }
+
+    /**
+     * A seller reversal undoes its share of that reclassification: Dr
+     * Accounts Payable – Sellers and Commission Revenue, Cr Sales Revenue.
+     */
+    private function postSellerReversal(Model $order, AccountingPostingRequest $request, Carbon $date): ?JournalEntry
+    {
+        if (! $order instanceof Order) {
+            return null;
+        }
+
+        $payload = (array) $request->payload;
+        $gross = Money::normalize((string) ($payload['gross'] ?? '0'));
+        $commission = Money::normalize((string) ($payload['commission'] ?? '0'));
+        $net = Money::normalize((string) ($payload['net'] ?? '0'));
+
+        if (! Money::isPositive($gross)) {
+            return null;
+        }
+
+        return $this->write($request, $date, 'Seller share reversed, order '.$order->order_number, $order, array_values(array_filter([
+            Money::isPositive($net) ? [$this->system('accounts_payable_sellers'), JournalEntryLine::DEBIT, $net, null] : null,
+            Money::isPositive($commission) ? [$this->system('commission_revenue'), JournalEntryLine::DEBIT, $commission, null] : null,
+            [$this->system('sales_revenue'), JournalEntryLine::CREDIT, $gross, null],
+        ])));
+    }
+
+    /**
+     * §50.5 markPaid(): Dr Accounts Payable – Sellers, Cr Cash/Bank.
+     */
+    private function postSellerPayout(Model $payout, AccountingPostingRequest $request, Carbon $date): ?JournalEntry
+    {
+        if (! $payout instanceof SellerPayout || ! Money::isPositive((string) $payout->net_payable)) {
+            return null;
+        }
+
+        $net = Money::normalize((string) $payout->net_payable);
+
+        return $this->write($request, $date, 'Seller payout'.($payout->reference === null ? '' : ' '.$payout->reference), $payout, [
+            [$this->system('accounts_payable_sellers'), JournalEntryLine::DEBIT, $net, null],
+            [$this->system('cash_bank'), JournalEntryLine::CREDIT, $net, null],
         ]);
     }
 

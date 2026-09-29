@@ -19,6 +19,8 @@ use App\Modules\Orders\Models\Order;
 use App\Modules\Payments\Models\OrderPayment;
 use App\Modules\Plans\Models\Plan;
 use App\Modules\Plans\Support\ModuleRegistry;
+use App\Modules\Pos\Models\PosRegister;
+use App\Modules\Pos\Services\PosSettingsService;
 use App\Modules\Promotions\Models\Promotion;
 use App\Modules\Promotions\Models\PromotionTarget;
 use App\Modules\Returns\Models\OrderReturn;
@@ -73,6 +75,10 @@ final readonly class LookupRegistry
         'fiscal-periods' => 'accounting',
         'approval-workflow-modules' => 'approval_workflows',
         'approval-request-statuses' => 'approval_workflows',
+        'seller-groups' => 'marketplace',
+        'suppliers' => 'purchasing',
+        'pos-terminal-providers' => 'pos',
+        'pos-payment-methods' => 'pos',
     ];
 
     public function feature(string $context, string $key): ?string
@@ -270,6 +276,16 @@ final readonly class LookupRegistry
                     array_values(ApprovalWorkflowService::registry()),
                 ),
                 'approval-request-statuses' => static fn (): array => self::enum(ApprovalRequest::STATUSES),
+                'seller-groups' => static fn (): array => DB::connection('tenant')->table('seller_groups')->orderBy('name')->get(['id', 'name', 'default_commission_rate'])
+                    ->map(static fn ($g): array => ['value' => (int) $g->id, 'label' => $g->name, 'meta' => [
+                        'default_commission_rate' => $g->default_commission_rate === null ? null : bcadd((string) $g->default_commission_rate, '0', 4),
+                    ]])->all(),
+                'suppliers' => static fn (): array => DB::connection('tenant')->table('suppliers')->whereNull('deleted_at')->where('is_active', true)->orderBy('name')
+                    ->get(['id', 'name', 'email'])
+                    ->map(static fn ($s): array => ['value' => (int) $s->id, 'label' => $s->name, 'meta' => ['email' => $s->email]])
+                    ->all(),
+                'pos-terminal-providers' => static fn (): array => self::enum(PosRegister::TERMINAL_PROVIDERS),
+                'pos-payment-methods' => static fn (): array => self::enum(app(PosSettingsService::class)->getSettings()->enabled_payment_methods),
                 'fiscal-periods' => fn (Request $r): array => FiscalPeriod::query()->where('fiscal_year_id', $this->requiredId($r, 'fiscal_year_id'))->orderBy('starts_on')->get()
                     ->map(static fn (FiscalPeriod $p): array => ['value' => $p->id, 'label' => $p->name, 'meta' => ['status' => $p->status, 'starts_on' => $p->starts_on->toDateString(), 'ends_on' => $p->ends_on->toDateString()]])
                     ->all(),

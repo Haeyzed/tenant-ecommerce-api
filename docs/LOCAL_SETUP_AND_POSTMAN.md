@@ -1037,7 +1037,125 @@ php artisan tenants:sync-defaults
 
 ---
 
-## 15. Troubleshooting
+## 15. Sales quotations (quotes before ordering) ➡ you
+
+Sales quotations are included from the **Standard** plan. They are for bulk or negotiated prices: the customer asks for a price, the store sends a quote, and an accepted quote becomes a normal order.
+
+```http
+POST /admin/modules/sales_quotations/enable
+PATCH /admin/settings   { "allow_quotation_without_stock": false }    (optional: refuse to quote items that are out of stock)
+```
+
+**Customer side** (customer token):
+
+```http
+POST /quotation-requests                  { "items": [{ "product_id": 7, "quantity": 10 }], "notes": "Bulk for our team", "sales_agent_code": "BOLAX7K2" }
+GET  /quotation-requests                  (includes each quote once it has been sent)
+POST /quotation-requests/{id}/accept      { "address_id": 3 }       (optional: the address used for tax; default is their default address)
+POST /quotation-requests/{id}/reject
+```
+
+**Store side:**
+
+```http
+POST /admin/sales-quotation-requests                  { "customer_id": 5, "items": [...], "sales_agent_id": 3, "draft": true }   (phone or walk-in enquiries; customer_id is optional)
+POST /admin/sales-quotation-requests/{id}/send        { "items": [{ "request_item_id": 11, "unit_price": "35000", "discount_amount": "5000" }], "valid_until": "2026-10-31" }
+POST /admin/sales-quotation-requests/{id}/cancel      (before a quote is sent)
+POST /admin/sales-quotations/{id}/accept              (on the customer's behalf)
+POST /admin/sales-quotations/{id}/reject
+GET  /admin/dashboard/sales_quotations?range=this_month
+```
+
+- **Sending a quote.** Price every requested line. The quote gets a number like `SQ-000001`, and the customer receives the "quotation sent" email with a link to `/account/quotations/{id}` on the storefront.
+- **Accepting a quote** creates a **pending** order:
+  - it uses the quoted prices and discounts, with no promotions on top;
+  - tax is worked out on the customer's address, and there's no shipping charge;
+  - stock is reserved, and the sales agent is credited;
+  - the order doesn't expire unpaid. The customer pays the normal way, or you record a bank transfer in the admin.
+- **Expiry.** A quote past its `valid_until` date can't be accepted, and it expires overnight.
+
+After pulling this step:
+
+```powershell
+php artisan tenants:migrate
+php artisan tenants:sync-defaults
+```
+
+---
+
+## 16. Marketplace: other sellers on your store ➡ you
+
+The marketplace needs the **Premium** plan (up to 100 approved sellers). Sellers list products under your storefront. **You** hold their stock in your warehouses and ship their orders; they get paid their share minus your commission.
+
+```http
+POST /admin/modules/marketplace/enable
+PATCH /admin/settings   { "default_seller_commission_rate": "10", "seller_product_approval_required": true, "seller_payout_hold_days": 14 }
+```
+
+### 16.1 Seller sign-up and approval
+
+```http
+POST /seller/auth/register    { "business_name": "Ade Crafts", "email": "…", "password": "…", "password_confirmation": "…" }   (seller, no token yet)
+GET  /admin/sellers?status=pending
+POST /admin/sellers/{id}/approve          (or /reject { "reason": "…" }, /suspend)
+POST /seller/auth/login                   (only approved sellers)
+```
+
+- **Commission rates.** Set a better rate for a set of sellers with a group: `POST /admin/seller-groups { "name": "Verified", "default_commission_rate": "8" }`, then `POST /admin/sellers/{id}/assign-group`.
+- **One seller's own rate** takes priority: `PATCH /admin/sellers/{id}/commission-rate`.
+- **Suspending a seller** signs them out and takes their products off sale.
+- **Approval workflow (optional).** To have a second person approve new sellers, create an approval workflow with `module_key: seller_application`.
+
+### 16.2 What a seller does (seller token)
+
+```http
+GET/PATCH /seller/profile                 (shows their rate, group and balance)
+POST      /seller/products                { "name": "Woven Basket", "price": "10000", "is_active": true }
+GET       /seller/orders                  (their lines only; no customer details)
+GET       /seller/ledger, /seller/payouts
+POST      /seller/product-questions/{id}/answers { "answer": "…" }
+```
+
+- **Any product type.** Sellers can list simple, variable (sizes, colours), digital and bundle products, and manage them as your staff do:
+
+  ```http
+  POST /seller/products                              { "product_type": "variable", "name": "Adire Shirt", "price": "15000" }
+  GET  /seller/product-options                       (your store's options; sellers can't change them)
+  POST /seller/products/{id}/variants                { "sku": "ADIRE-S", "price": "15000", "option_value_ids": [3] }
+  POST /seller/products/{id}/media                   (image upload)
+  POST /seller/products/{id}/digital-files           (file upload, digital products)
+  POST /seller/products/{id}/bundle-items            { "child_product_id": 12, "quantity": 1 }   (their own products only)
+  PUT  /seller/products/{id}/specifications
+  ```
+- **What sellers can't set:** warehouse pricing, their seller id, bookable, subscribable, or sales-channel options. Badges and related products stay with your staff.
+- **New products wait for approval.** With `seller_product_approval_required` on, a new product is hidden until you approve it: `GET /admin/seller-products`, then `POST /admin/seller-products/{id}/approve` or `/reject { "moderation_note": "…" }`.
+- **Stock is yours to manage.** Receive the seller's goods into a warehouse as normal stock (stock adjustment or purchase order).
+
+### 16.3 Earnings and payouts
+
+- **Earnings.** For each sale of a seller's product, the seller earns the line amount (before tax, minus any seller-funded discount) minus your commission.
+- **When they become payable.** Earnings can be paid once the order is complete and `seller_payout_hold_days` has passed. If that isn't set, your return window applies.
+- **Refunds, returns, cancellations and chargebacks** take back the seller's share automatically. The same money is never taken back twice.
+- **Paying a seller.** Pay outside the platform (bank transfer), then:
+
+  ```http
+  POST /admin/sellers/{id}/payouts              { "from": "2026-10-01", "to": "2026-10-31", "preview": true }   (totals only)
+  POST /admin/sellers/{id}/payouts              { "from": "2026-10-01", "to": "2026-10-31" }
+  POST /admin/sellers/{id}/payouts/{payout}/mark-paid   { "reference": "TRF-501" }   (Idempotency-Key header)
+  GET  /admin/dashboard/marketplace?range=this_month
+  ```
+- **With accounting on,** the seller's share moves from sales revenue into commission revenue and "payable to sellers", and marking a payout paid clears the payable.
+
+After pulling this step:
+
+```powershell
+php artisan tenants:migrate
+php artisan tenants:sync-defaults
+```
+
+---
+
+## 17. Troubleshooting
 
 | Symptom | Cause / fix |
 |---|---|

@@ -46,6 +46,8 @@ use App\Modules\Inventory\Models\Warehouse;
 use App\Modules\Inventory\Models\WarehouseProductPrice;
 use App\Modules\Legal\Models\LegalDocument;
 use App\Modules\Marketplace\Models\Seller;
+use App\Modules\Marketplace\Models\SellerGroup;
+use App\Modules\Marketplace\Models\SellerPayout;
 use App\Modules\Messaging\Models\SmsGatewaySetting;
 use App\Modules\Messaging\Models\WhatsAppSetting;
 use App\Modules\ModuleNotices\Models\ModuleNotice;
@@ -62,7 +64,6 @@ use App\Modules\PlatformSupport\Models\PlatformSupportMessageAttachment;
 use App\Modules\Pos\Models\PosRegister;
 use App\Modules\Pos\Models\PosSession;
 use App\Modules\Pos\Models\PosSettings;
-use App\Modules\SalesAgents\Models\SalesAgent;
 use App\Modules\Promotions\Models\Coupon;
 use App\Modules\Promotions\Models\FlashSale;
 use App\Modules\Promotions\Models\Promotion;
@@ -73,6 +74,9 @@ use App\Modules\Purchasing\Models\SupplierPayment;
 use App\Modules\Returns\Models\OrderReturn;
 use App\Modules\Reviews\Models\ProductReview;
 use App\Modules\RewardPoints\Models\RewardPointSettings;
+use App\Modules\SalesAgents\Models\SalesAgent;
+use App\Modules\SalesQuotations\Models\SalesQuotation;
+use App\Modules\SalesQuotations\Models\SalesQuotationRequest;
 use App\Modules\Settings\Models\PlatformSetting;
 use App\Modules\Settings\Models\StorefrontSetting;
 use App\Modules\Settings\Models\TenantPlatformSetting;
@@ -163,12 +167,16 @@ final class MorphMap
         'pos_session' => PosSession::class,
         'pos_settings' => PosSettings::class,
         'sales_agent' => SalesAgent::class,
+        'sales_quotation' => SalesQuotation::class,
+        'sales_quotation_request' => SalesQuotationRequest::class,
         'supplier' => Supplier::class,
         'purchase_order' => PurchaseOrder::class,
         'purchase_return' => PurchaseReturn::class,
         'supplier_payment' => SupplierPayment::class,
         'product_price' => ProductPrice::class,
         'seller' => Seller::class,
+        'seller_group' => SellerGroup::class,
+        'seller_payout' => SellerPayout::class,
         'driver' => Driver::class,
         'shipping_zone' => ShippingZone::class,
         'shipping_method' => ShippingMethod::class,

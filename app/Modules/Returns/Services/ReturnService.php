@@ -12,6 +12,7 @@ use App\Modules\Catalog\Models\ProductVariant;
 use App\Modules\Checkout\Services\CheckoutService;
 use App\Modules\Customers\Models\Customer;
 use App\Modules\Inventory\Services\InventoryService;
+use App\Modules\Marketplace\Services\SellerLedgerService;
 use App\Modules\Notifications\Services\NotificationDispatchService;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Models\OrderItem;
@@ -315,6 +316,8 @@ final readonly class ReturnService implements Approvable
 
             $this->restock($locked);
             $locked->forceFill(['status' => OrderReturn::REFUNDED, 'resolved_at' => now()])->save();
+            // The sellers' share of the refunded lines (§50.4).
+            app(SellerLedgerService::class)->recordReturnRefund($locked);
 
             return true;
         });

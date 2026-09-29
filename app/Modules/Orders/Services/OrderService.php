@@ -502,6 +502,27 @@ final readonly class OrderService
     }
 
     /**
+     * A marketplace seller's view (§50.3): confirmed, non-test orders with
+     * at least one of its lines, each with only its lines. The store
+     * fulfils (UD-20), so no customer details are included.
+     *
+     * @param  array{status?: string, from?: string, to?: string, per_page?: int}  $filters
+     * @return LengthAwarePaginator<int, Order>
+     */
+    public function getOrderItemsForSeller(int $sellerId, array $filters = []): LengthAwarePaginator
+    {
+        return Order::query()
+            ->with(['items' => static fn ($q) => $q->where('seller_id', $sellerId)])
+            ->whereHas('items', static fn ($q) => $q->where('seller_id', $sellerId))
+            ->whereNotNull('confirmed_at')->where('is_test', false)
+            ->when(isset($filters['status']), static fn ($q) => $q->where('status', $filters['status']))
+            ->when(isset($filters['from']), static fn ($q) => $q->whereDate('placed_at', '>=', $filters['from']))
+            ->when(isset($filters['to']), static fn ($q) => $q->whereDate('placed_at', '<=', $filters['to']))
+            ->orderByDesc('placed_at')->orderByDesc('id')
+            ->paginate((int) ($filters['per_page'] ?? 25));
+    }
+
+    /**
      * A POS void (§51.3): the sale is undone. The caller has already
      * refunded every payment except gift cards (provider calls stay outside
      * this transaction). Here stock returns (pos_void), the sale and its
@@ -653,6 +674,7 @@ final readonly class OrderService
             ->when($filters['customer_id'] ?? null, static fn (Builder $q, $v) => $q->where('customer_id', $v))
             ->when($filters['warehouse_id'] ?? null, static fn (Builder $q, $v) => $q->whereHas('items', static fn (Builder $i) => $i->where('warehouse_id', $v)))
             ->when($filters['promotion_id'] ?? null, static fn (Builder $q, $v) => $q->whereHas('redemptions', static fn (Builder $r) => $r->where('promotion_id', $v)))
+            ->when($filters['seller_id'] ?? null, static fn (Builder $q, $v) => $q->whereHas('items', static fn (Builder $i) => $i->where('seller_id', $v)))
             ->when(array_key_exists('is_test', $filters), static fn (Builder $q) => $q->where('is_test', (bool) $filters['is_test']))
             ->when($filters['from'] ?? null, static fn (Builder $q, $v) => $q->where('placed_at', '>=', $v))
             ->when($filters['to'] ?? null, static fn (Builder $q, $v) => $q->where('placed_at', '<=', $v))

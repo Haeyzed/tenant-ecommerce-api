@@ -128,6 +128,11 @@ it('buys stock: supplier, draft order with supplier costs, submit, partial and f
     // The product picker shows on-hand stock.
     $this->tenantJson('GET', '/api/admin/purchase-orders/product-lookup?q=Run', [], $this->auth)->assertOk()
         ->assertJsonPath('data.0.sku', 'RUN-1')->assertJsonPath('data.0.on_hand', '10.000');
+
+    // The purchasing dashboard section: received today, owed, and the top supplier.
+    $section = $this->tenantJson('GET', '/api/admin/dashboard/purchasing?range=today&compare=none', [], $this->auth)->assertOk()->json('data');
+    expect(collect($section['kpis'])->pluck('value', 'key')->all())->toMatchArray(['open_purchase_orders' => 0, 'received_value' => '200000.0000', 'supplier_balance' => '200000.0000'])
+        ->and($section['tables'][0]['rows'][0])->toMatchArray(['name' => 'Lagos Leather', 'orders' => 1, 'spend' => '200000.0000']);
 });
 
 it('pays suppliers, keeps order and supplier balances, and returns stock with a refund', function (): void {

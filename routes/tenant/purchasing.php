@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Modules\Dashboard\Http\Controllers\Tenant\Admin\ResourceMetricsController;
 use App\Modules\Purchasing\Http\Controllers\Tenant\Admin\PurchaseOrderController;
 use App\Modules\Purchasing\Http\Controllers\Tenant\Admin\PurchaseReturnController;
 use App\Modules\Purchasing\Http\Controllers\Tenant\Admin\PurchaseReturnReasonController;
@@ -40,6 +41,7 @@ Route::middleware(['tenant.admin', 'feature:purchasing', 'module.notice:purchasi
     Route::get('purchase-orders', [PurchaseOrderController::class, 'index'])->name('purchase-orders.index');
     Route::post('purchase-orders', [PurchaseOrderController::class, 'store'])->name('purchase-orders.store');
     Route::get('purchase-orders/product-lookup', [PurchaseOrderController::class, 'lookupProducts'])->name('purchase-orders.product-lookup');
+    Route::get('purchase-orders/metrics', [ResourceMetricsController::class, 'metrics'])->defaults('metrics_resource', 'purchase-orders')->name('purchase-orders.metrics');
     Route::prefix('purchase-orders/{order}')->whereNumber('order')->name('purchase-orders.')->group(function (): void {
         Route::get('/', [PurchaseOrderController::class, 'show'])->name('show');
         Route::patch('/', [PurchaseOrderController::class, 'update'])->name('update');

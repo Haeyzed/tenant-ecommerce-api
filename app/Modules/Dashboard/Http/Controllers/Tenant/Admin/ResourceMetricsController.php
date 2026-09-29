@@ -9,7 +9,11 @@ use App\Modules\Catalog\Metrics\CatalogMetrics;
 use App\Modules\Customers\Metrics\CustomerMetrics;
 use App\Modules\Dashboard\Services\Tenant\TenantDashboardService;
 use App\Modules\Expenses\Metrics\ExpenseMetrics;
+use App\Modules\GiftCards\Metrics\GiftCardMetrics;
 use App\Modules\Inventory\Metrics\InventoryMetrics;
+use App\Modules\Marketplace\Metrics\MarketplaceMetrics;
+use App\Modules\Purchasing\Metrics\PurchasingMetrics;
+use App\Modules\SalesQuotations\Metrics\SalesQuotationMetrics;
 use App\Modules\Orders\Metrics\OrderMetrics;
 use App\Modules\Payments\Metrics\PaymentMetrics;
 use App\Modules\Promotions\Metrics\PromotionMetrics;
@@ -52,6 +56,10 @@ final class ResourceMetricsController extends Controller
     /** Strips of optional modules; each module registers its route behind its feature. */
     private const array MODULE_STRIPS = [
         'expenses' => [ExpenseMetrics::class, 'contextual'],
+        'purchase-orders' => [PurchasingMetrics::class, 'contextual'],
+        'gift-cards' => [GiftCardMetrics::class, 'contextual'],
+        'sellers' => [MarketplaceMetrics::class, 'sellersStrip'],
+        'sales-quotation-requests' => [SalesQuotationMetrics::class, 'contextual'],
     ];
 
     public function metrics(MetricsRangeRequest $request, TenantDashboardService $dashboard, Container $container): JsonResponse

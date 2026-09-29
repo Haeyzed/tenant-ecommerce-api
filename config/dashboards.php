@@ -12,13 +12,19 @@ use App\Modules\Catalog\Metrics\CatalogMetrics;
 use App\Modules\Customers\Metrics\CustomerMetrics;
 use App\Modules\Dashboard\Metrics\OperationsMetrics;
 use App\Modules\Expenses\Metrics\ExpenseMetrics;
+use App\Modules\GiftCards\Metrics\GiftCardMetrics;
 use App\Modules\Inventory\Metrics\InventoryMetrics;
+use App\Modules\Marketplace\Metrics\MarketplaceMetrics;
 use App\Modules\Orders\Metrics\OrderMetrics;
 use App\Modules\Orders\Metrics\SalesMetrics;
 use App\Modules\Payments\Metrics\PaymentMetrics as TenantPaymentMetrics;
+use App\Modules\Pos\Metrics\PosMetrics;
 use App\Modules\Promotions\Metrics\PromotionMetrics;
+use App\Modules\Purchasing\Metrics\PurchasingMetrics;
 use App\Modules\Returns\Metrics\ReturnMetrics;
+use App\Modules\RewardPoints\Metrics\RewardPointMetrics;
 use App\Modules\SalesAgents\Metrics\SalesAgentMetrics;
+use App\Modules\SalesQuotations\Metrics\SalesQuotationMetrics;
 use App\Modules\Tenancy\Metrics\TenantMetrics;
 
 /*
@@ -199,6 +205,48 @@ return [
             'feature' => 'expenses',
             'permission' => 'expenses.view',
             'parts' => [[ExpenseMetrics::class, 'expenses']],
+            'alerts' => [],
+        ],
+        'pos' => [
+            'label' => 'Point of sale',
+            'feature' => 'pos',
+            'permission' => 'pos.sessions.view',
+            'parts' => [[PosMetrics::class, 'pos']],
+            'alerts' => [[PosMetrics::class, 'alerts']],
+        ],
+        'purchasing' => [
+            'label' => 'Purchasing',
+            'feature' => 'purchasing',
+            'permission' => 'purchase-orders.view',
+            'parts' => [[PurchasingMetrics::class, 'purchasing']],
+            'alerts' => [],
+        ],
+        'gift_cards' => [
+            'label' => 'Gift cards',
+            'feature' => 'gift_cards',
+            'permission' => 'gift-cards.view',
+            'parts' => [[GiftCardMetrics::class, 'giftCards']],
+            'alerts' => [],
+        ],
+        'reward_points' => [
+            'label' => 'Reward points',
+            'feature' => 'reward_points',
+            'permission' => 'reward-points.settings',
+            'parts' => [[RewardPointMetrics::class, 'rewardPoints']],
+            'alerts' => [],
+        ],
+        'marketplace' => [
+            'label' => 'Marketplace',
+            'feature' => 'marketplace',
+            'permission' => 'sellers.view',
+            'parts' => [[MarketplaceMetrics::class, 'marketplace']],
+            'alerts' => [],
+        ],
+        'sales_quotations' => [
+            'label' => 'Sales quotations',
+            'feature' => 'sales_quotations',
+            'permission' => 'sales-quotation-requests.view',
+            'parts' => [[SalesQuotationMetrics::class, 'salesQuotations']],
             'alerts' => [],
         ],
         'sales_agents' => [

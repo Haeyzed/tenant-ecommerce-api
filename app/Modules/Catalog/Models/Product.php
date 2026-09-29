@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Catalog\Models;
 
+use App\Modules\Marketplace\Models\Seller;
+use App\Modules\Marketplace\Support\MarketplaceGate;
 use App\Shared\Media\MediaDisks;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -148,6 +150,17 @@ class Product extends Model implements AuditableContract, HasMedia
     }
 
     /**
+     * The marketplace seller that lists it (§50.3); also the seller
+     * notification audience.
+     *
+     * @return BelongsTo<Seller, $this>
+     */
+    public function seller(): BelongsTo
+    {
+        return $this->belongsTo(Seller::class)->withTrashed();
+    }
+
+    /**
      * @return BelongsTo<UnitOfMeasure, $this>
      */
     public function unit(): BelongsTo
@@ -221,12 +234,14 @@ class Product extends Model implements AuditableContract, HasMedia
 
     /**
      * Published and visible on the storefront (moderation must allow it).
+     * Seller products are hidden while the marketplace is not enabled.
      *
      * @param  Builder<self>  $query
      */
     public function scopeVisible(Builder $query): void
     {
-        $query->where('products.is_active', true)->whereIn('products.moderation_status', ['not_required', 'approved']);
+        $query->where('products.is_active', true)->whereIn('products.moderation_status', ['not_required', 'approved'])
+            ->when(! MarketplaceGate::sellerProductsSellable(), static fn (Builder $q) => $q->whereNull('products.seller_id'));
     }
 
     public function isPhysical(): bool

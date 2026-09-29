@@ -11,11 +11,11 @@ use Illuminate\Support\Facades\Route;
 /*
 | Message delivery settings (spec §16). SMS and mail are always available;
 | WhatsApp requires the whatsapp module; push tokens are self-service for
-| every actor (the seller route arrives with the marketplace).
+| every actor (the seller's also requires the marketplace, §16.4).
 */
 
-foreach (['customer' => 'account', 'driver' => 'driver'] as $actor => $prefix) {
-    Route::middleware("tenant.{$actor}")->prefix($prefix)->name("tenant.messaging.{$actor}.")->group(function (): void {
+foreach (['customer' => 'account', 'driver' => 'driver', 'seller' => 'seller'] as $actor => $prefix) {
+    Route::middleware(["tenant.{$actor}", ...($actor === 'seller' ? ['feature:marketplace'] : [])])->prefix($prefix)->name("tenant.messaging.{$actor}.")->group(function (): void {
         Route::post('push-tokens', [PushDeviceTokenController::class, 'store'])->name('push-tokens.store');
         Route::delete('push-tokens', [PushDeviceTokenController::class, 'destroy'])->name('push-tokens.destroy');
     });

@@ -6,6 +6,7 @@ namespace App\Modules\Payments\Services;
 
 use App\Modules\GiftCards\Services\GiftCardService;
 use App\Modules\Installments\Services\InstallmentPlanService;
+use App\Modules\Marketplace\Services\SellerLedgerService;
 use App\Modules\Notifications\Services\NotificationDispatchService;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Services\OrderService;
@@ -379,6 +380,7 @@ final readonly class OrderPaymentService
 
                 $this->postings->reversal($row);
                 $this->orders->recalculatePaymentStatus($original->order);
+                app(SellerLedgerService::class)->recordRefund($row);
             }
 
             return $row;
@@ -491,6 +493,8 @@ final readonly class OrderPaymentService
             if ($status === OrderPayment::SUCCESSFUL) {
                 $this->postings->reversal($locked);
                 $this->orders->recalculatePaymentStatus($locked->order);
+                // The sellers' share of a direct refund or lost chargeback (§50.4).
+                app(SellerLedgerService::class)->recordRefund($locked);
             }
 
             return $status === OrderPayment::SUCCESSFUL;

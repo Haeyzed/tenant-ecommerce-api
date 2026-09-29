@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Modules\Marketplace\Support\MarketplaceLifecycle;
+use App\Modules\Pos\Support\PosLifecycle;
 use App\Modules\Purchasing\Support\PurchasingLifecycle;
 
 /*
@@ -49,14 +51,21 @@ $module = static fn (
 
 return [
 
-    'pos' => $module('Point of sale', 'module', '§51', 'Pos', ['pos'], windDown: ['tenant.admin.pos.sessions.close', 'tenant.admin.pos.sales.store']),
+    'pos' => $module('Point of sale', 'module', '§51', 'Pos', ['pos'], lifecycle: PosLifecycle::class, windDown: ['tenant.admin.pos.sessions.close', 'tenant.admin.pos.sales.store']),
     'purchasing' => $module('Suppliers and purchasing', 'module', '§49', 'Purchasing', ['suppliers', 'supplier-payments', 'purchase-orders', 'quotation-requests', 'supplier-quotations', 'purchase-returns', 'purchase-return-reasons'], customFieldEntities: ['supplier', 'purchase_order'], lifecycle: PurchasingLifecycle::class, windDown: ['tenant.admin.purchase-orders.receive', 'tenant.admin.suppliers.payments.store', 'tenant.admin.purchase-returns.store', 'tenant.admin.purchase-returns.approve', 'tenant.admin.purchase-returns.ship-back', 'tenant.admin.purchase-returns.refund']),
     'accounting' => $module('Accounting (general ledger)', 'module', '§57', 'Accounting', ['accounting']),
     'expenses' => $module('Expenses, income and billers', 'module', '§57.4', 'Expenses', ['billers', 'expense-categories', 'expenses', 'income-categories', 'income'], activation: 'auto', customFieldEntities: ['expense']),
     'hr' => $module('Human resources', 'module', '§58', 'Hr', ['hr'], customFieldEntities: ['employee']),
     'hr_payroll' => $module('Payroll', 'submodule', '§58.5', 'Hr', ['hr.payroll-runs', 'hr.payroll-items', 'hr.payroll-item-lines', 'hr.employees.salary', 'hr.employees.payslips', 'hr.employees.payroll-history'], requires: ['hr'], windDown: ['tenant.admin.hr.payroll-runs.mark-paid', 'tenant.admin.hr.payroll-items.mark-paid']),
     'hr_recruitment' => $module('Recruitment and careers', 'submodule', '§58.7', 'Hr', ['hr.job-postings', 'hr.applications'], requires: ['hr']),
-    'marketplace' => $module('Sellers, seller groups, ledger and payouts', 'module', '§50', 'Marketplace', ['sellers', 'seller-groups', 'seller-products'], customFieldEntities: ['seller'], windDown: ['tenant.admin.sellers.payouts.store', 'tenant.admin.sellers.payouts.mark-paid']),
+    'marketplace' => $module('Sellers, seller groups, ledger and payouts', 'module', '§50', 'Marketplace', ['sellers', 'seller-groups', 'seller-products'], customFieldEntities: ['seller'], lifecycle: MarketplaceLifecycle::class, windDown: [
+        // §11.5: sellers still sign in and read their records, and are paid what they earned.
+        'tenant.auth.seller.login', 'tenant.auth.seller.logout', 'tenant.auth.seller.password.forgot', 'tenant.auth.seller.password.reset',
+        'tenant.seller.profile.show', 'tenant.seller.products.index', 'tenant.seller.products.show', 'tenant.seller.products.variants.index',
+        'tenant.seller.orders.index', 'tenant.seller.ledger.index', 'tenant.seller.payouts.index', 'tenant.seller.product-options.index',
+        'tenant.seller.units.index', 'tenant.messaging.seller.push-tokens.destroy',
+        'tenant.admin.sellers.payouts.store', 'tenant.admin.sellers.payouts.mark-paid',
+    ]),
     'gift_cards' => $module('Gift cards', 'module', '§46', 'GiftCards', ['gift-cards'], windDown: ['tenant.storefront.cart.gift-card.store', 'tenant.storefront.cart.gift-card.destroy', 'tenant.public.gift-cards.balance']),
     'installments' => $module('Installment payments', 'capability', '§47', 'Installments', ['installment-plans'], windDown: ['tenant.storefront.installment-payments.pay']),
     'multi_currency' => $module('Multi-currency pricing', 'capability', '§48', 'Currency', ['currencies', 'products.prices']),

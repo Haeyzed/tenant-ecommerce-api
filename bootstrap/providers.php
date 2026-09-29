@@ -8,6 +8,7 @@ use App\Modules\Documents\DocumentsServiceProvider;
 use App\Modules\GiftCards\GiftCardsServiceProvider;
 use App\Modules\Installments\InstallmentsServiceProvider;
 use App\Modules\Inventory\InventoryServiceProvider;
+use App\Modules\Marketplace\MarketplaceServiceProvider;
 use App\Modules\Orders\OrdersServiceProvider;
 use App\Modules\Pos\PosServiceProvider;
 use App\Modules\Promotions\PromotionsServiceProvider;
@@ -16,6 +17,7 @@ use App\Modules\Returns\ReturnsServiceProvider;
 use App\Modules\Reviews\ReviewsServiceProvider;
 use App\Modules\RewardPoints\RewardPointsServiceProvider;
 use App\Modules\SalesAgents\SalesAgentsServiceProvider;
+use App\Modules\SalesQuotations\SalesQuotationsServiceProvider;
 use App\Providers\ApiDocsServiceProvider;
 use App\Providers\AppServiceProvider;
 use App\Providers\ModuleServiceProvider;
@@ -38,6 +40,8 @@ return [
     InstallmentsServiceProvider::class,
     RewardPointsServiceProvider::class,
     PosServiceProvider::class,
+    MarketplaceServiceProvider::class,
     SalesAgentsServiceProvider::class,
+    SalesQuotationsServiceProvider::class,
     ApiDocsServiceProvider::class,
 ];

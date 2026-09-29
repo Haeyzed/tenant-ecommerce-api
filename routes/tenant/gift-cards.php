@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Modules\Dashboard\Http\Controllers\Tenant\Admin\ResourceMetricsController;
 use App\Modules\GiftCards\Http\Controllers\Tenant\Admin\GiftCardController as AdminGiftCardController;
 use App\Modules\GiftCards\Http\Controllers\Tenant\CartGiftCardController;
 use App\Modules\GiftCards\Http\Controllers\Tenant\GiftCardController;
@@ -25,6 +26,7 @@ Route::middleware(['tenant.public', 'feature:gift_cards', 'throttle:auth-sensiti
 
 Route::middleware(['tenant.admin', 'feature:gift_cards', 'module.notice:gift_cards'])->prefix('admin')->name('tenant.gift-cards.')->group(function (): void {
     Route::get('gift-cards', [AdminGiftCardController::class, 'index'])->name('index');
+    Route::get('gift-cards/metrics', [ResourceMetricsController::class, 'metrics'])->defaults('metrics_resource', 'gift-cards')->name('metrics');
     Route::post('gift-cards', [AdminGiftCardController::class, 'store'])->middleware('idempotency')->name('store');
     Route::get('gift-cards/{card}', [AdminGiftCardController::class, 'show'])->whereNumber('card')->name('show');
     Route::patch('gift-cards/{card}/disable', [AdminGiftCardController::class, 'disable'])->whereNumber('card')->name('disable');

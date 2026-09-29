@@ -132,6 +132,12 @@ it('sells at the counter with change and split tender, then closes the drawer wi
 
     posSale(['payments' => [['method' => 'cash', 'amount' => '43000']]])->assertStatus(422)->assertJsonPath('meta.error_code', 'session_required');
     $this->tenantJson('GET', "/api/admin/pos/sales?session_id={$session['id']}", [], $this->staff)->assertOk()->assertJsonCount(2, 'data');
+
+    // The POS dashboard section: today's sales by register, and the flagged variance.
+    $section = $this->tenantJson('GET', '/api/admin/dashboard/pos?range=today&compare=none', [], $this->staff)->assertOk()->json('data');
+    expect(collect($section['kpis'])->pluck('value', 'key')->all())->toMatchArray(['pos_sales' => '129000.0000', 'pos_transactions' => 2, 'open_sessions' => 0, 'cash_variance' => '-500.0000'])
+        ->and($section['tables'][0]['rows'][0])->toMatchArray(['name' => 'Front Counter', 'orders' => 2])
+        ->and(collect($section['alerts'])->pluck('key')->all())->toContain('pos_variances_flagged');
 });
 
 it('voids a sale while its session is open: refunds, restocks and returns the gift card and points', function (): void {

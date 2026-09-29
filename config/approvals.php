@@ -6,6 +6,8 @@ use App\Modules\Catalog\Models\ProductQuestion;
 use App\Modules\Catalog\Services\ProductQuestionService;
 use App\Modules\Inventory\Models\StockAdjustment;
 use App\Modules\Inventory\Services\StockAdjustmentService;
+use App\Modules\Marketplace\Models\Seller;
+use App\Modules\Marketplace\Services\SellerService;
 use App\Modules\Purchasing\Models\PurchaseOrder;
 use App\Modules\Purchasing\Services\PurchaseOrderService;
 use App\Modules\Returns\Models\OrderReturn;
@@ -57,6 +59,14 @@ return [
         'model' => ProductQuestion::class,
         'service' => ProductQuestionService::class,
         'feature' => 'core',
+        'conditions' => [],
+    ],
+
+    'seller_application' => [
+        'label' => 'Seller applications',
+        'model' => Seller::class,
+        'service' => SellerService::class,
+        'feature' => 'marketplace',
         'conditions' => [],
     ],
 

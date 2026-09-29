@@ -23,6 +23,7 @@ use App\Modules\Plans\Enums\ModuleState;
 use App\Modules\Plans\Services\FeatureAccessService;
 use App\Modules\Purchasing\Jobs\ExpireSupplierQuotations;
 use App\Modules\RewardPoints\Jobs\ExpireRewardPoints;
+use App\Modules\SalesQuotations\Jobs\ExpireSalesQuotations;
 use App\Modules\Seo\Support\SitemapBuilder;
 use App\Modules\Tenancy\Enums\TenantStatus;
 use App\Modules\Tenancy\Models\Tenant;
@@ -95,6 +96,7 @@ final class RunTenantDailyMaintenance implements ShouldBeUnique, ShouldQueue
             // Module jobs run only while their module is enabled.
             $enabled = static fn (string $key): bool => app(FeatureAccessService::class)->state($tenant, $key) === ModuleState::Enabled;
             $this->task('supplier_quotations', static fn () => $enabled('purchasing') ? ExpireSupplierQuotations::dispatch() : null);
+            $this->task('sales_quotations', static fn () => $enabled('sales_quotations') ? ExpireSalesQuotations::dispatch() : null);
             $this->task('gift_cards', static fn () => $enabled('gift_cards') ? ExpireGiftCards::dispatch() : null);
             $this->task('reward_points', static fn () => $enabled('reward_points') ? ExpireRewardPoints::dispatch() : null);
             $this->task('installments', static function () use ($enabled): void {

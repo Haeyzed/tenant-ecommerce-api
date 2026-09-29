@@ -18,6 +18,7 @@ use App\Modules\GiftCards\Services\GiftCardService;
 use App\Modules\Installments\Services\InstallmentPlanService;
 use App\Modules\Inventory\Models\Warehouse;
 use App\Modules\Inventory\Services\InventoryService;
+use App\Modules\Marketplace\Support\MarketplaceGate;
 use App\Modules\Orders\Jobs\ExpireUnpaidOrder;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Models\OrderItem;
@@ -564,6 +565,11 @@ final readonly class CheckoutService
     public static function sellable(Product $product, ?ProductVariant $variant): bool
     {
         if ($product->trashed() || ! $product->is_active || ! in_array($product->moderation_status, ['not_required', 'approved'], true)) {
+            return false;
+        }
+
+        // A seller product cannot be sold while the marketplace is off (§11.5).
+        if ($product->seller_id !== null && ! MarketplaceGate::sellerProductsSellable()) {
             return false;
         }
 

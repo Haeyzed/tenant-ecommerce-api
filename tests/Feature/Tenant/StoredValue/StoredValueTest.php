@@ -122,6 +122,10 @@ it('issues a gift card once, pays part of an order with it and credits it back w
         ->and(Order::query()->findOrFail($order['id'])->payment_status)->toBe('refunded')
         ->and((string) Order::query()->findOrFail($order['id'])->gift_card_amount_applied)->toBe('0.0000');
 
+    // The gift-cards dashboard section: redeemed then credited back nets to zero.
+    $section = $this->tenantJson('GET', '/api/admin/dashboard/gift_cards?range=today&compare=none', [], $this->staff)->assertOk()->json('data');
+    expect(collect($section['kpis'])->pluck('value', 'key')->all())->toMatchArray(['issued_value' => '3000.0000', 'redeemed_value' => '0.0000', 'outstanding_liability' => '3000.0000']);
+
     // A disabled card is refused on the cart.
     $this->tenantJson('PATCH', "/api/admin/gift-cards/{$card['id']}/disable", [], $this->staff)->assertOk()->assertJsonPath('data.status', 'disabled');
     $this->tenantJson('POST', '/api/cart/items', ['product_id' => $this->guide->id, 'quantity' => 1], $this->adaAuth)->assertCreated();
@@ -201,6 +205,10 @@ it('redeems reward points as a discount, earns on completion, restores on cancel
     tenancy()->initialize($this->tenant);
     app(RewardPointService::class)->earnPoints(Order::query()->findOrFail($order['id']));
     expect(app(RewardPointService::class)->getBalance($this->ada))->toBe(140);
+
+    // The reward-points dashboard section: 200 adjusted + 40 earned, 100 redeemed.
+    $section = $this->tenantJson('GET', '/api/admin/dashboard/reward_points?range=today&compare=none', [], $this->staff)->assertOk()->json('data');
+    expect(collect($section['kpis'])->pluck('value', 'key')->all())->toMatchArray(['points_issued' => 240, 'points_redeemed' => 100, 'points_expired' => 0, 'points_outstanding' => 140]);
 
     // Points on a cancelled order come back.
     $second = adaCheckout(adaQuote(1, fn () => $this->tenantJson('POST', '/api/cart/apply-reward-points', ['points' => 50], $this->adaAuth)->assertOk()))->assertCreated()->json('data');

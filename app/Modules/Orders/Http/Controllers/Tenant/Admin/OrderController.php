@@ -42,6 +42,7 @@ final class OrderController extends Controller
             'customer_id' => ['sometimes', 'integer'],
             'warehouse_id' => ['sometimes', 'integer'],
             'promotion_id' => ['sometimes', 'integer'],
+            'seller_id' => ['sometimes', 'integer'],
             'is_test' => ['sometimes', 'boolean'],
             'search' => ['sometimes', 'string', 'max:100'],
             'from' => ['sometimes', 'date'],
