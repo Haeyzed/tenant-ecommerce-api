@@ -21,6 +21,7 @@ use App\Modules\Orders\Services\OrderService;
 use App\Modules\Payments\Services\OrderPaymentService;
 use App\Modules\Plans\Enums\ModuleState;
 use App\Modules\Plans\Services\FeatureAccessService;
+use App\Modules\ProductSubscriptions\Jobs\ProcessProductSubscriptionRenewals;
 use App\Modules\Purchasing\Jobs\ExpireSupplierQuotations;
 use App\Modules\RewardPoints\Jobs\ExpireRewardPoints;
 use App\Modules\SalesQuotations\Jobs\ExpireSalesQuotations;
@@ -103,6 +104,14 @@ final class RunTenantDailyMaintenance implements ShouldBeUnique, ShouldQueue
                 if ($enabled('installments')) {
                     MarkOverdueInstallments::dispatch();
                     ChargeDueInstallments::dispatch();
+                }
+            });
+            // Renewals are a wind-down job: existing subscriptions keep renewing (§11.5).
+            $this->task('product_subscriptions', static function () use ($tenant): void {
+                $state = app(FeatureAccessService::class)->state($tenant, 'product_subscriptions');
+
+                if (in_array($state, [ModuleState::Enabled, ModuleState::Disabled, ModuleState::Locked], true)) {
+                    ProcessProductSubscriptionRenewals::dispatch();
                 }
             });
             $this->task('exchange_rates', static function (): void {

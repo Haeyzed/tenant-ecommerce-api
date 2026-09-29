@@ -39,6 +39,11 @@ use App\Modules\Expenses\Models\Expense;
 use App\Modules\Expenses\Models\IncomeEntry;
 use App\Modules\Exports\Models\DataExport;
 use App\Modules\GiftCards\Models\GiftCard;
+use App\Modules\Hr\Models\HrCandidate;
+use App\Modules\Hr\Models\HrEmployee;
+use App\Modules\Hr\Models\HrEmployeeDocument;
+use App\Modules\Hr\Models\HrLeaveRequest;
+use App\Modules\Hr\Models\HrPayrollRun;
 use App\Modules\Installments\Models\InstallmentPlan;
 use App\Modules\Inventory\Models\StockAdjustment;
 use App\Modules\Inventory\Models\StockTransfer;
@@ -64,6 +69,9 @@ use App\Modules\PlatformSupport\Models\PlatformSupportMessageAttachment;
 use App\Modules\Pos\Models\PosRegister;
 use App\Modules\Pos\Models\PosSession;
 use App\Modules\Pos\Models\PosSettings;
+use App\Modules\ProductSubscriptions\Models\CustomerSubscription;
+use App\Modules\ProductSubscriptions\Models\ProductSubscriptionPlan;
+use App\Modules\Projects\Models\Project;
 use App\Modules\Promotions\Models\Coupon;
 use App\Modules\Promotions\Models\FlashSale;
 use App\Modules\Promotions\Models\Promotion;
@@ -85,6 +93,7 @@ use App\Modules\Shipping\Models\Driver;
 use App\Modules\Shipping\Models\Shipment;
 use App\Modules\Shipping\Models\ShippingMethod;
 use App\Modules\Shipping\Models\ShippingZone;
+use App\Modules\Support\Models\SupportMessageAttachment;
 use App\Modules\Tax\Models\TaxRate;
 use App\Modules\Tenancy\Models\DatabaseServer;
 use App\Modules\Tenancy\Models\Domain;
@@ -169,6 +178,15 @@ final class MorphMap
         'sales_agent' => SalesAgent::class,
         'sales_quotation' => SalesQuotation::class,
         'sales_quotation_request' => SalesQuotationRequest::class,
+        'hr_employee' => HrEmployee::class,
+        'hr_employee_document' => HrEmployeeDocument::class,
+        'hr_candidate' => HrCandidate::class,
+        'hr_leave_request' => HrLeaveRequest::class,
+        'hr_payroll_run' => HrPayrollRun::class,
+        'support_message_attachment' => SupportMessageAttachment::class,
+        'project' => Project::class,
+        'product_subscription_plan' => ProductSubscriptionPlan::class,
+        'customer_subscription' => CustomerSubscription::class,
         'supplier' => Supplier::class,
         'purchase_order' => PurchaseOrder::class,
         'purchase_return' => PurchaseReturn::class,

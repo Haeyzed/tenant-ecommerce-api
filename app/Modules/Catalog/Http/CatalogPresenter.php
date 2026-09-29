@@ -20,7 +20,10 @@ use App\Modules\Catalog\Support\ProductPricing;
 use App\Modules\Catalog\Support\ProductPromotions;
 use App\Modules\Currency\Services\CurrencyService;
 use App\Modules\CustomFields\Services\CustomFieldService;
+use App\Modules\Plans\Enums\ModuleState;
+use App\Modules\Plans\Services\FeatureAccessService;
 use App\Modules\Settings\Services\TenantSettingsService;
+use App\Modules\Tenancy\Models\Tenant;
 use App\Shared\Support\Money;
 use Illuminate\Support\Collection;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
@@ -157,9 +160,19 @@ final readonly class CatalogPresenter
                 'variant_id' => $i->child_product_variant_id,
                 'quantity' => (string) $i->quantity,
             ])->values()->all(),
+            // Product subscriptions (§55): the schedules come from GET /api/products/{product}/subscription-plans.
+            'subscription' => $product->is_subscribable && $this->subscriptionsEnabled()
+                ? ['discount_percent' => $product->subscription_discount_percent === null ? null : (string) $product->subscription_discount_percent] : null,
             'seo' => $this->seo($product),
             'custom_fields' => $this->customFields->valuesFor($product, ProductService::ENTITY, CustomFieldService::PUBLIC),
         ];
+    }
+
+    private function subscriptionsEnabled(): bool
+    {
+        $tenant = tenant();
+
+        return $tenant instanceof Tenant && app(FeatureAccessService::class)->state($tenant, 'product_subscriptions') === ModuleState::Enabled;
     }
 
     /**
@@ -199,6 +212,8 @@ final readonly class CatalogPresenter
             'expiry_date' => $product->expiry_date?->toDateString(),
             'low_stock_threshold' => $product->low_stock_threshold,
             'has_warehouse_pricing' => (bool) $product->has_warehouse_pricing,
+            'is_subscribable' => (bool) $product->is_subscribable,
+            'subscription_discount_percent' => $product->subscription_discount_percent !== null ? (string) $product->subscription_discount_percent : null,
             'meta_title' => $product->meta_title,
             'meta_description' => $product->meta_description,
             'meta_keywords' => $product->meta_keywords,

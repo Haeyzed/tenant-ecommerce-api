@@ -78,7 +78,9 @@ final class ModuleActivationService
 
         $row = $this->row($tenant, $key);
 
-        if ($row === null || $row->status === TenantModule::DISABLED) {
+        // Nothing to switch off: never activated, or already disabled. An
+        // auto module is enabled without a row (§11.5), so it is written.
+        if ($row?->status === TenantModule::DISABLED || ($row === null && $state !== ModuleState::Enabled)) {
             return;
         }
 

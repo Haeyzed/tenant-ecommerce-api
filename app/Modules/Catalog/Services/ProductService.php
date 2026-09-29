@@ -645,6 +645,9 @@ final readonly class ProductService
             'low_stock_threshold' => [in_array($type, [Product::SIMPLE, Product::VARIABLE], true) ? 'sometimes' : 'prohibited', 'nullable', 'integer', 'min:0', 'max:1000000'],
             'is_active' => ['sometimes', 'boolean'],
             'has_warehouse_pricing' => ['sometimes', 'boolean'],
+            // Product subscriptions (§55): offered once plans exist for the product.
+            'is_subscribable' => ['sometimes', 'boolean'],
+            'subscription_discount_percent' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:100', 'decimal:0,4'],
             'meta_title' => ['sometimes', 'nullable', 'string', 'max:200'],
             'meta_description' => ['sometimes', 'nullable', 'string', 'max:320'],
             'meta_keywords' => ['sometimes', 'nullable', 'string', 'max:255'],

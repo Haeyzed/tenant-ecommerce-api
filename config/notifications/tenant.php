@@ -103,6 +103,14 @@ return [
     'product_subscription.payment_failed' => $n(['customer'], $customerSms,
         'Subscription payment failed',
         "Hello {{customer_name}},\n\nWe could not renew your subscription to {{product_name}}. Please update your payment method: {{account_url}}"),
+    // §11.5: staff cancelled the subscription, or failed renewals reached the limit.
+    'product_subscription.cancelled' => $n(['customer'], $customer,
+        'Your subscription to {{product_name}} has ended',
+        "Hello {{customer_name}},\n\nYour subscription to {{product_name}} at {{store_name}} has been cancelled. No further orders will be made: {{account_url}}"),
+    // §55.2 step 2: the first order was paid, but the gateway returned no reusable authorization.
+    'product_subscription.payment_method_not_saved' => $n(['customer'], $customer,
+        'Your subscription to {{product_name}} has not started',
+        "Hello {{customer_name}},\n\nYour first order is paid, but the payment method you used cannot be saved for future deliveries of {{product_name}}. Please subscribe again with another payment method: {{account_url}}"),
     'back_in_stock.available' => $n(['customer'], $customer,
         '{{product_name}} is back in stock',
         "Hello,\n\n{{product_name}} is back in stock at {{store_name}}: {{product_url}}"),

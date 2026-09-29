@@ -12,6 +12,12 @@ use Illuminate\Routing\Router;
  */
 final class RoutePermissions
 {
+    /**
+     * Route default of a self-service route: the permission required to act
+     * on someone else's record (e.g. hr.attendance.record).
+     */
+    public const string ACTING_PERMISSION = 'acting_permission';
+
     public function __construct(private readonly Router $router) {}
 
     /**
@@ -26,6 +32,14 @@ final class RoutePermissions
 
             if ($name !== null) {
                 $names[$name] = true;
+            }
+        }
+
+        // Self-service routes need no permission for the user's own record,
+        // but name the one that lets staff act for someone else (§12.4).
+        foreach ($this->router->getRoutes()->getRoutes() as $route) {
+            if (in_array($context.'.admin', $route->middleware(), true) && isset($route->defaults[self::ACTING_PERMISSION])) {
+                $names[(string) $route->defaults[self::ACTING_PERMISSION]] = true;
             }
         }
 

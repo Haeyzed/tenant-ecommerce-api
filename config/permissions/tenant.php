@@ -45,7 +45,7 @@ return [
             'product-answers.*', 'inventory.*', 'warehouses.*', 'stock-transfers.*', 'stock-adjustments.*',
             'orders.*', 'order-payments.view', 'shipments.*', 'delivery-assignments.*', 'drivers.*', 'returns.*',
             'return-reasons.*', 'customers.*', 'customer-groups.*', 'promotions.*', 'coupons.*', 'flash-sales.*',
-            'reviews.*', 'cms.*', 'reports.*', 'dashboard.view', 'exports.*', 'lookups.*',
+            'reviews.*', 'cms.*', 'reports.*', 'dashboard.view', 'exports.*', 'lookups.*', 'product-subscriptions.*',
         ],
         'staff' => [
             'orders.view', 'orders.status', 'orders.invoice', 'orders.packing-slip', 'orders.shipments.*',

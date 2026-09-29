@@ -14,6 +14,7 @@ use App\Modules\Approvals\Services\ApprovalWorkflowService;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\ProductOption;
 use App\Modules\Dashboard\Services\Tenant\TenantDashboardService;
+use App\Modules\Hr\Models\HrEmployee;
 use App\Modules\Inventory\Models\InventoryMovement;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Payments\Models\OrderPayment;
@@ -79,6 +80,10 @@ final readonly class LookupRegistry
         'suppliers' => 'purchasing',
         'pos-terminal-providers' => 'pos',
         'pos-payment-methods' => 'pos',
+        'departments' => 'hr',
+        'document-types' => 'hr',
+        'leave-types' => 'hr',
+        'employment-types' => 'hr',
     ];
 
     public function feature(string $context, string $key): ?string
@@ -286,6 +291,16 @@ final readonly class LookupRegistry
                     ->all(),
                 'pos-terminal-providers' => static fn (): array => self::enum(PosRegister::TERMINAL_PROVIDERS),
                 'pos-payment-methods' => static fn (): array => self::enum(app(PosSettingsService::class)->getSettings()->enabled_payment_methods),
+                'departments' => static fn (): array => DB::connection('tenant')->table('hr_departments')->where('is_active', true)->orderBy('name')->get(['id', 'name'])
+                    ->map(static fn ($d): array => ['value' => (int) $d->id, 'label' => $d->name])->all(),
+                'document-types' => static fn (): array => DB::connection('tenant')->table('hr_document_types')->where('is_active', true)->orderBy('name')
+                    ->get(['id', 'name', 'requires_expiry_date', 'is_mandatory_at_onboarding'])
+                    ->map(static fn ($t): array => ['value' => (int) $t->id, 'label' => $t->name, 'meta' => [
+                        'requires_expiry_date' => (bool) $t->requires_expiry_date, 'is_mandatory_at_onboarding' => (bool) $t->is_mandatory_at_onboarding,
+                    ]])->all(),
+                'leave-types' => static fn (): array => DB::connection('tenant')->table('hr_leave_types')->where('is_active', true)->orderBy('name')->get(['id', 'name', 'days_per_year', 'is_paid'])
+                    ->map(static fn ($t): array => ['value' => (int) $t->id, 'label' => $t->name, 'meta' => ['days_per_year' => bcadd((string) $t->days_per_year, '0', 1), 'is_paid' => (bool) $t->is_paid]])->all(),
+                'employment-types' => static fn (): array => self::enum(HrEmployee::EMPLOYMENT_TYPES),
                 'fiscal-periods' => fn (Request $r): array => FiscalPeriod::query()->where('fiscal_year_id', $this->requiredId($r, 'fiscal_year_id'))->orderBy('starts_on')->get()
                     ->map(static fn (FiscalPeriod $p): array => ['value' => $p->id, 'label' => $p->name, 'meta' => ['status' => $p->status, 'starts_on' => $p->starts_on->toDateString(), 'ends_on' => $p->ends_on->toDateString()]])
                     ->all(),

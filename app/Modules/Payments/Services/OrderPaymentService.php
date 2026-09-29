@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Payments\Services;
 
 use App\Modules\GiftCards\Services\GiftCardService;
+use App\Modules\Installments\Models\InstallmentPayment;
 use App\Modules\Installments\Services\InstallmentPlanService;
 use App\Modules\Marketplace\Services\SellerLedgerService;
 use App\Modules\Notifications\Services\NotificationDispatchService;
@@ -16,6 +17,7 @@ use App\Modules\Payments\Models\OrderPayment;
 use App\Modules\Payments\Models\TenantPaymentSetting;
 use App\Modules\Payments\Support\PaymentPostings;
 use App\Modules\Pos\Terminals\PosTerminalGatewayFactory;
+use App\Modules\ProductSubscriptions\Services\ProductSubscriptionService;
 use App\Modules\Returns\Models\OrderReturn;
 use App\Modules\Returns\Services\ReturnService;
 use App\Modules\Tenancy\Models\Tenant;
@@ -91,7 +93,9 @@ final readonly class OrderPaymentService
             throw ApiException::unprocessable('installment_plan_active', 'This order is paid in installments: pay the next installment instead.');
         }
 
-        return $this->initiateGatewayPayment($order, $provider, null, $idempotencyKey);
+        // The first order of a product subscription saves the payment
+        // method for its renewals (§55.2, Assumption A-39).
+        return $this->initiateGatewayPayment($order, $provider, null, $idempotencyKey, null, ProductSubscriptionService::isFirstOrder($order->id));
     }
 
     /**
@@ -185,6 +189,67 @@ final readonly class OrderPaymentService
     }
 
     /**
+     * A merchant-initiated charge through a stored authorization (§40.2):
+     * installments (§47) and product-subscription renewals (§55). The
+     * provider is called outside any transaction with our reference as its
+     * idempotency key; the result goes through the normal transition, and
+     * an answer still pending is verified later.
+     */
+    public function chargeStoredAuthorization(Order $order, string $provider, string $authorizationToken, string $amount, ?InstallmentPayment $installment = null): OrderPayment
+    {
+        $mode = self::modeOf($order);
+        $amount = Money::normalize($amount);
+
+        $row = new OrderPayment;
+        $row->forceFill([
+            'order_id' => $order->id,
+            'kind' => OrderPayment::PAYMENT,
+            'payment_method' => 'gateway',
+            'provider' => $provider,
+            'mode' => $mode,
+            'status' => OrderPayment::PENDING,
+            'reference' => ($installment === null ? 'SUB-'.$order->order_number : 'INS-'.$order->order_number.'-'.$installment->sequence).'-'.Str::upper(Str::random(6)),
+            'amount_due' => $amount,
+            'amount_paid' => $amount,
+            'currency_code' => $order->currency_code,
+            'installment_payment_id' => $installment?->id,
+            'meta' => ['stored_authorization' => true],
+        ])->save();
+
+        try {
+            $result = $this->factory->forTenant($provider, $mode)->chargeAuthorization($authorizationToken, new ChargeRequest(
+                amount: $amount,
+                currencyCode: $order->currency_code,
+                reference: $row->reference,
+                customerEmail: (string) $order->customer_email,
+                customerName: $order->customer_name,
+                metadata: array_filter(['order_number' => $order->order_number, 'installment' => $installment?->sequence]),
+                description: $installment === null ? 'Subscription order '.$order->order_number : 'Installment '.$installment->sequence.' of order '.$order->order_number,
+            ));
+        } catch (PaymentGatewayException $e) {
+            if ($e->pending) {
+                VerifyOrderPayment::dispatch((string) tenant()?->getTenantKey(), $row->id, 1)->delay(now()->addMinutes(15));
+            } else {
+                $this->completeGatewayPayment($row, ['status' => 'failed', 'failure_reason' => 'charge_rejected']);
+            }
+
+            return $row->refresh();
+        }
+
+        if ($result['status'] === 'pending') {
+            VerifyOrderPayment::dispatch((string) tenant()?->getTenantKey(), $row->id, 1)->delay(now()->addMinutes(15));
+        } else {
+            $this->completeGatewayPayment($row, [
+                'status' => $result['status'],
+                'provider_reference' => $result['provider_reference'],
+                'failure_reason' => $result['failure_reason'],
+            ]);
+        }
+
+        return $row->refresh();
+    }
+
+    /**
      * Client verification (POST /api/payments/verify) and delayed checks:
      * asks the provider and applies a definitive result.
      */
@@ -259,12 +324,19 @@ final readonly class OrderPaymentService
                 if ($locked->installment_payment_id !== null) {
                     app(InstallmentPlanService::class)->handleInstallmentPaid($locked, $verified['authorization_token'] ?? null);
                 }
+
+                app(ProductSubscriptionService::class)->handlePaymentSucceeded($locked, $verified['authorization_token'] ?? null);
             } else {
                 $locked->forceFill(['status' => OrderPayment::FAILED, 'meta' => [...(array) $locked->meta, 'failure_reason' => $verified['failure_reason'] ?? 'declined']])->save();
                 $outcome = 'failed';
 
                 if ($locked->installment_payment_id !== null) {
                     app(InstallmentPlanService::class)->handleInstallmentFailed($locked);
+                }
+
+                // A failed renewal is answered by the subscription (§55.2), not by the order's retry notices.
+                if (app(ProductSubscriptionService::class)->handlePaymentFailed($locked)) {
+                    $outcome = 'renewal_failed';
                 }
             }
 

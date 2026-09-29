@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 use App\Modules\Catalog\Models\ProductQuestion;
 use App\Modules\Catalog\Services\ProductQuestionService;
+use App\Modules\Hr\Models\HrLeaveRequest;
+use App\Modules\Hr\Services\HrLeaveService;
 use App\Modules\Inventory\Models\StockAdjustment;
 use App\Modules\Inventory\Services\StockAdjustmentService;
 use App\Modules\Marketplace\Models\Seller;
@@ -77,6 +79,15 @@ return [
         'service' => PurchaseOrderService::class,
         'feature' => 'purchasing',
         'conditions' => ['min_amount'],
+    ],
+
+    // min_days: the days requested.
+    'leave_request' => [
+        'label' => 'Leave requests',
+        'model' => HrLeaveRequest::class,
+        'service' => HrLeaveService::class,
+        'feature' => 'hr',
+        'conditions' => ['min_days'],
     ],
 
 ];

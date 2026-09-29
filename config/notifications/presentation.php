@@ -101,6 +101,8 @@ return [
     'sales_quotation.sent' => ['eyebrow' => 'Quotation', 'highlight' => 'total', 'highlight_label' => 'Quotation total', 'action' => 'quotation_url', 'action_text' => 'View quotation'],
     'quotation_request.sent' => ['eyebrow' => 'Quotation request', 'highlight' => 'request_number', 'highlight_label' => 'Request'],
     'product_subscription.payment_failed' => ['tone' => 'danger', 'eyebrow' => 'Subscription', 'action' => 'account_url', 'action_text' => 'Update payment'],
+    'product_subscription.cancelled' => ['tone' => 'neutral', 'eyebrow' => 'Subscription', 'action' => 'account_url', 'action_text' => 'View subscription'],
+    'product_subscription.payment_method_not_saved' => ['tone' => 'warning', 'eyebrow' => 'Subscription', 'action' => 'account_url', 'action_text' => 'View subscription'],
     'back_in_stock.available' => ['tone' => 'success', 'eyebrow' => 'Back in stock', 'action' => 'product_url', 'action_text' => 'Shop now'],
     'wishlist_item.back_in_stock' => ['tone' => 'success', 'eyebrow' => 'Back in stock', 'action' => 'product_url', 'action_text' => 'Shop now'],
     'wishlist_item.price_drop' => ['tone' => 'success', 'eyebrow' => 'Price drop', 'action' => 'product_url', 'action_text' => 'Shop now'],

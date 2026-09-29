@@ -2,8 +2,10 @@
 
 declare(strict_types=1);
 
+use App\Modules\Hr\Support\HrPayrollLifecycle;
 use App\Modules\Marketplace\Support\MarketplaceLifecycle;
 use App\Modules\Pos\Support\PosLifecycle;
+use App\Modules\ProductSubscriptions\Support\ProductSubscriptionsLifecycle;
 use App\Modules\Purchasing\Support\PurchasingLifecycle;
 
 /*
@@ -56,7 +58,7 @@ return [
     'accounting' => $module('Accounting (general ledger)', 'module', '§57', 'Accounting', ['accounting']),
     'expenses' => $module('Expenses, income and billers', 'module', '§57.4', 'Expenses', ['billers', 'expense-categories', 'expenses', 'income-categories', 'income'], activation: 'auto', customFieldEntities: ['expense']),
     'hr' => $module('Human resources', 'module', '§58', 'Hr', ['hr'], customFieldEntities: ['employee']),
-    'hr_payroll' => $module('Payroll', 'submodule', '§58.5', 'Hr', ['hr.payroll-runs', 'hr.payroll-items', 'hr.payroll-item-lines', 'hr.employees.salary', 'hr.employees.payslips', 'hr.employees.payroll-history'], requires: ['hr'], windDown: ['tenant.admin.hr.payroll-runs.mark-paid', 'tenant.admin.hr.payroll-items.mark-paid']),
+    'hr_payroll' => $module('Payroll', 'submodule', '§58.5', 'Hr', ['hr.payroll-runs', 'hr.payroll-items', 'hr.payroll-item-lines', 'hr.employees.salary', 'hr.employees.payslips', 'hr.employees.payroll-history'], requires: ['hr'], lifecycle: HrPayrollLifecycle::class, windDown: ['tenant.admin.hr.payroll-runs.mark-paid', 'tenant.admin.hr.payroll-items.mark-paid']),
     'hr_recruitment' => $module('Recruitment and careers', 'submodule', '§58.7', 'Hr', ['hr.job-postings', 'hr.applications'], requires: ['hr']),
     'marketplace' => $module('Sellers, seller groups, ledger and payouts', 'module', '§50', 'Marketplace', ['sellers', 'seller-groups', 'seller-products'], customFieldEntities: ['seller'], lifecycle: MarketplaceLifecycle::class, windDown: [
         // §11.5: sellers still sign in and read their records, and are paid what they earned.
@@ -72,7 +74,7 @@ return [
     'reward_points' => $module('Loyalty and reward points', 'module', '§54', 'RewardPoints', ['reward-points', 'customers.reward-points']),
     'sales_quotations' => $module('Sales quotations', 'module', '§53', 'SalesQuotations', ['sales-quotation-requests', 'sales-quotations'], customFieldEntities: ['sales_quotation']),
     'sales_agents' => $module('Sales agents and commissions', 'module', '§52', 'SalesAgents', ['sales-agents', 'sales-agent-commissions'], windDown: ['tenant.admin.sales-agent-commissions.mark-paid']),
-    'product_subscriptions' => $module('Recurring product orders', 'module', '§55', 'ProductSubscriptions', ['product-subscriptions', 'products.subscription-plans'], windDown: ['tenant.customer.account.product-subscriptions.pause', 'tenant.customer.account.product-subscriptions.resume', 'tenant.customer.account.product-subscriptions.destroy']),
+    'product_subscriptions' => $module('Recurring product orders', 'module', '§55', 'ProductSubscriptions', ['product-subscriptions', 'products.subscription-plans'], lifecycle: ProductSubscriptionsLifecycle::class, windDown: ['tenant.customer.account.product-subscriptions.pause', 'tenant.customer.account.product-subscriptions.resume', 'tenant.customer.account.product-subscriptions.destroy']),
     'back_in_stock_alerts' => $module('Back-in-stock alerts', 'capability', '§56', 'BackInStock', ['products.back-in-stock-subscribers'], activation: 'auto'),
     'support' => $module('Customer support', 'module', '§59', 'Support', ['support']),
     'approval_workflows' => $module('Approval workflow engine', 'capability', '§60', 'Approvals', ['approval-workflows', 'approvals'], windDown: ['tenant.admin.approvals.approve', 'tenant.admin.approvals.reject']),

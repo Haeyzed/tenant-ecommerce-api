@@ -16,6 +16,7 @@ use App\Modules\Accounting\Models\JournalEntryLine;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Expenses\Models\Expense;
 use App\Modules\Expenses\Models\IncomeEntry;
+use App\Modules\Hr\Models\HrPayrollRun;
 use App\Modules\Inventory\Models\StockAdjustment;
 use App\Modules\Inventory\Models\StockAdjustmentItem;
 use App\Modules\Marketplace\Models\SellerLedgerEntry;
@@ -169,6 +170,7 @@ final class AccountingService
             'postSellerCommission' => $this->postSellerCommission($record, $request, $date),
             'postSellerReversal' => $this->postSellerReversal($record, $request, $date),
             'postSellerPayout' => $this->postSellerPayout($record, $request, $date),
+            'postPayroll' => $this->postPayroll($record, $request, $date),
             default => throw new PostingException("Unknown posting method [{$request->method}]."),
         };
     }
@@ -538,6 +540,28 @@ final class AccountingService
             [$this->system('accounts_payable_sellers'), JournalEntryLine::DEBIT, $net, null],
             [$this->system('cash_bank'), JournalEntryLine::CREDIT, $net, null],
         ]);
+    }
+
+    /**
+     * §58.5 markPayrollRunPaid(): one entry for the whole run. Dr Salaries
+     * and Wages (gross), Cr Cash/Bank (net), Cr Payroll Liabilities
+     * (deductions and tax withheld). Amounts are in the base currency.
+     */
+    private function postPayroll(Model $run, AccountingPostingRequest $request, Carbon $date): ?JournalEntry
+    {
+        if (! $run instanceof HrPayrollRun || $run->status !== HrPayrollRun::PAID || ! Money::isPositive((string) $run->total_gross)) {
+            return null;
+        }
+
+        $gross = Money::normalize((string) $run->total_gross);
+        $net = Money::normalize((string) $run->total_net);
+        $withheld = Money::normalize((string) $run->total_deductions);
+
+        return $this->write($request, $date, 'Payroll '.$run->period_start->toDateString().' to '.$run->period_end->toDateString(), $run, array_values(array_filter([
+            [$this->system('salaries_wages'), JournalEntryLine::DEBIT, $gross, null],
+            Money::isPositive($net) ? [$this->system('cash_bank'), JournalEntryLine::CREDIT, $net, null] : null,
+            Money::isPositive($withheld) ? [$this->system('payroll_liabilities'), JournalEntryLine::CREDIT, $withheld, null] : null,
+        ])));
     }
 
     private function postIncome(Model $income, AccountingPostingRequest $request, Carbon $date): ?JournalEntry

@@ -15,15 +15,11 @@ use App\Modules\Plans\Services\FeatureAccessService;
 use App\Modules\Settings\Services\TenantSettingsService;
 use App\Modules\Tenancy\Models\Tenant;
 use App\Shared\Exceptions\ApiException;
-use App\Shared\Payments\DTOs\ChargeRequest;
-use App\Shared\Payments\PaymentGatewayException;
-use App\Shared\Payments\PaymentGatewayFactory;
 use App\Shared\Support\Money;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 /**
@@ -41,7 +37,6 @@ final readonly class InstallmentPlanService
         private FeatureAccessService $features,
         private TenantSettingsService $settings,
         private OrderService $orders,
-        private PaymentGatewayFactory $factory,
     ) {}
 
     /**
@@ -174,53 +169,8 @@ final readonly class InstallmentPlanService
             throw ApiException::unprocessable('no_stored_authorization', 'The customer has not saved a payment method yet: they pay this installment themselves.');
         }
 
-        $order = $plan->order;
-        $amount = Money::sub((string) $payment->amount_due, (string) $payment->amount_paid);
-        $mode = OrderPaymentService::modeOf($order);
-
-        $row = new OrderPayment;
-        $row->forceFill([
-            'order_id' => $order->id,
-            'kind' => OrderPayment::PAYMENT,
-            'payment_method' => 'gateway',
-            'provider' => $plan->payment_provider,
-            'mode' => $mode,
-            'status' => OrderPayment::PENDING,
-            'reference' => 'INS-'.$order->order_number.'-'.$payment->sequence.'-'.Str::upper(Str::random(6)),
-            'amount_due' => $amount,
-            'amount_paid' => $amount,
-            'currency_code' => $order->currency_code,
-            'installment_payment_id' => $payment->id,
-            'meta' => ['stored_authorization' => true],
-        ])->save();
-
-        try {
-            $result = $this->factory->forTenant($plan->payment_provider, $mode)->chargeAuthorization($plan->authorization_token, new ChargeRequest(
-                amount: $amount,
-                currencyCode: $order->currency_code,
-                reference: $row->reference,
-                customerEmail: (string) $order->customer_email,
-                customerName: $order->customer_name,
-                metadata: ['order_number' => $order->order_number, 'installment' => $payment->sequence],
-                description: 'Installment '.$payment->sequence.' of order '.$order->order_number,
-            ));
-        } catch (PaymentGatewayException $e) {
-            if (! $e->pending) {
-                app(OrderPaymentService::class)->completeGatewayPayment($row, ['status' => 'failed', 'failure_reason' => 'charge_rejected']);
-            }
-
-            return $row->refresh();
-        }
-
-        if ($result['status'] !== 'pending') {
-            app(OrderPaymentService::class)->completeGatewayPayment($row, [
-                'status' => $result['status'],
-                'provider_reference' => $result['provider_reference'],
-                'failure_reason' => $result['failure_reason'],
-            ]);
-        }
-
-        return $row->refresh();
+        return app(OrderPaymentService::class)->chargeStoredAuthorization($plan->order, $plan->payment_provider, $plan->authorization_token,
+            Money::sub((string) $payment->amount_due, (string) $payment->amount_paid), $payment);
     }
 
     /**

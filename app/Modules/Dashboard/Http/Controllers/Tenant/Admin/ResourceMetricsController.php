@@ -10,16 +10,20 @@ use App\Modules\Customers\Metrics\CustomerMetrics;
 use App\Modules\Dashboard\Services\Tenant\TenantDashboardService;
 use App\Modules\Expenses\Metrics\ExpenseMetrics;
 use App\Modules\GiftCards\Metrics\GiftCardMetrics;
+use App\Modules\Hr\Metrics\HrMetrics;
 use App\Modules\Inventory\Metrics\InventoryMetrics;
 use App\Modules\Marketplace\Metrics\MarketplaceMetrics;
-use App\Modules\Purchasing\Metrics\PurchasingMetrics;
-use App\Modules\SalesQuotations\Metrics\SalesQuotationMetrics;
 use App\Modules\Orders\Metrics\OrderMetrics;
 use App\Modules\Payments\Metrics\PaymentMetrics;
+use App\Modules\ProductSubscriptions\Metrics\ProductSubscriptionMetrics;
+use App\Modules\Projects\Metrics\ProjectMetrics;
 use App\Modules\Promotions\Metrics\PromotionMetrics;
+use App\Modules\Purchasing\Metrics\PurchasingMetrics;
 use App\Modules\Returns\Metrics\ReturnMetrics;
 use App\Modules\Reviews\Metrics\ReviewMetrics;
+use App\Modules\SalesQuotations\Metrics\SalesQuotationMetrics;
 use App\Modules\Shipping\Metrics\ShipmentMetrics;
+use App\Modules\Support\Metrics\SupportMetrics;
 use App\Modules\Users\Models\User;
 use App\Shared\Http\APIResponse;
 use App\Shared\Http\Requests\MetricsRangeRequest;
@@ -60,6 +64,10 @@ final class ResourceMetricsController extends Controller
         'gift-cards' => [GiftCardMetrics::class, 'contextual'],
         'sellers' => [MarketplaceMetrics::class, 'sellersStrip'],
         'sales-quotation-requests' => [SalesQuotationMetrics::class, 'contextual'],
+        'product-subscriptions' => [ProductSubscriptionMetrics::class, 'contextual'],
+        'hr-employees' => [HrMetrics::class, 'contextual'],
+        'support-conversations' => [SupportMetrics::class, 'contextual'],
+        'projects' => [ProjectMetrics::class, 'contextual'],
     ];
 
     public function metrics(MetricsRangeRequest $request, TenantDashboardService $dashboard, Container $container): JsonResponse

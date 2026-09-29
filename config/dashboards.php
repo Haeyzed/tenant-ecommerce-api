@@ -13,18 +13,23 @@ use App\Modules\Customers\Metrics\CustomerMetrics;
 use App\Modules\Dashboard\Metrics\OperationsMetrics;
 use App\Modules\Expenses\Metrics\ExpenseMetrics;
 use App\Modules\GiftCards\Metrics\GiftCardMetrics;
+use App\Modules\Hr\Metrics\HrMetrics;
+use App\Modules\Installments\Metrics\InstallmentMetrics;
 use App\Modules\Inventory\Metrics\InventoryMetrics;
 use App\Modules\Marketplace\Metrics\MarketplaceMetrics;
 use App\Modules\Orders\Metrics\OrderMetrics;
 use App\Modules\Orders\Metrics\SalesMetrics;
 use App\Modules\Payments\Metrics\PaymentMetrics as TenantPaymentMetrics;
 use App\Modules\Pos\Metrics\PosMetrics;
+use App\Modules\ProductSubscriptions\Metrics\ProductSubscriptionMetrics;
+use App\Modules\Projects\Metrics\ProjectMetrics;
 use App\Modules\Promotions\Metrics\PromotionMetrics;
 use App\Modules\Purchasing\Metrics\PurchasingMetrics;
 use App\Modules\Returns\Metrics\ReturnMetrics;
 use App\Modules\RewardPoints\Metrics\RewardPointMetrics;
 use App\Modules\SalesAgents\Metrics\SalesAgentMetrics;
 use App\Modules\SalesQuotations\Metrics\SalesQuotationMetrics;
+use App\Modules\Support\Metrics\SupportMetrics;
 use App\Modules\Tenancy\Metrics\TenantMetrics;
 
 /*
@@ -233,6 +238,41 @@ return [
             'feature' => 'reward_points',
             'permission' => 'reward-points.settings',
             'parts' => [[RewardPointMetrics::class, 'rewardPoints']],
+            'alerts' => [],
+        ],
+        'hr' => [
+            'label' => 'Human resources',
+            'feature' => 'hr',
+            'permission' => 'hr.employees.view',
+            'parts' => [[HrMetrics::class, 'hr']],
+            'alerts' => [],
+        ],
+        'projects' => [
+            'label' => 'Projects',
+            'feature' => 'project_management',
+            'permission' => 'projects.view',
+            'parts' => [[ProjectMetrics::class, 'projects']],
+            'alerts' => [],
+        ],
+        'support' => [
+            'label' => 'Customer support',
+            'feature' => 'support',
+            'permission' => 'support.conversations.view',
+            'parts' => [[SupportMetrics::class, 'support']],
+            'alerts' => [],
+        ],
+        'installments' => [
+            'label' => 'Installments',
+            'feature' => 'installments',
+            'permission' => 'installment-plans.view',
+            'parts' => [[InstallmentMetrics::class, 'installments']],
+            'alerts' => [],
+        ],
+        'product_subscriptions' => [
+            'label' => 'Product subscriptions',
+            'feature' => 'product_subscriptions',
+            'permission' => 'product-subscriptions.view',
+            'parts' => [[ProductSubscriptionMetrics::class, 'productSubscriptions']],
             'alerts' => [],
         ],
         'marketplace' => [

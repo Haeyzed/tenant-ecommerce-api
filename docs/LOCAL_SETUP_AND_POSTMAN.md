@@ -1165,7 +1165,77 @@ php artisan tenants:sync-defaults
 
 ---
 
-## 17. Troubleshooting
+## 17. Subscribe and save, and "notify me when it's back" ➡ you
+
+### 17.1 Product subscriptions
+
+Product subscriptions need the **Premium** plan. A customer gets a product delivered on a schedule ("coffee every month"), at a discount you choose. Every delivery is a normal order: it reserves stock, ships and shows up in your order list like any other.
+
+```http
+POST  /admin/modules/product_subscriptions/enable
+PATCH /admin/products/{id}                          { "is_subscribable": true, "subscription_discount_percent": 10 }
+POST  /admin/products/{id}/subscription-plans       { "interval": "monthly" }            (weekly, biweekly, monthly or quarterly)
+POST  /admin/products/{id}/subscription-plans       { "interval": "monthly", "interval_count": 2 }   (every two months)
+DELETE /admin/products/{id}/subscription-plans/{plan}   (stops new sign-ups; existing subscriptions carry on)
+```
+
+**Customer side** (customer token):
+
+```http
+GET    /products/{slug}/subscription-plans          (no token needed: the schedules and the discount)
+POST   /account/product-subscriptions               { "product_id": 7, "product_subscription_plan_id": 2, "quantity": 2, "address_id": 3, "shipping_method_id": 1 }
+POST   /orders/{order}/pay                          { "gateway": "paystack" }   (the order returned above; this saves the card)
+GET    /account/product-subscriptions
+PATCH  /account/product-subscriptions/{id}          { "quantity": 3 }   (also product_variant_id, address_id, shipping_method_id)
+PATCH  /account/product-subscriptions/{id}/pause    (and /resume)
+DELETE /account/product-subscriptions/{id}          (cancels)
+```
+
+- **Starting.** The subscription starts when the first order is paid online with a card the provider can save. If the provider can't save the card, the order still ships, but the subscription doesn't start and the customer is told.
+- **Renewals.** The overnight job creates each renewal order at that day's price, minus the subscription discount, and charges the saved card. The queue worker and scheduler must be running.
+- **A failed charge** is retried each night. The customer is told each time, and the subscription is cancelled after `product_subscription_max_failed_renewals` failures (default 3). The unpaid renewal order is cancelled, so its stock goes back.
+- **Out of stock on renewal day?** The renewal waits and is tried again each night. It doesn't count as a failed payment, and staff can see why in `last_renewal_error`.
+- **Resuming** a paused subscription restarts the schedule from the day it's resumed.
+
+**Store side:**
+
+```http
+GET   /admin/product-subscriptions?status=payment_failed
+GET   /admin/product-subscriptions/{id}               (includes every order it made)
+PATCH /admin/product-subscriptions/{id}/cancel        (the customer is emailed)
+GET   /admin/product-subscriptions/metrics
+GET   /admin/dashboard/product_subscriptions?range=this_month
+```
+
+You can't switch the module off while any subscription is still running (`422 module_disable_blocked`): cancel them first. If your plan changes and the module becomes locked, existing subscriptions keep renewing.
+
+### 17.2 Back-in-stock alerts
+
+Back-in-stock alerts come with the **Standard** plan and above, and are switched on automatically. On an out-of-stock product, a shopper, even one without an account, leaves an email address:
+
+```http
+POST /products/{slug}/back-in-stock-alert           { "email": "…", "product_variant_id": 12 }   (variant optional; a signed-in customer can leave out the email)
+GET  /admin/products/{id}/back-in-stock-subscribers  (who is waiting, by size or colour)
+```
+
+- **When it's sent.** As soon as stock comes back (a stock adjustment, a purchase receipt, a return), everyone waiting gets one email.
+- **Bundles.** Restocking a part of a bundle also alerts people waiting for the bundle, once the bundle can be made.
+- **Refused requests.** The request is refused if the item is in stock or never runs out (digital and service products).
+- **Switching it off:** `POST /admin/modules/back_in_stock_alerts/disable`.
+
+After pulling this step:
+
+```powershell
+php artisan tenants:migrate
+php artisan tenants:sync-defaults
+php artisan config:clear
+```
+
+Then restart `queue:work` and `schedule:work`.
+
+---
+
+## 18. Troubleshooting
 
 | Symptom | Cause / fix |
 |---|---|
