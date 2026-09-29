@@ -1146,6 +1146,16 @@ POST      /seller/product-questions/{id}/answers { "answer": "…" }
   ```
 - **With accounting on,** the seller's share moves from sales revenue into commission revenue and "payable to sellers", and marking a payout paid clears the payable.
 
+### 16.4 Switching the marketplace off
+
+- **Pay first.** You can't disable the marketplace while any seller is still owed money (`422 module_disable_blocked`). Pay them out first. In the same way, POS can't be disabled while a register session is open.
+- **What happens when it's off:**
+  - seller products disappear from the storefront, carts and checkout, but stay in your admin catalogue;
+  - sellers can still sign in, see their products, orders, ledger and payouts, and you can still pay them;
+  - sellers can't register or change products.
+
+Helpful extras: `GET /admin/sellers/metrics` (the KPI strip for the sellers list), `GET /admin/lookups/seller-groups`, and `GET /admin/orders?seller_id=3`.
+
 After pulling this step:
 
 ```powershell

@@ -125,6 +125,8 @@ it('issues a gift card once, pays part of an order with it and credits it back w
     // The gift-cards dashboard section: redeemed then credited back nets to zero.
     $section = $this->tenantJson('GET', '/api/admin/dashboard/gift_cards?range=today&compare=none', [], $this->staff)->assertOk()->json('data');
     expect(collect($section['kpis'])->pluck('value', 'key')->all())->toMatchArray(['issued_value' => '3000.0000', 'redeemed_value' => '0.0000', 'outstanding_liability' => '3000.0000']);
+    $strip = collect($this->tenantJson('GET', '/api/admin/gift-cards/metrics?range=today&compare=none', [], $this->staff)->assertOk()->json('data.kpis'))->pluck('value', 'key')->all();
+    expect($strip)->toMatchArray(['active_cards' => 1, 'outstanding_balance' => '3000.0000', 'issued_value' => '3000.0000']);
 
     // A disabled card is refused on the cart.
     $this->tenantJson('PATCH', "/api/admin/gift-cards/{$card['id']}/disable", [], $this->staff)->assertOk()->assertJsonPath('data.status', 'disabled');

@@ -294,4 +294,9 @@ it('keeps registers within the plan and the warehouse ceiling', function (): voi
     $this->tenantJson('POST', '/api/admin/pos/sessions', ['register_id' => $this->register['id'], 'opening_cash_float' => '0'], $this->staff)->assertCreated();
     $this->tenantJson('DELETE', "/api/admin/pos/registers/{$this->register['id']}", [], $this->staff)->assertStatus(409)->assertJsonPath('meta.error_code', 'session_open');
     $this->tenantJson('GET', "/api/admin/pos/registers/{$this->register['id']}/current-session", [], $this->staff)->assertOk()->assertJsonPath('data.status', 'open');
+
+    // …and POS cannot be switched off while a drawer is still open (§11.5).
+    $this->tenantJson('POST', '/api/admin/modules/pos/disable', [], $this->staff)->assertStatus(422)->assertJsonPath('meta.error_code', 'module_disable_blocked');
+    $this->tenantJson('GET', '/api/admin/lookups/pos-terminal-providers', [], $this->staff)->assertOk()->assertJsonCount(3, 'data');
+    $this->tenantJson('GET', '/api/admin/lookups/pos-payment-methods', [], $this->staff)->assertOk()->assertJsonPath('data.0.value', 'cash');
 });

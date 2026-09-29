@@ -98,6 +98,8 @@ it('quotes a customer request and turns the accepted quote into an order at the 
 
     $section = $this->tenantJson('GET', '/api/admin/dashboard/sales_quotations?range=today&compare=none', [], $this->staff)->assertOk()->json('data');
     expect(collect($section['kpis'])->pluck('value', 'key')->all())->toMatchArray(['quotations_sent' => 1, 'quotations_accepted' => 1, 'accepted_value' => '370875.0000']);
+    $strip = collect($this->tenantJson('GET', '/api/admin/sales-quotation-requests/metrics?range=today&compare=none', [], $this->staff)->assertOk()->json('data.kpis'))->pluck('value', 'key')->all();
+    expect($strip)->toMatchArray(['awaiting_quote' => 0, 'sent' => 1, 'accepted' => 1]);
 });
 
 it('lets staff draft, check stock, reject and expire quotations', function (): void {

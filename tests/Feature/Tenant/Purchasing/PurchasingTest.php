@@ -133,6 +133,9 @@ it('buys stock: supplier, draft order with supplier costs, submit, partial and f
     $section = $this->tenantJson('GET', '/api/admin/dashboard/purchasing?range=today&compare=none', [], $this->auth)->assertOk()->json('data');
     expect(collect($section['kpis'])->pluck('value', 'key')->all())->toMatchArray(['open_purchase_orders' => 0, 'received_value' => '200000.0000', 'supplier_balance' => '200000.0000'])
         ->and($section['tables'][0]['rows'][0])->toMatchArray(['name' => 'Lagos Leather', 'orders' => 1, 'spend' => '200000.0000']);
+    $strip = collect($this->tenantJson('GET', '/api/admin/purchase-orders/metrics?range=today&compare=none', [], $this->auth)->assertOk()->json('data.kpis'))->pluck('value', 'key')->all();
+    expect($strip)->toMatchArray(['open' => 0, 'awaiting_receipt' => 0, 'received_value' => '200000.0000', 'outstanding_balance' => '200000.0000']);
+    $this->tenantJson('GET', '/api/admin/lookups/suppliers', [], $this->auth)->assertOk()->assertJsonPath('data.0.label', 'Lagos Leather');
 });
 
 it('pays suppliers, keeps order and supplier balances, and returns stock with a refund', function (): void {

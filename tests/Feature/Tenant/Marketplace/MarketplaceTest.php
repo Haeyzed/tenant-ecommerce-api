@@ -171,7 +171,7 @@ it('switches the marketplace off only once sellers are paid, then winds down', f
     $sale = sellerPosSale($register, $basket['id'], 1, '10000')->assertCreated()->json('data.sale');
 
     $this->tenantJson('GET', "/api/admin/orders?seller_id={$seller['id']}", [], $this->staff)->assertOk()->assertJsonPath('data.0.id', $sale['id']);
-    $strip = collect($this->tenantJson('GET', '/api/admin/sellers/metrics', [], $this->staff)->assertOk()->json('data'))->pluck('value', 'key')->all();
+    $strip = collect($this->tenantJson('GET', '/api/admin/sellers/metrics', [], $this->staff)->assertOk()->json('data.kpis'))->pluck('value', 'key')->all();
     expect($strip)->toMatchArray(['approved' => 1, 'pending' => 0, 'payable_balance' => '10000.0000']);
     $this->tenantJson('GET', '/api/admin/lookups/seller-groups', [], $this->staff)->assertOk();
 
