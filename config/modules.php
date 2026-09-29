@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Modules\AiAssistant\Support\AiAssistantLifecycle;
 use App\Modules\Hr\Support\HrPayrollLifecycle;
 use App\Modules\Marketplace\Support\MarketplaceLifecycle;
 use App\Modules\Pos\Support\PosLifecycle;
@@ -79,7 +80,7 @@ return [
     'support' => $module('Customer support', 'module', '§59', 'Support', ['support']),
     'approval_workflows' => $module('Approval workflow engine', 'capability', '§60', 'Approvals', ['approval-workflows', 'approvals'], windDown: ['tenant.admin.approvals.approve', 'tenant.admin.approvals.reject']),
     'advanced_reporting' => $module('Advanced reports', 'capability', '§61', 'Reporting', ['reports'], activation: 'auto', readWhenInactive: false),
-    'ai_assistant' => $module('AI business assistant', 'module', '§62', 'AiAssistant', ['ai-assistant'], readWhenInactive: false),
+    'ai_assistant' => $module('AI business assistant', 'module', '§62', 'AiAssistant', ['ai-assistant'], lifecycle: AiAssistantLifecycle::class, readWhenInactive: false),
     'project_management' => $module('Projects and tasks', 'module', '§63', 'Projects', ['projects', 'project-categories'], customFieldEntities: ['project']),
     'content_marketing' => $module('Blog, FAQs and testimonials', 'capability', '§24.4', 'Cms', ['cms.blog-categories', 'cms.blog-posts', 'cms.tags', 'cms.faq-categories', 'cms.faqs', 'cms.testimonials'], activation: 'auto'),
     'custom_email' => $module("Tenant's own mail provider", 'capability', '§16.2', 'Messaging', ['settings.mail'], activation: 'auto'),

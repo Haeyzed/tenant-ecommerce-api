@@ -22,6 +22,8 @@ final readonly class ExportDefinition
      * @param  list<string>  $formats
      * @param  string|null  $permission  required of staff requesters; null for customer self-service types
      * @param  string|null  $module  feature key whose data this is; canRead() must hold (§19.4)
+     * @param  list<string>  $requires  further feature keys that must be enabled (a report over an optional module, §61.2)
+     * @param  (Closure(array<string, mixed>): array<string, string>)|null  $columnsFor  the columns when they depend on the parameters
      */
     public function __construct(
         public string $type,
@@ -32,5 +34,16 @@ final readonly class ExportDefinition
         public array $formats = ['csv', 'json'],
         public ?string $permission = null,
         public ?string $module = null,
+        public array $requires = [],
+        public ?Closure $columnsFor = null,
     ) {}
+
+    /**
+     * @param  array<string, mixed>  $parameters
+     * @return array<string, string> row key => header label
+     */
+    public function columns(array $parameters): array
+    {
+        return $this->columnsFor === null ? $this->columns : ($this->columnsFor)($parameters);
+    }
 }

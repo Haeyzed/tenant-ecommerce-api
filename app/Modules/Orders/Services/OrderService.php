@@ -683,6 +683,27 @@ final readonly class OrderService
     }
 
     /**
+     * Live orders still to be fulfilled (pending or processing), oldest
+     * first, within the viewer's staff scope (§25.3): the AI assistant's
+     * pending_orders (§62.2).
+     *
+     * @return array{count: int, by_status: array<string, int>, orders: list<Order>}
+     */
+    public function getPendingOrders(?User $viewer = null, int $limit = 10): array
+    {
+        $visible = $this->warehouses->visibleIds($viewer);
+        $query = Order::query()->where('is_test', false)->whereIn('status', [Order::PENDING, Order::PROCESSING])
+            ->when($visible !== null, static fn (Builder $q) => $q->whereHas('items', static fn (Builder $i) => $i->whereIn('warehouse_id', $visible)));
+        $byStatus = (clone $query)->toBase()->selectRaw('status, COUNT(*) as n')->groupBy('status')->pluck('n', 'status')->map(static fn ($n): int => (int) $n)->all();
+
+        return [
+            'count' => array_sum($byStatus),
+            'by_status' => $byStatus,
+            'orders' => $query->orderBy('placed_at')->orderBy('id')->limit($limit)->get(['id', 'order_number', 'status', 'payment_status', 'customer_name', 'total', 'currency_code', 'placed_at'])->all(),
+        ];
+    }
+
+    /**
      * @return LengthAwarePaginator<int, Order>
      */
     public function listOrdersForCustomer(Customer $customer, int $perPage = 20): LengthAwarePaginator

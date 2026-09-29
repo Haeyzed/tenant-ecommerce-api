@@ -70,9 +70,11 @@ final class DataExportController extends Controller
     }
 
     /**
+     * The export payload, shared by every route that starts an export.
+     *
      * @return array<string, mixed>
      */
-    private function present(DataExport $export): array
+    public static function present(DataExport $export): array
     {
         return [
             'id' => $export->id,

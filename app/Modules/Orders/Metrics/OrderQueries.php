@@ -12,7 +12,9 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * The shared definitions of the order metrics (spec §44.1, §44.2), so every
- * provider and KPI strip counts the same orders the same way.
+ * provider, KPI strip and report (§61) counts the same orders the same way.
+ * Reports pass the read connection (§6.6); everything else reads the
+ * primary.
  */
 final class OrderQueries
 {
@@ -25,13 +27,16 @@ final class OrderQueries
     /** A line's discount (every promotion, with its order-level share), tax-exclusive, base currency. */
     public const string LINE_DISCOUNT = 'oi.discount_amount / (CASE WHEN o.prices_include_tax = 1 THEN 1 + oi.tax_rate_applied / 100 ELSE 1 END) * COALESCE(o.exchange_rate_used, 1)';
 
+    /** A line's cost at the time of sale (§5.8), base currency; null when unknown. */
+    public const string LINE_COST = 'oi.unit_cost_snapshot * oi.quantity * COALESCE(o.exchange_rate_used, 1)';
+
     /**
      * Included orders (§44.1): confirmed, live, not cancelled, standard,
      * within the staff scope. Date filtering is the caller's (confirmed_at).
      */
-    public static function included(MetricsScope $scope): Builder
+    public static function included(MetricsScope $scope, string $connection = 'tenant'): Builder
     {
-        return $scope->orders(DB::connection('tenant')->table('orders as o')
+        return $scope->orders(DB::connection($connection)->table('orders as o')
             ->where('o.is_test', false)
             ->whereNotNull('o.confirmed_at')
             ->where('o.status', '!=', Order::CANCELLED)
@@ -43,17 +48,17 @@ final class OrderQueries
      * Lines of included orders; a narrowed user sees only lines of their
      * warehouses.
      */
-    public static function includedLines(MetricsScope $scope): Builder
+    public static function includedLines(MetricsScope $scope, string $connection = 'tenant'): Builder
     {
-        return $scope->column(self::included($scope)->join('order_items as oi', 'oi.order_id', '=', 'o.id'), 'oi.warehouse_id');
+        return $scope->column(self::included($scope, $connection)->join('order_items as oi', 'oi.order_id', '=', 'o.id'), 'oi.warehouse_id');
     }
 
     /**
      * Every live order (for status counts by placed_at).
      */
-    public static function placed(MetricsScope $scope): Builder
+    public static function placed(MetricsScope $scope, string $connection = 'tenant'): Builder
     {
-        return $scope->orders(DB::connection('tenant')->table('orders as o')->where('o.is_test', false)->whereNull('o.deleted_at'));
+        return $scope->orders(DB::connection($connection)->table('orders as o')->where('o.is_test', false)->whereNull('o.deleted_at'));
     }
 
     /**
@@ -62,9 +67,9 @@ final class OrderQueries
      *
      * @param  list<string>  $kinds
      */
-    public static function reversals(MetricsScope $scope, array $kinds = ['refund']): Builder
+    public static function reversals(MetricsScope $scope, array $kinds = ['refund'], string $connection = 'tenant'): Builder
     {
-        return $scope->orders(DB::connection('tenant')->table('order_payments as op')
+        return $scope->orders(DB::connection($connection)->table('order_payments as op')
             ->join('orders as o', 'o.id', '=', 'op.order_id')
             ->whereIn('op.kind', $kinds)
             ->where('op.status', 'successful')
@@ -77,14 +82,21 @@ final class OrderQueries
      * "Returns"): each row less its order's tax share (A-44), in the base
      * currency, gift-card purchases excluded.
      */
-    public static function returnsValue(MetricsScope $scope, DateRange $range): string
+    public static function returnsValue(MetricsScope $scope, DateRange $range, string $connection = 'tenant'): string
     {
-        $value = self::reversals($scope, ['refund', 'chargeback'])
-            ->where('o.order_type', '!=', 'gift_card_purchase')
+        $value = self::returns($scope, $connection)
             ->whereBetween('op.paid_at', [$range->startUtc(), $range->endUtc()])
             ->value(DB::raw(self::RETURNS_SUM));
 
         return bcadd((string) ($value ?? '0'), '0', 4);
+    }
+
+    /**
+     * The refund and chargeback rows that count as returns (§44.2).
+     */
+    public static function returns(MetricsScope $scope, string $connection = 'tenant'): Builder
+    {
+        return self::reversals($scope, ['refund', 'chargeback'], $connection)->where('o.order_type', '!=', 'gift_card_purchase');
     }
 
     /** SUM of tax-exclusive refund value; see returnsValue(). */

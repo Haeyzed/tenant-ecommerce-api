@@ -1351,7 +1351,55 @@ php artisan tenants:sync-defaults
 
 ---
 
-## 19. Troubleshooting
+## 19. Reports and the business assistant ➡ you
+
+### 19.1 Advanced reports
+
+Advanced reports come with the **Standard** plan and above, and are switched on automatically. All 35 reports are read-only.
+
+```http
+GET /admin/reports/sales/daily?date=2026-10-01
+GET /admin/reports/sales?from=2026-10-01&to=2026-10-31&per_page=50&page=1
+GET /admin/reports/profit-by-product?from=2026-10-01&to=2026-10-31&category_id=3
+GET /admin/reports/stock?warehouse_id=1
+POST /admin/reports/profit-by-product/export      { "format": "csv", "filters": { "from": "2026-10-01", "to": "2026-10-31" } }   (or "pdf")
+```
+
+- **Filters:** every report takes the filters that apply to it: `from`, `to` (the store's calendar days; default the last 30 days), `warehouse_id`, `customer_id`, `supplier_id`, `category_id`, `brand_id`, `tag_id`, `payment_method`, `order_source` and `user_id`.
+- **The response** has `summary` (for the whole range), `columns`, `rows` (a page at a time), and `chart` and `notes` where they apply.
+- **Sales figures match the dashboard exactly.** Profit uses the cost price recorded when each item was sold.
+- **Reports over optional modules** (purchases, suppliers, cash register, installments, customer deals, billers) also need that module switched on.
+- **Exports** arrive like any other export: you get an "export ready" message, then download from `/admin/exports/{id}/download`. A PDF holds up to 2,000 rows; use CSV for more.
+- **Permissions:** each report has its own view permission, such as `reports.profit-by-product.view`. Exporting also needs `reports.export`.
+- **Big stores** can point reports at a read-only copy of the database. Set a `read_host` on the tenant's database server (landlord admin); reports then read from that copy, and everything else still uses the main database.
+
+### 19.2 Business assistant
+
+The business assistant needs the **Premium** plan. It answers everyday questions from your own data. It uses no outside AI service and costs nothing extra to run.
+
+```http
+POST  /admin/modules/ai_assistant/enable
+POST  /admin/ai-assistant/ask                        { "question": "What were today's sales?" }
+GET   /admin/ai-assistant/intents
+PATCH /admin/ai-assistant/intents/{id}/toggle        { "is_active": false }
+GET   /admin/ai-assistant/query-logs?matched=0       (questions it couldn't answer)
+```
+
+- **What it answers:** today's sales, a daily snapshot, best sellers, pending orders, low stock, out of stock, and, when those modules are on, today's purchases, what you owe suppliers and today's expenses.
+- **It never guesses.** Anything else gets: "I can help with sales, purchases, expenses, stock and order questions."
+- **It answers with the asker's permissions.** Someone without stock access who asks about stock is told which permission they need.
+
+After pulling this step:
+
+```powershell
+php artisan tenants:migrate
+php artisan tenants:sync-defaults
+php artisan config:clear
+```
+
+---
+
+## 20. Troubleshooting
 
 | Symptom | Cause / fix |
 |---|---|

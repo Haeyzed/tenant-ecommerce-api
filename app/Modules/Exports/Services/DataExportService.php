@@ -51,6 +51,12 @@ final readonly class DataExportService
             throw ApiException::forbidden('feature_unavailable', 'This data is not available on your plan.', ['module' => $definition->module]);
         }
 
+        foreach ($definition->requires as $required) {
+            if (! $this->features->tenantCanAccess($tenant, $required)) {
+                throw ApiException::forbidden('feature_unavailable', 'This data is not available on your plan.', ['module' => $required]);
+            }
+        }
+
         ksort($validated);
 
         return DB::connection('tenant')->transaction(function () use ($type, $validated, $format, $requestedBy): DataExport {

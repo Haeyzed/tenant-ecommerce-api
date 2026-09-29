@@ -197,7 +197,7 @@ final readonly class InventoryService
      * products) with available stock at or below the low-stock threshold
      * but above zero.
      *
-     * @param  array{search?: string, per_page?: int}  $filters
+     * @param  array{search?: string, per_page?: int, page?: int}  $filters  page: explicit for callers without a request (report exports)
      * @return LengthAwarePaginator<int, object>
      */
     public function getLowStockProducts(Warehouse|array|null $warehouse = null, array $filters = []): LengthAwarePaginator
@@ -205,7 +205,7 @@ final readonly class InventoryService
         return $this->stockLevels($warehouse, $filters)
             ->whereRaw('(COALESCE(s.quantity, 0) - COALESCE(s.reserved, 0)) > 0')
             ->whereRaw('(COALESCE(s.quantity, 0) - COALESCE(s.reserved, 0)) <= '.self::THRESHOLD_SQL, [$this->defaultLowStockThreshold()])
-            ->paginate((int) ($filters['per_page'] ?? 25));
+            ->paginate((int) ($filters['per_page'] ?? 25), ['*'], 'page', isset($filters['page']) ? (int) $filters['page'] : null);
     }
 
     private function defaultLowStockThreshold(): int

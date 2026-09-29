@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Modules\Exports\Jobs;
 
+use App\Modules\Documents\Contracts\DocumentRenderer;
 use App\Modules\Exports\Models\DataExport;
+use App\Modules\Exports\Support\ExportContext;
 use App\Modules\Exports\Support\ExportRegistry;
 use App\Modules\Notifications\Services\NotificationDispatchService;
 use App\Modules\Tenancy\Models\Tenant;
@@ -37,6 +39,9 @@ final class GenerateExport implements ShouldBeUnique, ShouldQueue
 
     public int $uniqueFor = 3600;
 
+    /** Rows a PDF holds at most; the file notes when more were left out. */
+    public const int PDF_MAX_ROWS = 2000;
+
     public function __construct(public readonly int $exportId)
     {
         $this->onQueue('tenant-bulk');
@@ -58,6 +63,9 @@ final class GenerateExport implements ShouldBeUnique, ShouldQueue
         $export->forceFill(['status' => DataExport::PROCESSING, 'error' => null])->save();
 
         $definition = $registry->get($export->export_type);
+        // Types that depend on who asks read the requester here, never from the parameters.
+        app()->instance(ExportContext::class, new ExportContext($export->requestedBy));
+        $columns = $definition->columns((array) $export->parameters);
         $path = tempnam(sys_get_temp_dir(), 'export');
         $handle = fopen((string) $path, 'wb');
 
@@ -66,25 +74,34 @@ final class GenerateExport implements ShouldBeUnique, ShouldQueue
         }
 
         $rows = 0;
+        $pdfRows = [];
+        $truncated = false;
 
         try {
             if ($export->format === 'csv') {
-                fputcsv($handle, array_values($definition->columns), escape: '');
-            } else {
+                fputcsv($handle, array_values($columns), escape: '');
+            } elseif ($export->format === 'json') {
                 fwrite($handle, '[');
             }
 
             foreach (($definition->rows)($export->parameters) as $row) {
                 $values = [];
 
-                foreach (array_keys($definition->columns) as $key) {
+                foreach (array_keys($columns) as $key) {
                     $values[$key] = $row[$key] ?? null;
                 }
 
                 if ($export->format === 'csv') {
                     fputcsv($handle, array_map(self::csvCell(...), array_values($values)), escape: '');
-                } else {
+                } elseif ($export->format === 'json') {
                     fwrite($handle, ($rows > 0 ? ',' : '').json_encode($values, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE));
+                } elseif ($rows < self::PDF_MAX_ROWS) {
+                    $pdfRows[] = array_map(static fn (mixed $v): string => is_scalar($v) || $v === null ? (string) $v : (string) json_encode($v), $values);
+                } else {
+                    // A PDF is for reading, not a data dump: CSV carries every row.
+                    $truncated = true;
+
+                    break;
                 }
 
                 $rows++;
@@ -92,6 +109,17 @@ final class GenerateExport implements ShouldBeUnique, ShouldQueue
 
             if ($export->format === 'json') {
                 fwrite($handle, ']');
+            }
+
+            if ($export->format === 'pdf') {
+                fwrite($handle, app(DocumentRenderer::class)->pdf('exports.table', [
+                    'title' => $definition->label,
+                    'columns' => array_values($columns),
+                    'rows' => $pdfRows,
+                    'parameters' => (array) $export->parameters,
+                    'generatedAt' => now(),
+                    'truncated' => $truncated ? self::PDF_MAX_ROWS : null,
+                ], 'a4', count($columns) > 5 ? 'landscape' : 'portrait'));
             }
 
             fclose($handle);

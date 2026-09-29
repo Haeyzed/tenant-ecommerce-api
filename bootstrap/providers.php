@@ -17,6 +17,7 @@ use App\Modules\ProductSubscriptions\ProductSubscriptionsServiceProvider;
 use App\Modules\Projects\ProjectsServiceProvider;
 use App\Modules\Promotions\PromotionsServiceProvider;
 use App\Modules\Purchasing\PurchasingServiceProvider;
+use App\Modules\Reporting\ReportingServiceProvider;
 use App\Modules\Returns\ReturnsServiceProvider;
 use App\Modules\Reviews\ReviewsServiceProvider;
 use App\Modules\RewardPoints\RewardPointsServiceProvider;
@@ -53,5 +54,6 @@ return [
     HrServiceProvider::class,
     SupportServiceProvider::class,
     ProjectsServiceProvider::class,
+    ReportingServiceProvider::class,
     ApiDocsServiceProvider::class,
 ];

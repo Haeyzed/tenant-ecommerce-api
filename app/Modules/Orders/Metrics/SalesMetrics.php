@@ -12,6 +12,8 @@ use App\Shared\Metrics\MetricsScope;
 use App\Shared\Metrics\SectionResult;
 use App\Shared\Metrics\TableBlock;
 use App\Shared\Metrics\TimeSeries;
+use Closure;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -88,22 +90,73 @@ final readonly class SalesMetrics
     }
 
     /**
+     * The §44.2 sales figures of included orders confirmed in the range.
+     * Reports (§61) pass their filters and the read connection, so a report
+     * and the dashboard compute every figure with the same code. $filter
+     * receives each query: the orders (second argument false; also the
+     * returns query) and the order lines (true).
+     *
+     * @param  (Closure(Builder, bool): mixed)|null  $filter
      * @return array{gross_sales: string, discounts: string, returns: string, net_sales: string, tax: string, shipping_revenue: string, total_sales: string, orders: int, average_order_value: string, units_sold: string, gross_profit: string, cost_unknown_lines: int}
      */
-    private function totals(DateRange $range, MetricsScope $scope): array
+    public function summary(DateRange $range, MetricsScope $scope, ?Closure $filter = null, string $connection = 'tenant'): array
+    {
+        return $this->totals($range, $scope, $filter, $connection);
+    }
+
+    /**
+     * The best-selling products by net sales (§44.2 line value less
+     * discounts): the dashboard table and the assistant's top_selling_products.
+     *
+     * @return list<array{product_id: int, name: string|null, units: string, net_sales: string, currency_code: string}>
+     */
+    public function topProductRows(DateRange $range, MetricsScope $scope, int $limit = TableBlock::MAX_ROWS): array
+    {
+        $currency = $this->currency();
+
+        return OrderQueries::includedLines($scope)
+            ->whereBetween('o.confirmed_at', [$range->startUtc(), $range->endUtc()])
+            ->whereNotNull('oi.product_id')
+            ->leftJoin('products as p', 'p.id', '=', 'oi.product_id')
+            ->groupBy('oi.product_id', 'p.name')
+            ->selectRaw('oi.product_id, p.name, SUM(oi.quantity) as units, SUM('.OrderQueries::LINE_GROSS.' - '.OrderQueries::LINE_DISCOUNT.') as net_sales')
+            ->orderByDesc('net_sales')
+            ->limit($limit)
+            ->get()
+            ->map(static fn ($r): array => [
+                'product_id' => (int) $r->product_id,
+                'name' => $r->name,
+                'units' => bcadd((string) $r->units, '0', 3),
+                'net_sales' => bcadd((string) $r->net_sales, '0', 4),
+                'currency_code' => $currency,
+            ])->all();
+    }
+
+    /**
+     * @param  (Closure(Builder, bool): mixed)|null  $filter
+     * @return array{gross_sales: string, discounts: string, returns: string, net_sales: string, tax: string, shipping_revenue: string, total_sales: string, orders: int, average_order_value: string, units_sold: string, gross_profit: string, cost_unknown_lines: int}
+     */
+    private function totals(DateRange $range, MetricsScope $scope, ?Closure $filter = null, string $connection = 'tenant'): array
     {
         $between = [$range->startUtc(), $range->endUtc()];
         $gross = OrderQueries::LINE_GROSS;
         $discount = OrderQueries::LINE_DISCOUNT;
+        $apply = static function (Builder $query, bool $lines) use ($filter): Builder {
+            if ($filter !== null) {
+                $filter($query, $lines);
+            }
 
-        $lines = OrderQueries::includedLines($scope)->whereBetween('o.confirmed_at', $between)->selectRaw(
+            return $query;
+        };
+
+        $lines = $apply(OrderQueries::includedLines($scope, $connection), true)->whereBetween('o.confirmed_at', $between)->selectRaw(
             "SUM({$gross}) as gross, SUM({$discount}) as discount, SUM(oi.quantity) as units,"
-            ." SUM(CASE WHEN oi.unit_cost_snapshot IS NOT NULL THEN {$gross} - {$discount} - oi.unit_cost_snapshot * oi.quantity * ".OrderQueries::FX.' ELSE 0 END) as profit,'
+            ." SUM(CASE WHEN oi.unit_cost_snapshot IS NOT NULL THEN {$gross} - {$discount} - ".OrderQueries::LINE_COST.' ELSE 0 END) as profit,'
             .' SUM(CASE WHEN oi.unit_cost_snapshot IS NULL THEN 1 ELSE 0 END) as cost_unknown'
         )->first();
 
         $fx = OrderQueries::FX;
-        $orders = OrderQueries::included($scope)->whereBetween('o.confirmed_at', $between)->selectRaw(
+        $orders = $apply(OrderQueries::included($scope, $connection), false)->whereBetween('o.confirmed_at', $between)->selectRaw(
             "COUNT(*) as orders, SUM(o.reward_points_discount_amount * {$fx}) as points, SUM(o.tax_amount * {$fx}) as tax,"
             ." SUM((o.shipping_amount - o.shipping_discount_amount) * {$fx}) as shipping, SUM(o.total * {$fx}) as total"
         )->first();
@@ -112,7 +165,7 @@ final readonly class SalesMetrics
         $grossSales = $n($lines->gross ?? null);
         $lineDiscounts = $n($lines->discount ?? null);
         $discounts = bcadd($lineDiscounts, $n($orders->points ?? null), 4);
-        $returns = OrderQueries::returnsValue($scope, $range);
+        $returns = $n($apply(OrderQueries::returns($scope, $connection), false)->whereBetween('op.paid_at', $between)->value(DB::raw(OrderQueries::RETURNS_SUM)));
         $count = (int) ($orders->orders ?? 0);
 
         return [
@@ -234,22 +287,7 @@ final readonly class SalesMetrics
 
     private function topProducts(DateRange $range, MetricsScope $scope, string $currency): TableBlock
     {
-        $rows = OrderQueries::includedLines($scope)
-            ->whereBetween('o.confirmed_at', [$range->startUtc(), $range->endUtc()])
-            ->whereNotNull('oi.product_id')
-            ->leftJoin('products as p', 'p.id', '=', 'oi.product_id')
-            ->groupBy('oi.product_id', 'p.name')
-            ->selectRaw('oi.product_id, p.name, SUM(oi.quantity) as units, SUM('.OrderQueries::LINE_GROSS.' - '.OrderQueries::LINE_DISCOUNT.') as net_sales')
-            ->orderByDesc('net_sales')
-            ->limit(TableBlock::MAX_ROWS)
-            ->get()
-            ->map(static fn ($r): array => [
-                'product_id' => (int) $r->product_id,
-                'name' => $r->name,
-                'units' => bcadd((string) $r->units, '0', 3),
-                'net_sales' => bcadd((string) $r->net_sales, '0', 4),
-                'currency_code' => $currency,
-            ])->all();
+        $rows = $this->topProductRows($range, $scope);
 
         return new TableBlock('top_products', 'Top products', [
             ['key' => 'name', 'label' => 'Product', 'format' => 'text'],
