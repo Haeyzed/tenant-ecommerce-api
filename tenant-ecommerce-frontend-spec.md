@@ -917,6 +917,8 @@ moduleState(snapshot, moduleKey): ModuleState
 useCan(routeName): boolean
 ```
 
+**Where gates run.** The route manifest is about 275 KB, so it never ships to the browser. The admin layout (a Server Component) evaluates `canRoute` for every route of the app's groups (`allowedRoutes(snapshot, manifest, ['tenant.admin'])`) and passes the allowed route names to `AccessProvider`; `useCan` and `<Can>` check membership. Navigation is filtered on the server the same way. Refreshing the snapshot (focus, access errors) re-renders the layout with `router.refresh()`.
+
 `canRoute` applies the backend order for the route's manifest entry (§13.4):
 
 1. **Module state.** The state must allow the method: `enabled`; or `disabled` or `locked` with `read_when_inactive` and a `GET`; or a wind-down route. `suspended` never passes.
@@ -1051,15 +1053,16 @@ export function createTenantClient(opts: {
 - OpenAPI paths are relative to `/api` (§3.9), so the browser base URL is the BFF prefix plus `/api`. For example, `client.GET('/admin/products')` requests `/bff/staff/api/admin/products`.
 - On the server the same factory receives a `fetch` bound to `upstream()`, which calls Laravel directly with the session.
 
-Features never call `client.GET` inline. They use typed helpers:
+Features never read `{data, error, response}` inline. They wrap the typed call in an unwrapping helper, which keeps openapi-fetch's full path, parameter and body typing:
 
 ```ts
-const products = await api.list(client, '/admin/products', { query });      // → Page<Product>
-const product  = await api.get(client, '/admin/products/{product}', { path }); // → Product
-const created  = await api.send(client, 'post', '/admin/products', { body });  // → Product
+const products = await unwrapPage(api.GET('/admin/products', { params: { query } }))          // → Page<Product>
+const product  = await unwrap(api.GET('/admin/products/{product}', { params: { path } }))     // → Product
+const created  = await unwrap(api.POST('/admin/products', { body }))                           // → Product
+const inbox    = await unwrapWithMeta(api.GET('/admin/notifications'))                         // → { data, meta, message }
 ```
 
-Each helper unwraps `data`, reads `meta.pagination`, and throws `ApiError` on failure. The return type comes from the response overlay (§13.2), keyed by the path and method.
+`unwrap`, `unwrapPage`, `unwrapCursorPage` and `unwrapWithMeta` check the envelope at runtime, unwrap `data`, split `meta.pagination` from other meta, and throw `ApiError` on failure (a rejected `fetch` becomes `network_error`). The return type is the generated response type; for the few untyped operations the feature normalises the value at the boundary (§13.2).
 
 ### 12.3 Middleware
 
@@ -1230,7 +1233,7 @@ Each feature defines a key factory whose first element is the resource name. URL
 |---|---|---|
 | Session snapshot | 5 minutes | Focus, every 5 minutes |
 | Modules | 5 minutes | After module actions |
-| Lookups (`/api/admin/lookups/{key}`, `/api/lookups/{key}`) | 30 minutes | Never on focus |
+| Lookups (`/api/admin/lookups/{key}`, `/api/lookups/{key}`) | 30 minutes | Never on focus. These are small bounded lists (brands, categories, warehouses, roles…): the combobox loads the list once and filters locally. Large resources (products, customers, orders, suppliers) are searched on the server with `search` and `per_page`, debounced 300 ms (`EntityCombobox`). |
 | Admin lists and records | 30 seconds | Focus |
 | Dashboard sections | 60 seconds | Every 5 minutes while visible |
 | Reports | 5 minutes | Manual refresh |
@@ -2765,6 +2768,7 @@ Nightly runs execute the full end-to-end and visual suites. Turborepo remote cac
   - The current backend `.env` defaults (ports 3000, 3001 and 3002) collide with the frontend dev ports and are replaced by these host URLs.
 - **App ports behind the edge:** platform-admin 3000, tenant-admin 3001, storefront 3002, platform-web 3003, affiliate-portal 3004.
 - **Hosts:** `https://ecommerce.localhost`, `https://platform.ecommerce.localhost`, `https://affiliates.ecommerce.localhost`, `https://{slug}.admin.ecommerce.localhost` and `https://{slug}.ecommerce.localhost`.
+- **Without the edge.** For work on one app, the app can run on its own port against Laravel Herd: `LARAVEL_INTERNAL_URL=http://127.0.0.1` (Herd's nginx serves every `*.{root}` host, and the BFF sets `Host` itself), `DEV_TENANT_SLUG={slug}` maps `localhost` to that store, and `INSECURE_COOKIES=true` drops the `__Host-` prefix and `Secure` so cookies work over plain http. Both variables are honoured only when `APP_ENV=local` and refused in production (`src/env.ts`).
 - **Mock mode.** `pnpm dev:mock` runs any app against the MSW handlers of `packages/testing` for UI work without a backend.
 - **Queues.** `php artisan queue:work` runs so imports, exports and notifications complete.
 
@@ -3151,6 +3155,16 @@ Resolved gaps keep their section and number, with a **Status** row, so reference
 |---|---|
 | **Required change** | `GET /api/admin/cms/pages/{page}/preview` (and the landlord equivalent), returning the draft in the public page shape, with media URLs resolved |
 | **Priority** | P3. Interim: preview renders unsaved form data. |
+
+### BG-17: Paginator `page` Parameter in OpenAPI
+
+| | |
+|---|---|
+| **Found** | While building the tenant-admin product list |
+| **Capability** | A typed `page` query parameter on every length-aware list |
+| **Reason** | Scramble documents the validated filters and `per_page` but not the paginator's `page`, which Laravel reads directly from the request. The frontend passes `page` through a cast. |
+| **Required change** | Document `page` (integer, min 1) on every operation whose response has `meta.pagination` with `current_page`, for example in the `ApiResponseTypeExtension` document pass. |
+| **Priority** | P3 |
 
 ---
 
