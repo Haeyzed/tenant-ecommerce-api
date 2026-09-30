@@ -147,7 +147,7 @@ final readonly class KpiValue implements JsonSerializable
     }
 
     /**
-     * @return array<string, mixed>
+     * @return array{key: string, label: string, value: string|int|null, format: string, currency_code: string|null, is_estimated: bool, comparison: array{value: string|int|null, from: string, to: string, change_percent: string|null, direction: string, sentiment: string}|null, supporting_label: string|null, sparkline: list<array{x: string, y: string|int}>|null}
      */
     public function jsonSerialize(): array
     {

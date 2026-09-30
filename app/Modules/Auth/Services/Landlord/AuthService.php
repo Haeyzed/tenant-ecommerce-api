@@ -12,8 +12,10 @@ use App\Modules\Auth\Support\TokenIssuer;
 use App\Shared\Activity\ActivityRecorder;
 use App\Shared\Exceptions\ApiException;
 use Illuminate\Auth\Events\PasswordReset;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Validation\ValidationException;
+use Laravel\Sanctum\PersonalAccessToken;
 
 /**
  * Platform-user authentication (spec §10.3).
@@ -45,6 +47,42 @@ final readonly class AuthService
     public function logout(PlatformUser $user): void
     {
         $user->currentAccessToken()?->delete();
+    }
+
+    /**
+     * A new token replaces the current one (spec §10.2, BG-10).
+     *
+     * @return array{token: string, token_type: string, expires_at: string|null, user: PlatformUser}
+     */
+    public function refreshToken(PlatformUser $user): array
+    {
+        $current = $user->currentAccessToken();
+        $issued = TokenIssuer::issue($user, 'platform', $current instanceof PersonalAccessToken ? $current->name : 'api');
+
+        if ($current instanceof PersonalAccessToken) {
+            $current->delete();
+        }
+
+        return $issued + ['user' => $user];
+    }
+
+    /**
+     * Changing the password revokes every other token of the user (BG-10).
+     */
+    public function changePassword(PlatformUser $user, string $current, string $new): void
+    {
+        if (! Hash::check($current, (string) $user->getAuthPassword())) {
+            throw ValidationException::withMessages(['current_password' => [__('auth.password')]]);
+        }
+
+        $user->forceFill(['password' => $new])->save();
+
+        $currentToken = $user->currentAccessToken();
+        $user->tokens()
+            ->when($currentToken instanceof PersonalAccessToken, static fn ($q) => $q->where('id', '!=', $currentToken->getKey()))
+            ->delete();
+
+        ActivityRecorder::landlord('auth', 'Platform user changed password', $user, [], $user);
     }
 
     public function verifyEmail(string $id, string $hash, int $expires, string $signature): PlatformUser

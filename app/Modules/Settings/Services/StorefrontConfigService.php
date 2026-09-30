@@ -31,6 +31,9 @@ final readonly class StorefrontConfigService
      */
     private const array STOREFRONT_MODULES = [
         'reward_points', 'gift_cards', 'multi_currency', 'back_in_stock_alerts', 'installments', 'booking', 'content_marketing',
+        // Modules with storefront surfaces: support chat, the "sell with us" page,
+        // careers, quotation requests, subscription plans, repair approvals (BG-11).
+        'support', 'marketplace', 'hr_recruitment', 'sales_quotations', 'product_subscriptions', 'repair',
     ];
 
     public function __construct(
@@ -72,6 +75,8 @@ final readonly class StorefrontConfigService
         }
 
         return [
+            // Identity for canonical URLs, the admin host and realtime channel names (BG-04).
+            'tenant' => self::identity($tenant),
             'storefront' => $this->storefront->all(),
             'business' => [
                 'store_name' => $settings->get('store_name'),
@@ -104,6 +109,21 @@ final readonly class StorefrontConfigService
             'social_login_providers' => app(CustomerSocialAuthService::class)->providers(),
             // Live announcements (at most three), so the storefront needs no extra request (§24.5).
             'announcement_bar' => $this->banners->getAnnouncementBar()->map(static fn (CmsBanner $b): array => CmsPresenter::banner($b, true))->values()->all(),
+        ];
+    }
+
+    /**
+     * The store's public identity (BG-04): the id names its broadcast
+     * channels; slug and primary domain build canonical and admin URLs.
+     *
+     * @return array{id: string, slug: string, primary_domain: string|null}
+     */
+    public static function identity(Tenant $tenant): array
+    {
+        return [
+            'id' => (string) $tenant->getTenantKey(),
+            'slug' => (string) $tenant->slug,
+            'primary_domain' => $tenant->primaryDomain()?->domain,
         ];
     }
 

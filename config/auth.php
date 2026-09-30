@@ -87,4 +87,15 @@ return [
 
     'password_timeout' => 10800,
 
+    /*
+    | API token lifetime in minutes per actor type (BG-10). Actors with a
+    | refresh route (staff, platform users) get short-lived tokens that the
+    | frontend renews; the others fall back to sanctum.expiration, which is
+    | also the ceiling Sanctum enforces for every token.
+    */
+    'token_lifetimes' => [
+        'staff' => (int) env('AUTH_TOKEN_LIFETIME_STAFF', 720),
+        'platform' => (int) env('AUTH_TOKEN_LIFETIME_PLATFORM', 720),
+    ],
+
 ];

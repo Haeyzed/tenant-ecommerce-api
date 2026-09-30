@@ -6,6 +6,7 @@ namespace App\Modules\Tenancy\Services;
 
 use App\Modules\Notifications\Services\NotificationDispatchService;
 use App\Modules\Settings\Services\PlatformSettingsService;
+use App\Modules\Settings\Services\StorefrontConfigService;
 use App\Modules\Tenancy\Enums\DomainStatus;
 use App\Modules\Tenancy\Jobs\CheckCustomDomainTls;
 use App\Modules\Tenancy\Models\Domain;
@@ -266,6 +267,8 @@ final readonly class TenantDomainService
             $domain->forceFill(['is_primary' => true])->save();
         });
 
+        self::forgetStorefrontConfig($domain);
+
         return $domain;
     }
 
@@ -282,6 +285,20 @@ final readonly class TenantDomainService
 
             $domain->delete();
         });
+
+        self::forgetStorefrontConfig($domain);
+    }
+
+    /**
+     * The storefront config carries the primary domain (BG-04). Its cache is
+     * tenant-scoped, so it is cleared only inside that tenant's context;
+     * elsewhere it expires with its TTL.
+     */
+    private static function forgetStorefrontConfig(Domain $domain): void
+    {
+        if (tenant()?->getTenantKey() === $domain->tenant_id) {
+            StorefrontConfigService::flush();
+        }
     }
 
     /**

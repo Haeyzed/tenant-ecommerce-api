@@ -150,9 +150,9 @@ return [
     */
     'frontend' => [
         'platform_admin_url' => env('PLATFORM_ADMIN_URL', 'http://localhost:3000'),
-        'affiliate_portal_url' => env('AFFILIATE_PORTAL_URL', 'http://localhost:3001'),
+        'affiliate_portal_url' => env('AFFILIATE_PORTAL_URL', 'http://localhost:3004'),
         // The public marketing website; affiliate referral links point here (§21A.2).
-        'website_url' => env('PLATFORM_WEBSITE_URL', 'http://localhost:3002'),
+        'website_url' => env('PLATFORM_WEBSITE_URL', 'http://localhost:3003'),
         'tenant_scheme' => env('TENANT_FRONTEND_SCHEME', 'https'),
         // The store admin and seller portal run on their own origin, isolated
         // from storefront scripts (BG-02): {slug} and {root} are replaced.

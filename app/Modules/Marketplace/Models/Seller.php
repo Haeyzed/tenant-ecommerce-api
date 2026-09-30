@@ -129,7 +129,7 @@ class Seller extends Authenticatable implements AuditableContract, CanResetPassw
         app(NotificationDispatchService::class)->dispatch('seller.password_reset', $this, [
             'seller_name' => $this->business_name,
             'store_name' => Customer::storeName(),
-            'reset_url' => FrontendUrl::storefront($tenant, '/seller/reset-password', ['token' => $token, 'email' => $this->email]),
+            'reset_url' => FrontendUrl::sellerPortal($tenant, '/reset-password', ['token' => $token, 'email' => $this->email]),
             'expires_in_minutes' => (int) config('auth.passwords.sellers.expire', 60),
         ]);
     }

@@ -105,7 +105,7 @@ final readonly class TenantDashboardService
      *
      * @param  Closure(DateRange, MetricsScope): list<KpiValue>  $compute
      * @param  list<string>  $parameters  extra parameters that change the figures (e.g. warehouse)
-     * @return array{data: array{kpis: list<array<string, mixed>>}, cached: bool, generated_at: string}
+     * @return array{data: array{kpis: list<array{key: string, label: string, value: string|int|null, format: string, currency_code: string|null, is_estimated: bool, comparison: array{value: string|int|null, from: string, to: string, change_percent: string|null, direction: string, sentiment: string}|null, supporting_label: string|null, sparkline: list<array{x: string, y: string|int}>|null}>}, cached: bool, generated_at: string}
      */
     public function contextualKpis(string $resource, DateRange $range, User $user, Closure $compute, array $parameters = []): array
     {

@@ -78,6 +78,10 @@ it('registers, records legal acceptance and sends a verification code', function
         ->and(Hash::check('Secret123', (string) $registration->password_hash))->toBeTrue()
         ->and(LegalAcceptance::query()->where('tenant_registration_id', $registration->id)->count())->toBe(2)
         ->and(sentCode())->toMatch('/^\d{6}$/');
+
+    // The emailed link opens the signup flow on the website, not the platform admin (BG-03).
+    Notification::assertSentTo(new AnonymousNotifiable, TemplatedNotification::class, fn (TemplatedNotification $n): bool => $n->key === 'tenant.registration_verification'
+        && str_contains($n->body, 'http://localhost:3002/register/verify?registration='.$id.'&code='));
 });
 
 it('refuses registration while switched off or without published terms', function (): void {

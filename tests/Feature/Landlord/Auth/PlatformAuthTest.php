@@ -120,3 +120,41 @@ it('stores display preferences and falls back to the platform default', function
 
     $this->landlordJson('PATCH', '/api/admin/auth/preferences', ['date_format' => 'nonsense'], $headers)->assertStatus(422);
 });
+
+it('issues a 12-hour platform token and refreshes it, revoking the old one', function (): void {
+    $this->freezeTime();
+    $login = platformLogin()->assertOk();
+    expect($login->json('data.expires_at'))->toBe(now()->addMinutes(720)->toIso8601String());
+    $old = $login->json('data.token');
+
+    $new = $this->landlordJson('POST', '/api/admin/auth/refresh', [], ['Authorization' => 'Bearer '.$old])
+        ->assertOk()->assertJsonPath('data.user.email', 'root@platform.test')->json('data.token');
+    app('auth')->forgetGuards();
+
+    $this->landlordJson('GET', '/api/admin/auth/me', [], ['Authorization' => 'Bearer '.$old])->assertUnauthorized();
+    app('auth')->forgetGuards();
+    $this->landlordJson('GET', '/api/admin/auth/me', [], ['Authorization' => 'Bearer '.$new])->assertOk();
+});
+
+it('changes the platform password and revokes the other tokens', function (): void {
+    $first = platformLogin()->json('data.token');
+    $second = platformLogin()->json('data.token');
+
+    $this->landlordJson('PATCH', '/api/admin/auth/password', [
+        'current_password' => 'Wrong999',
+        'password' => 'NewSecret456',
+        'password_confirmation' => 'NewSecret456',
+    ], ['Authorization' => 'Bearer '.$second])->assertStatus(422)->assertJsonValidationErrors('current_password');
+
+    $this->landlordJson('PATCH', '/api/admin/auth/password', [
+        'current_password' => 'Secret123',
+        'password' => 'NewSecret456',
+        'password_confirmation' => 'NewSecret456',
+    ], ['Authorization' => 'Bearer '.$second])->assertOk();
+    app('auth')->forgetGuards();
+
+    $this->landlordJson('GET', '/api/admin/auth/me', [], ['Authorization' => 'Bearer '.$first])->assertUnauthorized();
+    app('auth')->forgetGuards();
+    $this->landlordJson('GET', '/api/admin/auth/me', [], ['Authorization' => 'Bearer '.$second])->assertOk();
+    platformLogin('root@platform.test', 'NewSecret456')->assertOk();
+});

@@ -20,10 +20,14 @@ Route::middleware('landlord.public')->prefix('admin/auth')->name('landlord.auth.
         Route::post('email/resend', [AuthController::class, 'resendVerificationEmail'])
             ->middleware('auth.as:platform')
             ->name('email.resend');
+        Route::patch('password', [AuthController::class, 'changePassword'])
+            ->middleware('auth.as:platform')
+            ->name('password.change');
     });
 
     Route::middleware(['auth.as:platform', 'throttle:api'])->group(function (): void {
         Route::post('logout', [AuthController::class, 'logout'])->name('logout');
+        Route::post('refresh', [AuthController::class, 'refresh'])->name('refresh');
         Route::get('me', [AuthController::class, 'me'])->name('me');
         Route::patch('preferences', [AuthController::class, 'updatePreferences'])->name('preferences');
     });

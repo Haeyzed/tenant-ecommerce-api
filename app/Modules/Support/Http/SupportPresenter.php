@@ -9,6 +9,7 @@ use App\Modules\Support\Models\SupportConversation;
 use App\Modules\Support\Models\SupportMessage;
 use App\Modules\Support\Models\SupportMessageAttachment;
 use App\Modules\Users\Models\User;
+use App\Shared\Support\TenantChannel;
 
 /**
  * Support payloads (spec §59). The customer view never contains internal
@@ -29,6 +30,8 @@ final class SupportPresenter
             'priority' => $conversation->priority,
             'last_message_at' => $conversation->last_message_at?->toIso8601String(),
             'created_at' => $conversation->created_at->toIso8601String(),
+            // For Echo.private() (BG-05): Echo adds the "private-" prefix.
+            'broadcast_channel' => TenantChannel::name('support-conversation.'.$conversation->id),
         ];
 
         if ($admin) {

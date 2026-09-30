@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Modules\Notifications\Http\Controllers\Landlord\Admin\InboxController;
 use App\Modules\Notifications\Http\Controllers\Landlord\Admin\NotificationMatrixController;
 use App\Modules\Notifications\Http\Controllers\Landlord\Admin\NotificationTemplateController;
 use Illuminate\Support\Facades\Route;
@@ -17,4 +18,11 @@ Route::middleware('landlord.admin')->prefix('admin')->name('landlord.notificatio
 
     Route::get('notifications/matrix', [NotificationMatrixController::class, 'index'])->name('matrix.index');
     Route::patch('notifications/matrix/{templateKey}', [NotificationMatrixController::class, 'update'])->where('templateKey', '[a-z0-9_.]+')->name('matrix.update');
+
+    // The platform user's own inbox (BG-08, BG-09): self-service, no permission.
+    Route::withoutMiddleware('permission.derived')->group(function (): void {
+        Route::get('notifications', [InboxController::class, 'index'])->name('inbox.index');
+        Route::post('notifications/{id}/read', [InboxController::class, 'markRead'])->whereUuid('id')->name('inbox.read');
+        Route::post('notifications/read-all', [InboxController::class, 'markAllRead'])->name('inbox.read-all');
+    });
 });

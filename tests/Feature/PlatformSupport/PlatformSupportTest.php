@@ -40,6 +40,10 @@ it('lets any staff user open a conversation and alerts platform support', functi
         ->assertJsonMissingPath('data.assignee')
         ->json('data.id');
 
+    // The channel the conversation's events are broadcast on (BG-05).
+    $this->landlordJson('GET', "/api/admin/platform-support/conversations/{$id}", [], $this->platformAuth)
+        ->assertJsonPath('data.broadcast_channel', "platform-support-conversation.{$id}");
+
     Event::assertDispatched(PlatformSupportMessageSent::class, fn ($e): bool => $e->conversationId === $id);
     Notification::assertSentTo($this->support, TemplatedNotification::class, fn ($n): bool => $n->key === 'platform_support.message_received');
 });

@@ -283,6 +283,18 @@ php artisan api-docs:export
 
 This rewrites both JSON files. In Postman, re-import them, or link the files and pull changes. The first run creates an empty schema-only database, `tea_tenant_docs_schema`. It holds the tenant table structure the docs generator reads, never any data.
 
+Responses are documented in the real envelope `{success, message, data, meta, errors}`: `data` has the endpoint's own fields, list endpoints show `meta.pagination`, and every error response uses the shared `ErrorEnvelope` schema.
+
+**The frontend contract bundle.** The frontends are typed from these documents plus route, module, limit, permission and error-code registries:
+
+```powershell
+php artisan frontend:contract --path=C:\my-project\tenant-ecommerce-frontend\packages\contract\bundle --openapi
+```
+
+Without `--path`, the files go to `storage/app/frontend-contract`. `--openapi` runs `api-docs:export` first.
+
+**Uploading store images.** Store logo, favicon and share image are uploaded as form-data to `POST /admin/settings/media` on the store's base URL, with `setting` (`store_logo`, `favicon` or `seo_share_image`) and `image` (a file). The platform logo uses `POST /admin/platform-settings/media` on the landlord base URL, with `setting` `platform_logo`.
+
 ---
 
 ## 8. Billing: test gateways and upgrading a plan ➡ you
@@ -494,7 +506,7 @@ The response is `201` with `checkout_url`, `reference` (for example `SUB-…`) a
    | Paystack | `4084 0840 8408 4081` | expiry any future date, CVV `408`, PIN `0000`, OTP `123456` |
    | Flutterwave | `5531 8866 5214 2950` | expiry `09/32`, CVV `564`, PIN `3310`, OTP `12345` |
 
-2. **The provider redirects the browser** to `https://softmaxtech-online-store.tenant-ecommerce-api.test/admin/billing/callback?reference=…`. That is the store-admin *frontend* page. Until the frontend exists, the browser shows an error. **That's expected and harmless:** the payment is confirmed by the webhook, not by this page.
+2. **The provider redirects the browser** to `https://softmaxtech-online-store.admin.tenant-ecommerce-api.test/billing/callback?reference=…` (the store admin runs on its own `{slug}.admin` host, set by `TENANT_ADMIN_URL`). That is the store-admin *frontend* page. Until the frontend exists, the browser shows an error. **That's expected and harmless:** the payment is confirmed by the webhook, not by this page.
 
 3. **The webhook arrives** (§8.3). The worker marks the charge successful, sets the subscription `active` on the new plan, saves the card token, sets `renews_at` a month or year ahead, and emails *payment received*.
 

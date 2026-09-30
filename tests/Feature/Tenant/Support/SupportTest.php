@@ -68,8 +68,13 @@ it('lets a guest chat without an account, takes the chat along on sign-in, and k
     $this->tenantJson('GET', "/api/support/conversations/{$chat['id']}", [], $this->bolaAuth)->assertNotFound();
 
     // The inbox: unassigned with one unread; only agents can be assigned.
+    // Resources and the inbox name their Echo channels (BG-05), matching the events.
+    expect($chat['broadcast_channel'])->toBe('tenant.'.$this->tenant->id.'.support-conversation.'.$chat['id']);
     $this->tenantJson('GET', '/api/admin/support/conversations?assigned_to=unassigned', [], $this->staff)->assertOk()
-        ->assertJsonPath('data.0.unread_count', 1)->assertJsonPath('data.0.guest.name', null);
+        ->assertJsonPath('data.0.unread_count', 1)->assertJsonPath('data.0.guest.name', null)
+        ->assertJsonPath('data.0.broadcast_channel', $chat['broadcast_channel'])
+        ->assertJsonPath('meta.inbox_channel', 'tenant.'.$this->tenant->id.'.support-inbox')
+        ->assertJsonPath('meta.presence_channel', 'tenant.'.$this->tenant->id.'.support-agents-online');
     $this->tenantJson('GET', '/api/admin/support/conversations', [], $this->cashierAuth)->assertForbidden();
     $this->tenantJson('PATCH', "/api/admin/support/conversations/{$chat['id']}", ['assigned_to_user_id' => $this->cashier->id], $this->staff)
         ->assertStatus(422)->assertJsonPath('meta.error_code', 'agent_not_eligible');

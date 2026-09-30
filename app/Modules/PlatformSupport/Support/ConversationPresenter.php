@@ -30,6 +30,8 @@ final class ConversationPresenter
             'assignee' => $platform && $c->relationLoaded('assignee') && $c->assignee !== null ? ['id' => $c->assignee->id, 'name' => $c->assignee->name] : null,
             'last_message_at' => $c->last_message_at?->toIso8601String(),
             'created_at' => $c->created_at?->toIso8601String(),
+            // For Echo.private() (BG-05): Echo adds the "private-" prefix.
+            'broadcast_channel' => 'platform-support-conversation.'.$c->id,
         ], static fn (mixed $v, string $k): bool => $v !== null || in_array($k, ['last_message_at'], true), ARRAY_FILTER_USE_BOTH);
     }
 

@@ -9,9 +9,11 @@ use App\Modules\Catalog\Http\CatalogPresenter;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\ProductVariant;
 use App\Modules\Catalog\Services\ProductService;
+use App\Modules\Cms\Support\CmsMedia;
 use App\Shared\Http\APIResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 
 /**
  * Variants of a variable product (spec §28.6). A variant is looked up
@@ -26,7 +28,7 @@ final class ProductVariantController extends Controller
 
     public function index(Product $product): JsonResponse
     {
-        return APIResponse::success($product->variants()->with('optionValues.option')->get()->map(fn (ProductVariant $v): array => $this->presenter->adminVariant($v))->values());
+        return APIResponse::success($product->variants()->with(['optionValues.option', 'media'])->get()->map(fn (ProductVariant $v): array => $this->presenter->adminVariant($v))->values());
     }
 
     public function store(Request $request, Product $product): JsonResponse
@@ -46,6 +48,26 @@ final class ProductVariantController extends Controller
         $this->products->deleteVariant($this->find($product, $variant));
 
         return APIResponse::noContent('Variant deleted');
+    }
+
+    /**
+     * Multipart: image. Replaces the variant's image (BG-12).
+     */
+    public function image(Request $request, Product $product, int $variant, CmsMedia $media): JsonResponse
+    {
+        $request->validate(['image' => ['required', 'file']]);
+        /** @var UploadedFile $upload */
+        $upload = $request->file('image');
+        $stored = $media->store($this->find($product, $variant), 'image', $upload);
+
+        return APIResponse::created(['id' => $stored->id, 'collection' => $stored->collection_name, 'url' => $stored->getUrl()], 'Image uploaded');
+    }
+
+    public function removeImage(Product $product, int $variant): JsonResponse
+    {
+        $this->find($product, $variant)->clearMediaCollection('image');
+
+        return APIResponse::success(null, 'Image removed');
     }
 
     private function find(Product $product, int $id): ProductVariant

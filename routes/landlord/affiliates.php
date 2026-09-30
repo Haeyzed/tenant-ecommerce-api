@@ -54,6 +54,7 @@ Route::middleware('landlord.affiliate')->prefix('affiliate')->name('landlord.aff
     Route::get('payouts/{payout}', [PayoutController::class, 'show'])->where('payout', 'AFP-[A-Z0-9-]+')->name('payouts.show');
     Route::get('notifications', [NotificationController::class, 'index'])->name('notifications.index');
     Route::post('notifications/{id}/read', [NotificationController::class, 'markRead'])->whereUuid('id')->name('notifications.read');
+    Route::post('notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.read-all');
     Route::get('legal-documents/pending', [LegalController::class, 'pending'])->name('legal.pending');
     Route::post('legal-acceptances', [LegalController::class, 'accept'])->name('legal.accept');
 });

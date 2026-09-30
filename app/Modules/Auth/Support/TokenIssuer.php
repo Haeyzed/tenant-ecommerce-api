@@ -23,7 +23,8 @@ final class TokenIssuer
             throw new \InvalidArgumentException($actor::class.' cannot hold API tokens.');
         }
 
-        $minutes = config('sanctum.expiration');
+        // Per-actor lifetime (BG-10), else the global Sanctum expiration.
+        $minutes = config("auth.token_lifetimes.{$actorType}") ?? config('sanctum.expiration');
         $expiresAt = $minutes === null ? null : now()->addMinutes((int) $minutes);
 
         /** @var NewAccessToken $token */

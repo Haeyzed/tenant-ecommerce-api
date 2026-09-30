@@ -6,6 +6,7 @@ namespace App\Modules\Auth\Http\Controllers\Landlord;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Access\Models\PlatformUser;
+use App\Modules\Auth\Http\Requests\ChangePasswordRequest;
 use App\Modules\Auth\Http\Requests\ForgotPasswordRequest;
 use App\Modules\Auth\Http\Requests\LoginRequest;
 use App\Modules\Auth\Http\Requests\ResetPasswordRequest;
@@ -32,12 +33,7 @@ final class AuthController extends Controller
             (string) ($request->validated('device_name') ?? $request->userAgent() ?? 'api'),
         );
 
-        return APIResponse::success([
-            'token' => $result['token'],
-            'token_type' => $result['token_type'],
-            'expires_at' => $result['expires_at'],
-            'user' => new PlatformUserResource($result['user']),
-        ], 'Logged in');
+        return $this->tokenResponse($result, 'Logged in');
     }
 
     public function logout(Request $request): JsonResponse
@@ -45,6 +41,22 @@ final class AuthController extends Controller
         $this->auth->logout($this->user($request));
 
         return APIResponse::success(null, 'Logged out');
+    }
+
+    public function refresh(Request $request): JsonResponse
+    {
+        return $this->tokenResponse($this->auth->refreshToken($this->user($request)), 'Token refreshed');
+    }
+
+    public function changePassword(ChangePasswordRequest $request): JsonResponse
+    {
+        $this->auth->changePassword(
+            $this->user($request),
+            (string) $request->validated('current_password'),
+            (string) $request->validated('password'),
+        );
+
+        return APIResponse::success(null, 'Password changed');
     }
 
     public function verifyEmail(VerifyEmailRequest $request): JsonResponse
@@ -97,6 +109,19 @@ final class AuthController extends Controller
         $user = $this->auth->updatePreferences($this->user($request), $request->validated());
 
         return APIResponse::success(new PlatformUserResource($user), 'Preferences updated');
+    }
+
+    /**
+     * @param  array{token: string, token_type: string, expires_at: string|null, user: PlatformUser}  $result
+     */
+    private function tokenResponse(array $result, string $message): JsonResponse
+    {
+        return APIResponse::success([
+            'token' => $result['token'],
+            'token_type' => $result['token_type'],
+            'expires_at' => $result['expires_at'],
+            'user' => new PlatformUserResource($result['user']),
+        ], $message);
     }
 
     private function user(Request $request): PlatformUser

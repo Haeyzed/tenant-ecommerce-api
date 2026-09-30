@@ -38,4 +38,9 @@ final class NotificationController extends PortalController
 
         return APIResponse::success(null, 'Marked as read');
     }
+
+    public function markAllRead(Request $request): JsonResponse
+    {
+        return APIResponse::success(['marked' => $this->affiliate($request)->unreadNotifications()->update(['read_at' => now()])], 'Marked all as read');
+    }
 }

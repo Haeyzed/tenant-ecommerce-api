@@ -10,6 +10,7 @@ use App\Modules\Auth\Support\TokenIssuer;
 use App\Modules\Billing\Models\Subscription;
 use App\Modules\Legal\Services\LegalDocumentService;
 use App\Modules\Plans\Services\FeatureAccessService;
+use App\Modules\Settings\Services\StorefrontConfigService;
 use App\Modules\Settings\Services\TenantSettingsService;
 use App\Modules\Tenancy\Models\Tenant;
 use App\Modules\Users\Models\User;
@@ -137,6 +138,8 @@ final readonly class AuthService
         $isOwner = $user->isOwner();
 
         $profile = [
+            // The store's identity: realtime channel names and links to the storefront (BG-04).
+            'tenant' => StorefrontConfigService::identity($tenant),
             'user' => $user,
             'roles' => $user->getRoleNames()->values()->all(),
             'permissions' => $user->getAllPermissions()->pluck('name')->sort()->values()->all(),

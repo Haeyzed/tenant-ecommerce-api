@@ -124,6 +124,8 @@ return [
     'platform-coupons.redemptions.view',
     'platform-coupons.update',
     'platform-coupons.view',
+    'platform-settings.media.create',
+    'platform-settings.media.delete',
     'platform-settings.update',
     'platform-settings.view',
     'platform-support.conversations.messages',

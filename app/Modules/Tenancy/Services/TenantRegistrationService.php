@@ -420,7 +420,7 @@ final readonly class TenantRegistrationService
             'owner_name' => $registration->owner_name,
             'code' => $code,
             'expires_in_hours' => (int) $this->settings->get('registration_verification_hours', 24),
-            'verification_url' => FrontendUrl::platformAdmin('/register/verify', ['registration' => $registration->public_id, 'code' => $code]),
+            'verification_url' => FrontendUrl::website('/register/verify', ['registration' => $registration->public_id, 'code' => $code]),
         ]);
     }
 

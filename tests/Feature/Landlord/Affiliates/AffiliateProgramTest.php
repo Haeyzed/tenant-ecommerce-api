@@ -232,3 +232,16 @@ it('keeps each affiliate to its own records and separates actor tokens', functio
     $this->landlordJson('GET', '/api/admin/affiliates', [], $aAuth)->assertUnauthorized();
     $this->landlordJson('GET', '/api/admin/affiliates', [], $this->managerAuth)->assertOk()->assertJsonCount(2, 'data');
 });
+
+it('marks all of an affiliate\'s notifications read, and only theirs', function (): void {
+    $a = approvedAffiliate('a@promo.test', 'ALPHA1');
+    $b = approvedAffiliate('b@promo.test', 'BRAVO1');
+    foreach ([$a, $a, $b] as $owner) {
+        $owner->notifications()->create(['id' => (string) Str::uuid(), 'type' => 'affiliate.commission_approved', 'data' => ['subject' => 'Commission']]);
+    }
+    $auth = ['Authorization' => 'Bearer '.$a->createToken('t', ['affiliate'])->plainTextToken];
+
+    $this->landlordJson('POST', '/api/affiliate/notifications/read-all', [], $auth)->assertOk()->assertJsonPath('data.marked', 2);
+    $this->landlordJson('POST', '/api/affiliate/notifications/read-all', [], $auth)->assertOk()->assertJsonPath('data.marked', 0);
+    expect($b->unreadNotifications()->count())->toBe(1);
+});

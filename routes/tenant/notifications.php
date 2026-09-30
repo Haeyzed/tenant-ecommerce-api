@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\Route;
 Route::middleware('tenant.customer')->name('tenant.customer.notifications.')->group(function (): void {
     Route::get('notifications', [InboxController::class, 'index'])->name('inbox.index');
     Route::post('notifications/{id}/read', [InboxController::class, 'markRead'])->whereUuid('id')->name('inbox.read');
+    Route::post('notifications/read-all', [InboxController::class, 'markAllRead'])->name('inbox.read-all');
 
     Route::get('notification-preferences', [NotificationPreferenceController::class, 'index'])->name('preferences.index');
     Route::patch('notification-preferences', [NotificationPreferenceController::class, 'update'])->name('preferences.update');
@@ -34,6 +35,7 @@ Route::middleware('tenant.admin')->prefix('admin')->name('tenant.notifications.'
     Route::withoutMiddleware('permission.derived')->group(function (): void {
         Route::get('notifications', [InboxController::class, 'index'])->name('inbox.index');
         Route::post('notifications/{id}/read', [InboxController::class, 'markRead'])->whereUuid('id')->name('inbox.read');
+        Route::post('notifications/read-all', [InboxController::class, 'markAllRead'])->name('inbox.read-all');
 
         Route::get('notification-preferences', [NotificationPreferenceController::class, 'index'])->name('preferences.index');
         Route::patch('notification-preferences', [NotificationPreferenceController::class, 'update'])->name('preferences.update');

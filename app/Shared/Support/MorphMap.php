@@ -94,6 +94,7 @@ use App\Modules\SalesQuotations\Models\SalesQuotationRequest;
 use App\Modules\Settings\Models\PlatformSetting;
 use App\Modules\Settings\Models\StorefrontSetting;
 use App\Modules\Settings\Models\TenantPlatformSetting;
+use App\Modules\Settings\Models\TenantSetting;
 use App\Modules\Shipping\Models\DeliveryAssignment;
 use App\Modules\Shipping\Models\Driver;
 use App\Modules\Shipping\Models\Shipment;
@@ -223,6 +224,7 @@ final class MorphMap
         'expense' => Expense::class,
         'income_entry' => IncomeEntry::class,
         'storefront_setting' => StorefrontSetting::class,
+        'tenant_setting' => TenantSetting::class,
         'data_export' => DataExport::class,
         'data_import' => DataImport::class,
         'platform_export' => PlatformExport::class,

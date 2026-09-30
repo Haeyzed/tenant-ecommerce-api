@@ -92,7 +92,7 @@ it('sends the staff reset link to the tenant admin frontend', function (): void 
     $this->tenantJson('POST', '/api/admin/auth/password/forgot', ['email' => 'owner@a.test'])->assertStatus(202);
 
     Notification::assertSentTo($this->owner, TemplatedNotification::class, fn (TemplatedNotification $n): bool => $n->key === 'staff.password_reset'
-        && str_contains($n->body, 'https://tenant-a.platform.test/admin/reset-password?token='));
+        && str_contains($n->body, 'https://tenant-a.admin.platform.test/reset-password?token='));
 });
 
 it('blocks tenants that are not active', function (TenantStatus $status, int $code, string $error): void {
@@ -117,4 +117,13 @@ it('applies a suspension on the next request even after the host was cached', fu
 it('returns 404 for an unknown host', function (): void {
     $this->json('POST', 'http://unknown.platform.test/api/admin/auth/login', ['email' => 'x@y.test', 'password' => 'x'])
         ->assertNotFound();
+});
+
+it('issues 12-hour staff tokens and falls back to the Sanctum lifetime without an actor setting', function (): void {
+    $this->freezeTime();
+
+    expect(staffLogin()->assertOk()->json('data.expires_at'))->toBe(now()->addMinutes(720)->toIso8601String());
+
+    config(['auth.token_lifetimes' => []]);
+    expect(staffLogin()->assertOk()->json('data.expires_at'))->toBe(now()->addMinutes((int) config('sanctum.expiration'))->toIso8601String());
 });

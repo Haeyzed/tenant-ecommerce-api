@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
+use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 /**
  * Platform-wide configuration (spec §13.2, §13.7). Every key is declared in
@@ -241,11 +242,22 @@ final class PlatformSettingsService
     {
         $values = $this->values();
 
-        return array_filter(
+        $public = array_filter(
             $values,
             fn (string $key): bool => (bool) ($this->definitions()[$key]['public'] ?? false),
             ARRAY_FILTER_USE_KEY,
         );
+
+        // Image settings also carry their URL (platform_logo_media_id → platform_logo_url, BG-12).
+        foreach ($public as $key => $value) {
+            if (str_ends_with($key, '_media_id')) {
+                $public[substr($key, 0, -strlen('_media_id')).'_url'] = is_numeric($value)
+                    ? Media::on('landlord')->find((int) $value)?->getUrl()
+                    : null;
+            }
+        }
+
+        return $public;
     }
 
     /**

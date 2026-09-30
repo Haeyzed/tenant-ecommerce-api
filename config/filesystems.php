@@ -41,7 +41,7 @@ $s3 = static fn (?string $bucket, ?string $url, string $root): array => [
 ];
 
 $mediaPublic = $mediaDriver === 's3'
-    ? $s3(env('MEDIA_PUBLIC_BUCKET', env('AWS_BUCKET')), env('MEDIA_PUBLIC_URL'), 'public')
+    ? $s3((env('MEDIA_PUBLIC_BUCKET') ?: env('AWS_BUCKET')), env('MEDIA_PUBLIC_URL'), 'public')
     : [
         'driver' => 'local',
         // Under storage/app/public, so the storage:link symlink serves it.
@@ -119,7 +119,7 @@ return [
         'media-public-central' => $mediaPublic,
 
         'media-private' => $mediaDriver === 's3'
-            ? $s3(env('MEDIA_PRIVATE_BUCKET', env('AWS_BUCKET')), null, 'private')
+            ? $s3((env('MEDIA_PRIVATE_BUCKET') ?: env('AWS_BUCKET')), null, 'private')
             : [
                 'driver' => 'local',
                 // Never web-served: private files are streamed after an authorisation check.

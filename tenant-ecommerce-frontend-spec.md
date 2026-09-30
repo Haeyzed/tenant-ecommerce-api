@@ -151,8 +151,8 @@ Classification: **A** kept as correct, **B** outdated and updated, **C** incompl
 |---|---|---|---|---|
 | Response envelope | `{data}`, `{data, links, meta}`, `{error, message, details}`. The draft rejected a `success` envelope. | Every response is `{success, message, data, meta, errors}` (UD-40). Pagination is in `meta.pagination` and `meta.links`. Errors carry `meta.error_code` and `meta.details`, with field errors in `errors`. | B, D | The client unwraps the real envelope (§3.3, §12). |
 | Tenant identification by the BFF | Send the tenant host as `X-Forwarded-Host`. | Laravel trusts no proxies and resolves the tenant from the raw `Host` header, for landlord routes too. | D | The BFF sends `Host: {apiHost}` to the private Laravel address (§7.4, §8.3). |
-| Client IP forwarding | Assumed Laravel trusts forwarded headers (BA-03). | No trusted proxies are configured, so every BFF request would share one IP for the `public` (60/min) and `auth-sensitive` (5/min) limiters. | F | Gap BG-01, priority P0. It blocks a public launch. |
-| Tenant-admin origin | `{slug}.admin.ROOT` | The backend generates tenant-admin links as `{primary domain}/admin/...` (`TENANT_ADMIN_PATH`). | E, F | Keep the separate origin for security (ADR-07). The storefront redirects `/admin/*` and `/seller/*` until BG-02 changes the link builder. |
+| Client IP forwarding | Assumed Laravel trusts forwarded headers (BA-03). | Laravel trusted no proxies, so every BFF request would have shared one IP for the `public` (60/min) and `auth-sensitive` (5/min) limiters. | F | Resolved: BG-01 (D-141), with `TRUSTED_PROXIES` trusting only `X-Forwarded-For` and `-Proto`. |
+| Tenant-admin origin | `{slug}.admin.ROOT` | The backend generated tenant-admin links as `{primary domain}/admin/...`. | E, F | Keep the separate origin for security (ADR-07). Resolved: BG-02 (D-141). The backend builds admin and seller links from `TENANT_ADMIN_URL`. |
 | Other hosts | `console.ROOT`, `ws.ROOT`, `media.ROOT` | The backend reserves `platform`, `affiliates`, `cdn` and `admin`, but not `console`, `ws` or `media`. | B | `platform.ROOT`, `affiliates.ROOT`, `cdn.ROOT`, and Reverb on `ROOT/app`. No new reserved slug is needed (§6.2). |
 | Affiliates | Absent | A sixth actor with its own guard, portal routes (`/api/affiliate/*`), portal URL config and link emails (API §21A, UD-41) | G | New app `affiliate-portal` (§26). |
 | Platform-user session | No `me`, no refresh, no password change (BA-01) | `GET /api/admin/auth/me` now exists. There is still no refresh and no password change. | D, F | Use `me`. Refresh and password change are BG-10. |
@@ -160,21 +160,21 @@ Classification: **A** kept as correct, **B** outdated and updated, **C** incompl
 | Social login | Absent | Google and Facebook through a platform-wide relay page, single-use state and link or unlink (D-132) | G | A full flow, with the relay hosted in `platform-web` (§9.5). |
 | Guest token | Returned in the `X-Guest-Token` response header | Returned in the body as `data.guest_token` on cart responses | D | The BFF removes it from the body and seals it in a cookie (§8.4). |
 | Frontend links in emails | Unknown targets (BA-02) | `FrontendUrl` defines every path (§3.8). | D | Frontend routes match these paths exactly. |
-| Registration verification link | `platform-web` | The backend sends it to `PLATFORM_ADMIN_URL/register/verify`. | E, F | Gap BG-03. `platform-admin` redirects to `platform-web` meanwhile. |
+| Registration verification link | `platform-web` | The backend sent it to `PLATFORM_ADMIN_URL/register/verify`. | E, F | Resolved: BG-03 (D-141). The link now uses `PLATFORM_WEBSITE_URL`. |
 | Payment return | `/checkout/return?reference=` | The gateway callback is `{storefront}/orders/{order}/payment-return`. | D | The route is `/orders/[order]/payment-return` (§29.7). |
 | Product and category by slug | Missing (BA-14) | `{product}`, `{category}` and `{brand}` accept an id or a slug. | D | Use slugs directly. |
 | Bulk actions | Products and coupons only, synchronous | Products, coupons, customers, categories, orders and reviews. Synchronous, at most 100 ids, with a summary `{operation_id, succeeded, failed, results}` (D-133) | D | One bulk bar with a per-item result dialog (§19.1). |
 | Imports | Absent | Queued imports with types, templates, statuses, error rows and notification (D-135) | G | Reusable import flow (§19.2). |
 | Exports | Tenant exports only | Tenant and platform exports in csv, xlsx and json, plus report pdf; queued, notified, 7-day retention (D-134) | C, D | Shared export centre in both admin apps (§19.3). |
 | Notifications | Polling; no unread count (BA-17); no landlord inbox | Staff, customer and affiliate inboxes with `meta.unread_count`. Platform messages reach the staff inbox (D-137). There is no platform-user inbox and no mark-all-read. | D, F | Bell with count (§21.1). Gaps BG-08 and BG-09. |
-| OpenAPI types | Generated types as the source of truth for everything | Operation IDs equal route names, and parameters and request bodies are typed. Response `data` is typed as `string` in 95% of operations, and documented errors use Laravel's default shape. | D, F | Hybrid: generated request side, hand-maintained response overlay (§13). Gap BG-06. |
-| Route manifest (permission and module per route) | Contract bundle (BA-06) | Not produced by the backend | F | Gap BG-07 (P1), with interim rules (§13.4). |
-| Realtime | Support conversations; channel name from the API | Channels need the tenant id, which no resource or config exposes. Auth routes are `/api/broadcasting/auth` and, for guest support, `/api/support/broadcasting/auth`. | C, F | Gap BG-04 (tenant identity in config). Poll until it is fixed (§21.2). |
+| OpenAPI types | Generated types as the source of truth for everything | Operation IDs equal route names, and parameters and request bodies are typed. Response `data` was typed as `string` in 95% of operations, and documented errors used Laravel's default shape. | D, F | Resolved in D-142 (BG-06): generated response types, with a small overlay for the remaining untyped operations (§13). |
+| Route manifest (permission and module per route) | Contract bundle (BA-06) | Was not produced by the backend | F | Resolved in D-142 (BG-07): `php artisan frontend:contract` (§13.3, §13.4). |
+| Realtime | Support conversations; channel name from the API | Channels need the tenant id. Auth routes are `/api/broadcasting/auth` and, for guest support, `/api/support/broadcasting/auth`. | C, D | The tenant id is now in the storefront config and staff `me` (BG-04, D-141). Channel names are built from it (§21.2). |
 | Dashboards | Widgets poll separately | Section endpoints `/api/admin/dashboard/{section}` and per-resource `/metrics` return KPI shapes (UD-39). | C | One request per section (§22). |
 | Onboarding checklist | Endpoint assumed | `GET /api/admin/onboarding` exists (D-136). | D | Owner dashboard card (§27.3). |
 | HR shifts, overtime, commission, FX | Absent | D-137 to D-140 | G | Mapped in §27 and §40. |
-| Storefront config | Missing identity and module flags (BA-07) | Has business, formatting, checkout, seven module flags, social providers and announcement bar. No tenant id, slug or primary domain. | C, F | Gap BG-04 for identity. Gap BG-11 for missing module flags. |
-| Store images | Media endpoints missing (BA-05) | Product, brand, category, CMS and seller product media routes exist. Store logo, favicon, share image and variant image have no upload route. | D, F | Gap BG-12 (the logo is an onboarding step). |
+| Storefront config | Missing identity and module flags (BA-07) | Has business, formatting, checkout, module flags, social providers, announcement bar and `tenant: {id, slug, primary_domain}` | D | Resolved: BG-04 and BG-11 (D-141) |
+| Store images | Media endpoints missing (BA-05) | Product, brand, category, CMS and seller product media routes exist. Store logo, favicon, share image and variant image have no upload route. | D, F | Gap BG-12, resolved in D-142. |
 | Monorepo | pnpm, Turborepo, `@repo/*` names | The repo exists: pnpm 10.33, Turborepo 2.9, `@workspace/*` names, four apps, Next.js 16.3.3, React 19.2.4, Base UI shadcn style `base-nova`, HugeIcons | A, B | Keep the repo and its naming. Add packages per §5. |
 | Technology choices | Next.js, Tailwind, shadcn on Base UI, TanStack Query and Table, nuqs, RHF, Zod, `openapi-fetch`, no Axios | Confirmed by the repo, apart from missing packages | A | Kept (§4). |
 | Security, testing, CI, deployment, observability | Referenced but unwritten (draft sections 35 to 50) | Not applicable | C | Written in Parts V and VI. |
@@ -192,7 +192,7 @@ This section states only facts the frontend depends on. Each was checked in the 
 | Landlord routes are bound with `Route::domain('{landlord_domain}')` to `tenancy.central_domains` (the root domain plus `CENTRAL_DOMAINS`). Every other host goes to the tenant routes. | `bootstrap/app.php` |
 | The tenant is resolved from `$request->getHost()` by `InitializeTenancyByDomain` through `HostTenantResolver`. It matches `domains.domain` exactly, and only for domains that identify a tenant (subdomains, and verified custom domains of active tenants). | `HostTenantResolver` |
 | An unknown host returns 404 `not_found`. | `ExceptionRenderer` |
-| No trusted proxies are configured, so `getHost()` and `ip()` come from the raw request. | `bootstrap/app.php` |
+| Trusted proxies come from `TRUSTED_PROXIES` (D-141). Only `X-Forwarded-For` and `X-Forwarded-Proto` are trusted, so `ip()` is the real client behind the edge and BFF, while `getHost()` is always the raw `Host`. | `App\Shared\Http\TrustedProxies` |
 | Reserved slugs: `www api app admin mail smtp ftp static assets cdn docs help support status blog affiliate affiliates billing login register dashboard platform root system test` | `TenantRegistrationService::RESERVED_SLUGS` |
 | CORS (`HandleDynamicCors`) allows the platform admin origins, https origins on landlord domains, tenant subdomains and verified custom domains. It never uses a wildcard and does not support credentials, because every actor uses bearer tokens. | `HandleDynamicCors` |
 
@@ -332,12 +332,12 @@ The backend places these URLs in emails and gateway callbacks (`FrontendUrl`). T
 | Base | Path | Purpose |
 |---|---|---|
 | `PLATFORM_ADMIN_URL` | `/reset-password?token&email`, `/verify-email?…`, `/exports/{id}` | Platform user password set and reset, verification, export ready |
-| `PLATFORM_ADMIN_URL` | `/register/verify?registration&code` | Registration verification. This is misrouted; it belongs on the website (BG-03). |
+| `PLATFORM_WEBSITE_URL` | `/register/verify?registration&code` | Registration verification (D-141) |
 | `AFFILIATE_PORTAL_URL` | `/reset-password`, `/verify-email` | Affiliate auth |
 | `PLATFORM_WEBSITE_URL` | `/?ref={code}`, and the landlord sitemap paths | Referral links, sitemap |
 | Tenant primary domain | `/reset-password`, `/verify-email`, `/account/downloads`, `/account/export?link=`, `/account/subscriptions/{id}`, `/account/quotations/{id}`, `/products/{slug}`, `/orders/{order}/payment-return`, and the CMS paths `/`, `/pages/{slug}`, `/blog`, `/blog/{slug}`, `/products/{slug}`, `/categories/{slug}`, `/brands/{slug}` (`config/cms.php` `paths`) | Customer flows, sitemap and menus |
-| Tenant primary domain | `/seller/reset-password` | Seller reset. The seller portal is on the admin host (BG-02). |
-| Tenant primary domain + `TENANT_ADMIN_PATH` (`/admin`) | `/`, `/reset-password`, `/exports/{id}`, `/imports/{id}`, `/billing/callback?reference=` | Staff links. The admin is on its own host (BG-02). |
+| `TENANT_ADMIN_URL` (`https://{slug}.admin.{root}`) + `/seller` | `/reset-password` | Seller reset (D-141) |
+| `TENANT_ADMIN_URL` (`https://{slug}.admin.{root}`) | `/`, `/reset-password`, `/exports/{id}`, `/imports/{id}`, `/billing/callback?reference=` | Staff links (D-141) |
 
 ### 3.9 OpenAPI Documents
 
@@ -370,7 +370,7 @@ Versions are pinned exactly in each `package.json`, and shared runtime versions 
 | **nuqs v2** | Keep | All apps with lists or filters | Typed URL state, with parsers shared by server (`createSearchParamsCache`) and client | None significant |
 | **React Hook Form** | Add | All forms | Uncontrolled inputs keep large forms fast, and it pairs with the shadcn `Field` components already in `ui`. | TanStack Form considered; less mature for dynamic forms |
 | **Zod v4** | Keep (already in `ui`), move | Forms, env validation, BFF input validation | Validates untrusted input at the edges | Not used to mirror backend rules (§18.4) |
-| **openapi-typescript + openapi-fetch** | Add | `packages/contract`, `packages/api-client` | Typed paths, operation parameters and bodies from Scramble, over native `fetch` with middleware | Response types need an overlay until BG-06 (§13) |
+| **openapi-typescript + openapi-fetch** | Add | `packages/contract`, `packages/api-client` | Typed paths, operation parameters and bodies from Scramble, over native `fetch` with middleware | Response types are generated since D-142; a small overlay covers the untyped rest (§13) |
 | **Native `fetch`** | Keep | Everywhere | Streams, `AbortSignal`, and Next data-cache integration on the server | No upload progress; `XMLHttpRequest` is used for that one case (§20.1) |
 | **jose** | Add | `packages/bff` | JWE session cookies (`dir` + `A256GCM`) | None |
 | **laravel-echo + pusher-js** | Add | `packages/realtime` | The Reverb client protocol | Loaded only on realtime routes |
@@ -596,7 +596,7 @@ type TenantContext =
   | { kind: 'tenant'; apiHost: string; requestHost: string; slug: string | null };
 ```
 
-`slug` is known on admin hosts and on `{slug}.ROOT`. On custom domains it is `null` until the storefront config exposes it (BG-04).
+`slug` is known on admin hosts and on `{slug}.ROOT`. On custom domains it comes from the storefront config `tenant.slug`.
 
 **Flow:**
 
@@ -635,7 +635,7 @@ Every app has a thin BFF built from Next.js route handlers and `packages/bff` (A
 
 | App | Cookie | Actor | Max-Age |
 |---|---|---|---|
-| `platform-admin` | `__Host-plat` | Platform user | Until `expires_at` |
+| `platform-admin` | `__Host-plat` | Platform user | Until `expires_at`; refreshed (§9.3) |
 | `affiliate-portal` | `__Host-aff` | Affiliate | Until `expires_at` |
 | `tenant-admin` | `__Host-staff` | Staff | Until `expires_at`; refreshed (§9.3) |
 | `tenant-admin` | `__Host-seller` | Seller | Until `expires_at` |
@@ -678,7 +678,7 @@ The request is built as follows.
 |---|---|
 | URL | `${LARAVEL_INTERNAL_URL}${path}${search}`: a private network address, never the public edge |
 | `Host` | `ctx.tenant.apiHost`. This is how Laravel resolves the tenant or landlord (§3.1). The upstream uses `undici`'s `request` with an explicit `Host` header, because it must set `Host`; this is covered by an integration test (§35.3). |
-| `X-Forwarded-For`, `X-Real-IP` | The client IP from the edge's `X-Real-IP` (effective after BG-01) |
+| `X-Forwarded-For`, `X-Real-IP` | The client IP from the edge's `X-Real-IP`. Laravel trusts it from `TRUSTED_PROXIES` (D-141). |
 | `X-Forwarded-Proto` | `https` |
 | `User-Agent` | The browser's user agent. Legal acceptance and token device names record it. |
 | `Accept` | `application/json` |
@@ -700,7 +700,7 @@ The request is built as follows.
 
 | Route (upstream) | BFF behaviour |
 |---|---|
-| Any login, `register`, social `callback`, staff `refresh` | On 2xx: seal `data.token` and `data.expires_at` into the actor's cookie, and return the envelope with `data.token` and `data.token_type` removed. |
+| Any login, `register`, social `callback`, staff or platform-user `refresh` | On 2xx: seal `data.token` and `data.expires_at` into the actor's cookie, and return the envelope with `data.token` and `data.token_type` removed. |
 | Any `logout` | Call upstream (best effort, 3-second timeout), then always clear the cookie. |
 | Cart routes and `POST /api/orders` | If `data.guest_token` is present: seal it into `__Host-guest` and replace the value with `null` in the body. Browser code never sees the guest token. |
 | Customer `login`, `register`, social `callback` | Send `X-Guest-Token` so the backend merges the guest cart. On success, clear `__Host-guest`. |
@@ -751,7 +751,7 @@ The extra hop is accepted.
 
 | Actor | App and login URL | Upstream login | Session source of truth | Expiry |
 |---|---|---|---|---|
-| Platform user | `platform.ROOT/login` | Landlord `POST /api/admin/auth/login` | `GET /api/admin/auth/me` | Re-login at `expires_at`. There is no refresh (BG-10). |
+| Platform user | `platform.ROOT/login` | Landlord `POST /api/admin/auth/login` | `GET /api/admin/auth/me` | Refreshed like staff (§9.3) through `POST /api/admin/auth/refresh` on the landlord (BG-10, D-143). |
 | Affiliate | `affiliates.ROOT/login` | `POST /api/affiliate/auth/login` | `GET /api/affiliate/profile` | Re-login |
 | Staff | `{slug}.admin.ROOT/login` | Tenant `POST /api/admin/auth/login` | `GET /api/admin/auth/me` | Proactive refresh (§9.3) |
 | Seller | `{slug}.admin.ROOT/seller/login` | `POST /api/seller/auth/login` | `GET /api/seller/profile` | Re-login |
@@ -768,17 +768,17 @@ The extra hop is accepted.
 6. After login the page navigates to `next` only when `next` is a relative path that starts with a single `/` and not `//` or `/\`. Otherwise it goes to the app's home.
 7. Staff login returns the user and permissions, but the shell always loads `me` for the full snapshot (§10.2).
 
-### 9.3 Staff Token Refresh
+### 9.3 Staff and Platform-User Token Refresh
 
-`POST /api/admin/auth/refresh` revokes the current token and issues a new one.
+`POST /api/admin/auth/refresh` revokes the current token and issues a new one: on the tenant host for staff, and on the landlord host for platform users (D-143). Both tokens last 12 hours.
 
 1. The client shell schedules a refresh when 75% of the lifetime has passed, using `expiresAt` from `/bff/session`.
-2. Only one tab refreshes: the call runs inside `navigator.locks.request('staff-session-refresh', …)`. Other tabs share the cookie and see the new expiry on their next `/bff/session` read.
+2. Only one tab refreshes: the call runs inside `navigator.locks.request('{app}-session-refresh', …)`. Other tabs share the cookie and see the new expiry on their next `/bff/session` read.
 3. `/bff/auth/refresh` calls the upstream refresh with the current token and seals the new one.
 4. A request in flight with the old token may get 401 after the swap. The `sessionRetry` middleware (§12.3) calls `/bff/session` once and retries once if the session is valid. Otherwise it redirects to login with `next`.
 5. After 30 minutes without user interaction the shell stops refreshing, so an abandoned session expires naturally.
 
-Other actors have no refresh endpoint. Their sessions last the token lifetime, which is currently 30 days for everyone. BG-10 asks for per-actor lifetimes and a platform-user refresh.
+Customers, affiliates, sellers and drivers have no refresh endpoint. Their sessions last the Sanctum token lifetime, 30 days by default (BG-10, D-143).
 
 ### 9.4 Registration and Account Flows
 
@@ -1085,7 +1085,7 @@ class ApiError extends Error {
 }
 ```
 
-`ApiErrorCode` is the union of the generated `error-codes.json` (BG-07) and these frontend-only codes. Until BG-07 ships, it is `string` with the known codes listed in `packages/api-client/src/codes.ts`.
+`ApiErrorCode` is the union of the generated `error-codes.json` (BG-07, resolved in D-142) and these frontend-only codes, widened with `(string & {})`, because a few backend codes are built at runtime and cannot be listed. An unknown code is handled by its HTTP status.
 
 | Frontend-only code | Meaning |
 |---|---|
@@ -1140,59 +1140,53 @@ type CursorPage<T> = { items: T[]; pagination: CursorPagination; links: CursorLi
 | Paths, methods, operation IDs (= route names) | Complete: 232 landlord and 996 tenant operations | Generated |
 | Path and query parameters, enums, validation limits | Good | Generated |
 | Request bodies | Good where controllers validate inline or through FormRequests (360 tenant operations) | Generated |
-| Response `data` | Untyped (`string`) in 95% of operations | Hand-maintained overlay until BG-06 |
-| Error responses | Documented in Laravel's default shape, not the envelope | Ignored. Errors are normalised from the real envelope (§12.4). |
-| Route manifest: permission, module, wind-down, idempotency, usage limit per route | Not produced | BG-07. Interim per §13.4. |
-| Module, limit and permission registries | PHP config only | BG-07. Interim per §13.4. |
+| Response `data` | Typed inside the envelope in about 97% of operations since D-142 (BG-06), with `meta.pagination` and `meta.links` on paginated lists. Still `string`: the KPI strips (`*/metrics`), dashboard sections, landlord platform-settings groups and `PUT products/{product}/tags`. | Generated; overlay only for the untyped operations |
+| Error responses | Every 4xx/5xx points at the `ErrorEnvelope` schema (D-142) | Generated type; errors are still normalised from the real envelope (§12.4) |
+| Route manifest: permission, module, wind-down, idempotency, usage limit per route | `routes.{landlord,tenant}.json` from `php artisan frontend:contract` (D-142, BG-07) | Generated |
+| Module, limit and permission registries | `modules.json`, `limits.json`, `permissions.*.json`, `error-codes.json` (D-142) | Generated |
 
 **Decision (ADR-11): hybrid typing.**
 
 - `openapi-typescript` generates `paths` for both documents. `openapi-fetch` uses them for URLs, parameters and bodies.
-- Response types come from a typed overlay in `packages/contract/src/responses/`, one file per backend module. It is mapped by operation ID, for example `'tenant.catalog.admin.products.index': Page<AdminProduct>`.
-- A full generated SDK is rejected. It would multiply untyped `string` responses into hundreds of useless wrappers, and it would duplicate what `openapi-fetch` already gives with zero runtime.
+- Response types are generated from the same documents (BG-06, resolved in D-142). A small typed overlay in `packages/contract/src/responses/` covers only the operations whose `data` is still `string` (§13.1). It is mapped by operation ID, for example `'tenant.admin.projects.metrics': KpiStrip`.
+- A full generated SDK is rejected. It would duplicate what `openapi-fetch` already gives with zero runtime.
 
 ### 13.2 The Response Overlay
 
 - The overlay is written from the backend Resources and presenters, the source of truth for response fields. Every type carries a `/** @source App\Modules\...\ProductResource */` comment.
 - A contract test suite (§35.3) runs against a seeded backend in CI. It records one real response per overlay entry and validates it against a Zod schema derived from the overlay (`zod` + `@workspace/contract/schemas`). Drift fails the contract job. Runtime validation is not done in production.
-- `pnpm contract:gaps` lists overlay entries whose OpenAPI `data` is still untyped. When BG-06 lands, each entry is replaced by the generated type, and the command's count must fall to zero.
+- `pnpm contract:gaps` lists overlay entries and fails when an entry's operation has become typed in OpenAPI, so the overlay shrinks as the backend improves. After D-142 it holds about 35 entries (the KPI strip shape is shared by all `*/metrics` routes).
 
 ### 13.3 Generation
 
 - `packages/contract/bundle/` holds the pinned backend artefacts:
-  - `landlord.openapi.json` and `tenant.openapi.json`, copied from the backend's `docs/api/`;
-  - after BG-07: `routes.*.json`, `modules.json`, `limits.json`, `permissions.*.json`, `error-codes.json` and `storefront.json` (themes, fonts).
+  - `landlord.openapi.json` and `tenant.openapi.json`;
+  - `routes.{landlord,tenant}.json`, `modules.json`, `limits.json`, `permissions.{landlord,tenant}.json`, `error-codes.json` and `storefront.json` (themes, fonts).
+- All of them come from one backend command (BG-07, resolved in D-142): `php artisan frontend:contract --path={absolute bundle path} [--openapi]`. `--openapi` re-exports the OpenAPI documents first. The bundle is not committed in the backend.
 - `contract.lock.json` records the backend commit SHA and the SHA-256 of each file.
-- `pnpm contract:pull --from ../tenant-ecommerce-api` copies the artefacts and updates the lock.
+- `pnpm contract:pull --from ../tenant-ecommerce-api` runs that command into `packages/contract/bundle/` and updates the lock.
 - `pnpm contract:generate` writes `packages/contract/src/generated/**`: `paths` types, the `ModuleKey`, `LimitKey`, `Permission` and `RouteName` unions, the route manifest, and theme and font identifier lists.
 - Generated output is committed, marked generated, and excluded from lint.
 - CI regenerates and fails when the committed output differs (§38.3). Upgrading the contract is an ordinary pull request: bump, regenerate, fix type errors. The type errors are the list of affected screens.
 
-### 13.4 Route Manifest (BG-07) and the Interim Rule
+### 13.4 Route Manifest (BG-07)
 
-The admin apps need, for each Laravel route name:
+`routes.{landlord,tenant}.json` (D-142) gives, for each named API route:
 
-- method and URI;
-- the feature key (or `null`);
-- the permission (or `null`);
-- wind-down, idempotency and usage-limit metadata.
+| Field | Meaning |
+|---|---|
+| `name`, `methods`, `uri` | Laravel route name (= OpenAPI operation ID), methods without `HEAD`, URI with `/api` |
+| `group` | Middleware group: `tenant.admin`, `tenant.public`, `tenant.customer`, `landlord.admin`, `landlord.affiliate` and the others |
+| `actor`, `actor_optional` | Token actor from `auth.as` (`staff`, `customer`, `seller`, `driver`, `platform`, `affiliate`); `actor_optional` for storefront routes that accept a customer token |
+| `module`, `module_notice` | Feature key from `feature:{key}` (null for core), and the `module.notice` key |
+| `wind_down`, `read_when_inactive` | The route stays usable while its module is disabled or locked: wind-down routes always, admin `GET`s when the module reads while inactive |
+| `permission`, `acting_permission` | The derived permission checked by `permission.derived` (null when the route opts out), and the permission a self-service route needs to act for someone else |
+| `idempotency`, `usage_limit`, `signed` | `Idempotency-Key` required, the limit key checked before a create, a signed URL |
 
-Once BG-07 ships, all of this is generated.
+- `contract:generate` turns these into the `RouteName`, `Permission`, `ModuleKey`, `LimitKey` and `ApiErrorCode` unions and a typed manifest keyed by route name. Navigation entries and gated actions name a route, and their permission and module come from the manifest. A misspelt route name is a type error.
+- **CI check.** Any permission, module or route literal written by hand outside the manifest must exist in the generated unions.
 
-Until then:
-
-- **Generated from the route list.** `php artisan route:list --json -v` is stored in the bundle, and `contract:generate` parses each route's middleware into the manifest:
-  - route name, method and URI;
-  - `module` from `EnsureFeatureEnabled:{key}`, or from `CheckModuleNotice:{key}` when it is not `core`;
-  - `usageLimit` from `EnsureWithinUsageLimit:{limit}`;
-  - `idempotency` from `EnforceIdempotency`;
-  - the actor group from `tenant.admin`, `landlord.admin` and the others.
-- **Permission names.** A derived permission is not visible in middleware. It is declared per navigation entry and per gated action, as a `Permission` string literal. The union is generated from the backend's committed `config/permissions/generated/{tenant,landlord}.php`, exported as JSON by `packages/contract/scripts/`. A misspelt permission is a type error.
-- **Unions.** The `ModuleKey` and `LimitKey` unions are generated from `config/modules.php` and `config/limits.php` in the same way.
-- **Wind-down flags** are read from each module's `wind_down` list in `config/modules.php`.
-- **CI check.** A test compares every declared (route, permission) pair with `permission.derived` routes and with the generated permission list. It fails on any mismatch.
-
-This keeps one module system and one permission system: nothing is invented, and every value is checked against the backend.
+This keeps one module system and one permission system: nothing is invented, and every value comes from the backend.
 
 ---
 
@@ -1312,8 +1306,8 @@ Every cached data function:
 
 - `next` parameters are validated as same-origin relative paths (§9.2).
 - Access-state pages keep the requested URL, so the user returns after enabling a module or upgrading.
-- **Storefront host canonicalisation.** A page request on a non-primary domain is redirected with 308 to the primary domain (§29.9), once BG-04 exposes the primary domain.
-- **Storefront `/admin/*` and `/seller/*`** redirect with 308 to `https://{slug}.admin.ROOT/…` (with `/seller` kept for seller paths). This is interim until BG-02, and needs the slug: on `{slug}.ROOT` hosts it is the first label; on custom domains it comes from BG-04.
+- **Storefront host canonicalisation.** A page request on a non-primary domain is redirected with 308 to the config's `tenant.primary_domain` (§29.9).
+- **Storefront `/admin` and `/admin/*`** redirect with 308 to `https://{tenant.slug}.admin.ROOT/…`, for people who type the store address followed by `/admin`. The backend's own links already point at the admin host (D-141).
 
 ---
 
@@ -1713,7 +1707,7 @@ The backend queues imports, exports, tenant exports, tenant provisioning, paymen
 | Employee documents | `POST /api/admin/hr/employees/{employee}/documents` |
 | Return photos, support attachments, job application résumé | Multipart on their create routes |
 | Custom-field files | Entity media endpoint with `collection=custom_fields` (§18.5) |
-| Store logo, favicon, share image (`*_media_id` settings), variant image, platform logo | **No endpoint (BG-12).** The settings screens show these fields read-only, with "Coming soon". The onboarding step "store details" cannot be completed from the UI until BG-12 ships. |
+| Store logo, favicon, share image (`*_media_id` settings), variant image, platform logo | `POST /api/admin/settings/media` (`setting` + `image`) and `DELETE /api/admin/settings/media/{setting}`; `POST`/`DELETE /api/admin/products/{product}/variants/{variant}/image`; landlord `POST`/`DELETE /api/admin/platform-settings/media` (BG-12, resolved in D-142). The settings screens upload in place and show the returned `url`. |
 
 ### 20.3 Public and Private Files
 
@@ -1769,11 +1763,8 @@ useWhisperTyping(name);   // at most one whisper per 2 seconds
 ```
 
 - **Lazy connection.** Echo connects when the first realtime component mounts and disconnects when the last unmounts.
-- **Channel names.** Tenant channels need the tenant id, which no API response exposes today (BG-04). Until it is exposed:
-  - tenant support screens poll the open conversation every 5 seconds and the inbox every 15 seconds;
-  - platform support conversations (no tenant id needed) use realtime.
-
-  The hook takes the channel name from the API, and never assembles it from a guessed id.
+- **Channel names** are built from the documented patterns (§3.7) with the tenant id from the storefront config or staff `me` (`tenant.id`, D-141). BG-05 would move the names onto the resources themselves.
+  The id is never taken from user input or the URL.
 - **Gap filling.** On subscribe and on every reconnect, the conversation query refetches the newest messages. Events merge into the TanStack cache by message id, so there are no duplicates and no losses.
 - **Fallback.** On a 403 from auth, or after 3 failed reconnects, the hook falls back to polling every 10 seconds.
 - **Not realtime:** notifications, dashboards, orders, stock, POS and kitchen. They poll at the intervals stated in their sections.
@@ -1958,12 +1949,11 @@ The site-wide layout (header, footer, menus) uses `GET /api/platform/config` and
 |---|---|---|
 | 1. Plan | `/pricing`, then `/signup?price={plan_price_id}` | The chosen price is carried in the URL. |
 | 2. Details | `/signup` | Business name, owner name, email, password and confirmation, country (lookup), optional currency, price, optional platform coupon (`POST /api/platform-coupons/validate`), and one checkbox per document from `GET /api/legal-documents/current` that is required at registration. Submits `POST /api/register` with `ref` and `referral_token` from the affiliate cookie (§24.4). A 503 `registration_unavailable` shows "Signups are paused". A 422 `legal_version_outdated` reloads the documents and asks for acceptance again. |
-| 3. Verify | `/register/verify?registration={public_id}[&code]` | This is the backend's link path (BG-03). A six-digit code input submits `POST /api/register/verify`. A link that carries `code` verifies automatically. Resend (`POST /api/register/resend`) is allowed once per 60 seconds with a countdown. `verification_code_invalid` and `verification_expired` show inline. |
+| 3. Verify | `/register/verify?registration={public_id}[&code]` | The backend's link path (D-141). A six-digit code input submits `POST /api/register/verify`. A link that carries `code` verifies automatically. Resend (`POST /api/register/resend`) is allowed once per 60 seconds with a countdown. `verification_code_invalid` and `verification_expired` show inline. |
 | 4. Payment | `/signup/payment?registration={public_id}` | When `next_action = payment`, the browser goes to `checkout_url`. `POST /api/register/{registration}/checkout` gets a fresh URL after a failed or abandoned payment. |
 | 5. Provisioning | `/signup/status?registration={public_id}` | Polls `GET /api/register/{registration}/status` every 15 seconds. After 10 minutes it stops and says the owner will receive an email. |
 | 6. Done | same page | When `active`, a button opens `https://{slug}.admin.ROOT/login?email={email}`. The slug is the first label of the returned `domain`. |
 
-Until BG-03 ships, `platform-admin` serves `/register/verify` as a 308 redirect to `https://ROOT/register/verify`, keeping the query string.
 
 ### 24.4 Affiliate Referral Capture
 
@@ -2211,7 +2201,6 @@ The seller portal is served by `tenant-admin` under `/seller`, with the `__Host-
 
 - A `pending` seller who signs in gets the backend's refusal, shown as "Your application is being reviewed."
 - The storefront's `/seller` page is a "Sell with us" link to `https://{slug}.admin.ROOT/seller/register`.
-- Until BG-02, the storefront also redirects `/seller/reset-password` to the admin host (§15.4).
 
 ---
 
@@ -2255,7 +2244,7 @@ The seller portal is served by `tenant-admin` under `/seller`, with the `__Host-
 | `/careers`, `/careers/[slug]` | Careers (`hr_recruitment`) | `GET /api/careers/jobs`, `/{slug}`, `POST …/apply` (multipart) |
 | `/book/[slug]` | Book a bookable product (`booking`) | `GET /api/products/{product}/available-slots`, `POST /api/bookings` |
 | `/seller` | "Sell with us" (`marketplace`) | none |
-| `/admin/*`, `/seller/*` (except `/seller`) | 308 to the admin host (§15.4) | none |
+| `/admin`, `/admin/*` | 308 to the admin host (§15.4) | none |
 | `/robots.txt` | `robots.ts` | Config |
 | `/sitemap.xml` | Edge-routed to Laravel | `tenant.sitemap` |
 
@@ -2270,7 +2259,7 @@ These paths are the storefront URL contract shared with `config/cms.php` and `Fr
 - checkout switches: guest checkout, prices include tax, payment mode, plus the storefront settings `checkout_phone_required` and `checkout_order_notes_enabled`;
 - the visible module flags, the social login providers and the announcement bar.
 
-**Module visibility.** A route or widget for a module flagged false returns `notFound()`, and its links are omitted. Some modules with storefront surfaces are not in the config flags: `support`, `marketplace`, `hr_recruitment`, `sales_quotations`, `product_subscriptions` and `repair` (BG-11). Their widgets call their endpoint and hide themselves on a 403 module code. Their routes render the endpoint's module refusal as `notFound()`.
+**Module visibility.** A route or widget for a module flagged false returns `notFound()`, and its links are omitted. The flags cover every module with a storefront surface (§3.6).
 
 **Test mode.** When `checkout.payment_mode = test`, a slim banner reads "This store is in test mode. No real payments are taken."
 
@@ -2360,7 +2349,7 @@ Guest orders are readable only with the guest token that placed them. A guest wh
   - The description is `meta_description`, or else the plain-text description truncated to 160 characters, or else `seo_default_description`.
   - The Open Graph image is the entity image, or else the store share image.
   - CMS pages honour `canonical_url` and `robots`.
-- **Canonical host.** Canonical URLs use the tenant's primary domain from BG-04. Until then they use the request host. Once the primary domain is known, a page `GET` on any other verified domain gets a 308 to the primary domain. `/api/*` and `/sitemap.xml` are never redirected.
+- **Canonical host.** Canonical URLs use `tenant.primary_domain` from the config. A page `GET` on any other verified domain gets a 308 to the primary domain. `/api/*` and `/sitemap.xml` are never redirected.
 - **Robots.** `robots.ts` behaves as follows:
   - when `robots_indexing_enabled` is false, it disallows everything;
   - otherwise it disallows `/cart`, `/checkout`, `/account`, `/orders`, `/auth`, `/bff` and `/search`, and gives the sitemap URL;
@@ -2499,8 +2488,7 @@ Each app has one `proxy.ts`. It must stay light: no data fetching.
 
 1. Validate the request host shape for the app (§7.4), returning 404 on failure.
 2. Set the CSP nonce and security headers.
-3. Storefront: the `/admin/*` and `/seller/*` redirects when the slug is derivable from the host (§15.4).
-4. `platform-admin`: the `/register/verify` redirect (§24.3).
+3. Storefront: the `/admin` convenience redirect (§15.4).
 5. Optimistic auth redirect: a protected route with no session cookie goes to login. This is a UX shortcut only; real checks happen in the BFF and Laravel.
 
 ---
@@ -2709,7 +2697,7 @@ OAuth configuration lives only in the backend: `GOOGLE_*` and `FACEBOOK_*`, with
 | `PLATFORM_ADMIN_ORIGINS` | Empty in production (the BFF makes browser CORS unnecessary) |
 | `GOOGLE_REDIRECT_URI`, `FACEBOOK_REDIRECT_URI` | `https://ROOT/oauth/google/callback`, `https://ROOT/oauth/facebook/callback` |
 | `REVERB_HOST`, `REVERB_PORT`, `REVERB_SCHEME` | The edge host (`ROOT`), 443, https |
-| `TENANT_ADMIN_PATH` | Unused after BG-02, replaced by the admin URL template |
+| `TENANT_ADMIN_URL` | `https://{slug}.admin.{root}` (D-141) |
 
 Turborepo `env` and `globalEnv` list these variables per task, so the build cache varies correctly.
 
@@ -2804,7 +2792,7 @@ tenant-ecommerce-frontend/
 │   ├── platform-admin/               platform.ROOT
 │   │   └── src/
 │   │       ├── app/
-│   │       │   ├── (auth)/           login, forgot-password, reset-password, verify-email, register/verify (redirect)
+│   │       │   ├── (auth)/           login, forgot-password, reset-password, verify-email
 │   │       │   ├── (console)/        dashboard, tenants, tenant-registrations, database-servers, plans,
 │   │       │   │                     subscriptions, payment-transactions, platform-coupons, platform-commissions,
 │   │       │   │                     payment-gateways, affiliates, affiliate-referrals, affiliate-commissions,
@@ -2914,7 +2902,7 @@ Key:
 
 | Backend domain | API capability | App | Frontend feature | Auth | Permission | Module gate | UI pattern | Async | Import | Export | Bulk | Status |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| Registration | `/api/register*` | platform-web | signup | — | none | none | Wizard | Q (provisioning) | no | no | no | Covered (link BG-03) |
+| Registration | `/api/register*` | platform-web | signup | — | none | none | Wizard | Q (provisioning) | no | no | no | Covered |
 | Plans | `/api/admin/plans*` | platform-admin | plans | P | derived | none | CRUD + tabs | no | no | no | no | Covered |
 | Tenants | `/api/admin/tenants*` | platform-admin | tenancy | P | derived | none | List, detail tabs, actions | Q (tenant export) | no | yes | no | Covered |
 | Subscriptions, transactions, coupons | `/api/admin/{subscriptions,payment-transactions,platform-coupons}*` | platform-admin | billing | P | derived | none | List, detail, metrics strip | no | no | yes | no | Covered |
@@ -2930,7 +2918,7 @@ Key:
 | Dashboards | `/api/admin/dashboard*`, `…/metrics` | platform-admin, tenant-admin | dashboard | P, S | derived | per section | KPI grid | no | no | no | no | Covered |
 | Staff auth and session | `/api/admin/auth/*` | tenant-admin | auth | S | none | none | Login, refresh | no | no | no | no | Covered |
 | Modules | `/api/admin/modules*` | tenant-admin | modules | S | derived (enable, disable) | none | Catalogue | no | no | no | no | Covered |
-| Onboarding | `/api/admin/onboarding` | tenant-admin | onboarding | S (owner) | none | none | Checklist card | no | no | no | no | Covered (logo BG-12) |
+| Onboarding | `/api/admin/onboarding` | tenant-admin | onboarding | S (owner) | none | none | Checklist card | no | no | no | no | Covered |
 | Products | `/api/admin/products*` | tenant-admin | catalog | S | derived | none | CRUD, media, variants | no | yes | yes | yes | Covered |
 | Categories, brands, tags, options, units | `/api/admin/{categories,…}` | tenant-admin | catalog | S | derived | none | CRUD, dialogs | no | yes (categories) | yes (categories) | yes (categories) | Covered |
 | Reviews, questions | `/api/admin/{reviews,product-questions,product-answers}` | tenant-admin | reviews | S | derived | none | Moderation list | no | no | no | yes | Covered |
@@ -2947,14 +2935,14 @@ Key:
 | Exports | `/api/admin/exports*` | tenant-admin | exports | S | derived | none | Export centre | Q | no | yes | no | Covered |
 | Notifications | `/api/admin/notifications*`, `/notification-preferences*`, `/notification-templates*`, `/notifications/matrix*` | tenant-admin | notifications | S | own, derived | none | Bell, inbox, preferences, matrix | no | no | no | no | Covered (mark all: BG-09) |
 | Staff users, roles | `/api/admin/{users,roles,permissions}` | tenant-admin | users, roles | S | derived | none | CRUD, permission picker grouped by module | no | no | no | no | Covered |
-| Support | `/api/admin/support/*`; `/api/support/*` | tenant-admin, storefront | support | S, C, G | derived; own | `support` | Inbox, conversation | Realtime (after BG-04) | no | no | no | Partial (BG-04) |
+| Support | `/api/admin/support/*`; `/api/support/*` | tenant-admin, storefront | support | S, C, G | derived; own | `support` | Inbox, conversation | Realtime | no | no | no | Covered |
 | POS | `/api/admin/pos/*` | tenant-admin | pos | S | derived | `pos` | Full-screen terminal | Q (terminal charge) | no | no | no | Covered (offline snapshot BG-14) |
 | Purchasing | `/api/admin/{suppliers,purchase-orders,supplier-*,quotation-requests,purchase-return*}` | tenant-admin | purchasing | S | derived | `purchasing` | CRUD, documents | no | no | yes | no | Covered |
 | Accounting | `/api/admin/accounting/*` | tenant-admin | accounting | S | derived | `accounting` | Ledger screens, reports | no | no | yes (reports) | no | Covered |
 | Expenses, income | `/api/admin/{expenses,income,*-categories}` | tenant-admin | expenses | S | derived | `expenses` | CRUD | no | no | yes | no | Covered |
 | HR | `/api/admin/hr/*` | tenant-admin | hr | S | derived; own | `hr`, `hr_payroll`, `hr_recruitment` | CRUD, roster grid, review queues, payroll runs | no | no | no | no | Covered |
 | Marketplace (staff) | `/api/admin/{sellers,seller-products,seller-groups}` | tenant-admin | marketplace | S | derived | `marketplace` | CRUD, approvals, payouts | no | no | no | no | Covered |
-| Seller portal | `/api/seller/*` | tenant-admin | seller-portal | L | own | `marketplace` | Portal | no | no | no | no | Covered (link BG-02) |
+| Seller portal | `/api/seller/*` | tenant-admin | seller-portal | L | own | `marketplace` | Portal | no | no | no | no | Covered |
 | Sales quotations, agents, product subscriptions, installments | `/api/admin/{sales-quotations,sales-quotation-requests,sales-agents,sales-agent-commissions,product-subscriptions,installment-plans}` | tenant-admin | same names | S | derived | own modules | CRUD | no | no | no | no | Covered |
 | Approvals | `/api/admin/{approvals,approval-workflows}` | tenant-admin | approvals | S | derived | `approval_workflows` | Queue, workflow editor | no | no | no | no | Covered |
 | AI assistant | `/api/admin/ai-assistant*` | tenant-admin | ai-assistant | S | derived | `ai_assistant` | Chat panel | no | no | no | no | Covered |
@@ -2964,7 +2952,7 @@ Key:
 | Repair | `/api/admin/repair-jobs*`; `/api/account/repair-jobs*` | tenant-admin, storefront | repair, account | S, C | derived; own | `repair` | Job board; customer approval | no | no | no | no | Covered |
 | Integrations | `/api/admin/{woocommerce,social-commerce}*` | tenant-admin | woocommerce, social-commerce | S | derived | integration keys | Connection settings, sync runs | Q (sync) | no | no | no | Covered (OAuth connect: UD-23, backend open decision) |
 | Storefront catalogue | `/api/{products,categories,brands,tags,flash-sales}*` | storefront | catalog | — | none | none | Server-rendered pages | no | no | no | no | Covered (view recording BG-15) |
-| Storefront config, CMS | `/api/storefront/*`, `/api/cms/*` | storefront | shell, cms | — | none | per flag | Server-rendered | no | no | no | no | Partial (BG-04, BG-11) |
+| Storefront config, CMS | `/api/storefront/*`, `/api/cms/*` | storefront | shell, cms | — | none | per flag | Server-rendered | no | no | no | no | Covered |
 | Cart, checkout, payments | `/api/cart*`, `/api/orders*`, `/api/payments/verify`, `/api/payment-methods`, `/api/shipping/methods` | storefront | cart, checkout, payment-return | C, G | own | none | Client islands | Q (payment verify) | no | no | no | Covered |
 | Customer auth and social | `/api/auth/*`, `/api/account/social-accounts*` | storefront, platform-web | auth, social-login, oauth-relay | —, C | own | none | Forms, redirect flow | no | no | no | no | Covered |
 | Customer account | `/api/account*`, `/api/wishlist*`, `/api/returns*`, `/api/notifications*`, `/api/quotation-requests*`, `/api/downloads/*` | storefront | account | C | own | per module | Account pages | Q (data export) | no | yes (own data) | no | Covered |
@@ -2977,18 +2965,18 @@ Key:
 | Frontend requirement | Classification | Resolution |
 |---|---|---|
 | Resolve the tenant from the admin host via the slug | Supported | `Host: {slug}.ROOT` (§7.4) |
-| Per-customer rate limiting and correct IPs through the BFF | Backend contract gap | BG-01 |
-| Admin and seller links on the admin origin | Backend contract gap | BG-02, with an interim redirect |
-| Registration verification link on the website | Backend contract gap | BG-03, with an interim redirect |
-| Tenant id, slug and primary domain on the storefront | Backend contract gap | BG-04 |
-| Realtime channel names for tenant support | Partially supported | BG-04 or BG-05; polling meanwhile |
-| Typed response data in OpenAPI | Partially supported | BG-06; overlay meanwhile |
-| Route manifest and registries as artefacts | Backend contract gap | BG-07; interim checked declarations |
+| Per-customer rate limiting and correct IPs through the BFF | Supported | BG-01 resolved (D-141) |
+| Admin and seller links on the admin origin | Supported | BG-02 resolved (D-141) |
+| Registration verification link on the website | Supported | BG-03 resolved (D-141) |
+| Tenant id, slug and primary domain on the storefront | Supported | BG-04 resolved (D-141) |
+| Realtime channel names for tenant support | Supported | Built from `tenant.id` (BG-04); BG-05 optional |
+| Typed response data in OpenAPI | Supported (about 97%) | BG-06, resolved in D-142; overlay for the metrics, dashboard and platform-settings operations |
+| Route manifest and registries as artefacts | Supported | BG-07, resolved in D-142 |
 | Platform-user inbox | Backend contract gap | BG-08 |
 | Mark all notifications read | Backend contract gap | BG-09 |
 | Platform-user refresh and password change; per-actor token lifetimes | Backend contract gap | BG-10 |
-| Storefront flags for every module with storefront surfaces | Partially supported | BG-11; 403-based hiding meanwhile |
-| Upload endpoints for store logo, favicon, share image and variant image | Backend contract gap | BG-12 |
+| Storefront flags for every module with storefront surfaces | Supported | BG-11 resolved (D-141) |
+| Upload endpoints for store logo, favicon, share image and variant image | Supported | BG-12, resolved in D-142 |
 | Backend-triggered storefront revalidation | Future | BG-13 |
 | POS offline catalogue snapshot | Future | BG-14 |
 | Product view recording separate from cached pages | Partially supported | BG-15 |
@@ -3011,6 +2999,8 @@ Each gap is written so the backend can schedule it without further analysis. Pri
 - **P2** improves correctness or UX and has an acceptable interim.
 - **P3** is future.
 
+Resolved gaps keep their section and number, with a **Status** row, so references stay stable. BG-01, BG-02, BG-03, BG-04 and BG-11 were resolved in backend decision D-141; BG-06, BG-07 and BG-12 in D-142; BG-05, BG-08, BG-09 and BG-10 in D-143.
+
 ### BG-01: Trust the BFF's Forwarded Client IP
 
 | | |
@@ -3021,6 +3011,7 @@ Each gap is written so the backend can schedule it without further analysis. Pri
 | **Request, response** | No API shape change |
 | **Auth, authorisation, tenant scope** | Unchanged |
 | **Priority** | P0 |
+| **Status** | **Resolved** in D-141: `TRUSTED_PROXIES`, applied by `App\Shared\Http\TrustedProxies` |
 
 ### BG-02: Tenant-Admin and Seller Link Base
 
@@ -3030,7 +3021,8 @@ Each gap is written so the backend can schedule it without further analysis. Pri
 | **Reason** | `FrontendUrl::tenantAdmin()` builds `{primary domain}{TENANT_ADMIN_PATH}`, and seller reset links use the storefront host. The frontend serves both at `{slug}.admin.ROOT` for origin isolation (ADR-07). |
 | **Required change** | Add `TENANT_ADMIN_URL_TEMPLATE` (default `https://{slug}.admin.{root}`). `FrontendUrl::tenantAdmin()` and the seller reset link use it (the seller path stays `/seller/…`). Remove `TENANT_ADMIN_PATH`. |
 | **Request, response** | Unchanged; only link values change |
-| **Priority** | P1. Interim: storefront 308 redirects for `/admin/*` and `/seller/*` (§15.4). |
+| **Priority** | P1 |
+| **Status** | **Resolved** in D-141: `TENANT_ADMIN_URL` and `FrontendUrl::sellerPortal()` |
 
 ### BG-03: Registration Verification Link Target
 
@@ -3039,7 +3031,8 @@ Each gap is written so the backend can schedule it without further analysis. Pri
 | **Capability** | The emailed verification link opens the signup flow on the website |
 | **Reason** | `TenantRegistrationService` uses `FrontendUrl::platformAdmin('/register/verify', …)`. Registrants have nothing to do with the platform admin. |
 | **Required change** | Use `FrontendUrl::website('/register/verify', …)`. |
-| **Priority** | P1. Interim: `platform-admin` redirects the path to `platform-web`. |
+| **Priority** | P1 |
+| **Status** | **Resolved** in D-141 |
 
 ### BG-04: Tenant Identity in the Storefront Config
 
@@ -3052,6 +3045,7 @@ Each gap is written so the backend can schedule it without further analysis. Pri
 | **Response** | `data.tenant = {"id": "…", "slug": "acme", "primary_domain": "shop.acme.com"}` |
 | **Tenant scope** | The current tenant only. The id is not secret; channel authorisation stays server-side. |
 | **Priority** | P1 |
+| **Status** | **Resolved** in D-141. The config cache is cleared when the primary domain changes. |
 
 ### BG-05: Broadcast Channel Name on Conversation Resources
 
@@ -3060,6 +3054,7 @@ Each gap is written so the backend can schedule it without further analysis. Pri
 | **Capability** | Subscribing to the right channel without assembling names in the client |
 | **Required change** | Add `broadcast_channel` (for example `private-tenant.{id}.support-conversation.{id}`) to tenant and platform support conversation resources. Add `inbox_channel` and `presence_channel` to the support inbox listing meta. |
 | **Priority** | P2. With BG-04 the client can build names from the documented pattern, but the resource field removes the duplication. |
+| **Status** | **Resolved** in D-143. The names are given in Laravel Echo form, without the `private-` or `presence-` prefix: pass `broadcast_channel` and `meta.inbox_channel` to `Echo.private()`, and `meta.presence_channel` to `Echo.join()`. |
 
 ### BG-06: Typed Response Schemas and Error Envelope in OpenAPI
 
@@ -3069,6 +3064,7 @@ Each gap is written so the backend can schedule it without further analysis. Pri
 | **Reason** | `APIResponse::success($resource)` hides the resource from Scramble, so `data` is documented as `string` in 95% of operations. Errors are documented in Laravel's shape rather than the envelope. |
 | **Required change** | A Scramble extension that types `APIResponse::success`, `created` and `accepted` with the wrapped `JsonResource` or array shape (including paginated `meta.pagination`), and a document transformer that replaces the error responses with the envelope schema (`meta.error_code` enum per route where known). |
 | **Priority** | P1 |
+| **Status** | **Resolved** in D-142. `data`, `meta.pagination` and `meta.links` are typed; every error response references `ErrorEnvelope`. `meta.error_code` is a plain string (the list is `error-codes.json`), not a per-route enum. About 35 operations stay untyped (§13.1). |
 
 ### BG-07: Contract Bundle Export
 
@@ -3081,7 +3077,8 @@ Each gap is written so the backend can schedule it without further analysis. Pri
 | | `permissions.{landlord,tenant}.json`, `error-codes.json` (code, status, owning module) |
 | | `storefront.json` (themes, fonts) |
 | | The OpenAPI documents |
-| **Priority** | P1. The interim manifest (§13.4) is generated from the route list, except for derived permissions. |
+| **Priority** | P1 |
+| **Status** | **Resolved** in D-142, with the fields listed in §13.4. `--path` takes an absolute directory and `--openapi` re-exports the documents first. The bundle is a build artefact, not committed in the backend. |
 
 ### BG-08: Platform-User Notification Inbox
 
@@ -3090,6 +3087,7 @@ Each gap is written so the backend can schedule it without further analysis. Pri
 | **Capability** | In-app notifications for platform users. Landlord templates targeting `platform_user` default to the `database` channel, but there is no route to read them. |
 | **Required change** | `GET /api/admin/notifications` (paginated, `meta.unread_count`) and `POST /api/admin/notifications/{id}/read` on the landlord, mirroring the tenant staff inbox |
 | **Priority** | P2 |
+| **Status** | **Resolved** in D-143. Same item shape as the staff inbox. Self-service: no permission is required. |
 
 ### BG-09: Mark All Notifications Read
 
@@ -3097,6 +3095,7 @@ Each gap is written so the backend can schedule it without further analysis. Pri
 |---|---|
 | **Required change** | `POST …/notifications/read-all` for staff, customers, affiliates and (after BG-08) platform users. Response: `{marked: n}`. |
 | **Priority** | P3 |
+| **Status** | **Resolved** in D-143: `POST /api/admin/notifications/read-all` (staff, platform users), `POST /api/notifications/read-all` (customers), `POST /api/affiliate/notifications/read-all`. |
 
 ### BG-10: Platform-User Session Completeness and Per-Actor Lifetimes
 
@@ -3105,13 +3104,15 @@ Each gap is written so the backend can schedule it without further analysis. Pri
 | **Required change** | Landlord `POST /api/admin/auth/refresh` and `PATCH /api/admin/auth/password` for platform users, and per-actor token lifetimes: for example staff and platform users at 12 hours with refresh, customers and affiliates at 30 days. |
 | **Reason** | Platform users hold the most privileged tokens, yet have the only 30-day non-rotating session and cannot change their password. |
 | **Priority** | P2 |
+| **Status** | **Resolved** in D-143. Staff and platform tokens last 12 hours (`AUTH_TOKEN_LIFETIME_STAFF`, `AUTH_TOKEN_LIFETIME_PLATFORM`, in minutes) and are renewed through `refresh`. Customers, affiliates, sellers and drivers keep `SANCTUM_EXPIRATION` (30 days), because they have no refresh route. The client shell refreshes at 75% of the lifetime (§9.3). |
 
 ### BG-11: Complete Storefront Module Flags
 
 | | |
 |---|---|
 | **Required change** | Add `support`, `marketplace`, `hr_recruitment`, `sales_quotations`, `product_subscriptions` and `repair` to `StorefrontConfigService::STOREFRONT_MODULES`. |
-| **Priority** | P2. Interim: widgets hide on a 403 module code. |
+| **Priority** | P2 |
+| **Status** | **Resolved** in D-141 |
 
 ### BG-12: Upload Endpoints for Setting and Variant Images
 
@@ -3120,6 +3121,7 @@ Each gap is written so the backend can schedule it without further analysis. Pri
 | **Required change** | `POST /api/admin/settings/media` (multipart `file`, `setting`: `store_logo`, `favicon` or `seo_share_image`), returning `{media_id, url}` and storing the id in the setting. `POST /api/admin/products/{product}/variants/{variant}/image`. The landlord equivalent for the platform logo. |
 | **Reason** | Onboarding's `store_details` step requires a logo, and there is no way to upload one. |
 | **Priority** | P1 |
+| **Status** | **Resolved** in D-142. The shipped contract is multipart `image` (not `file`) plus `setting`, and it returns 201 `{setting, media_id, url}`. `DELETE /api/admin/settings/media/{setting}` clears the slot. The variant routes are `POST` and `DELETE …/variants/{variant}/image`, and admin variants carry `image_url`. The landlord routes are `POST /api/admin/platform-settings/media` (`platform_logo`, `platform_favicon`, `seo_share_image`) and `DELETE …/{setting}`. `GET /api/platform/config` adds `{name}_url` beside each public `{name}_media_id`. Uploads count against `max_storage_mb`. |
 
 ### BG-13: Storefront Revalidation Hook
 
@@ -3173,11 +3175,11 @@ Each phase lists its dependencies, what it delivers, the tests it adds and its a
 | 12 | Platform admin | 6, 8 | `admin-kit` | platform-admin | §25 features | Feature tests; end-to-end suspend flow | Every landlord route family in §40.2 has a screen |
 | 13 | Affiliate portal | 5, 6 | `admin-kit` | affiliate-portal | §26 | End-to-end apply, login, payout details | Portal routes complete |
 | 14 | Optional modules | 7, 8 | none | tenant-admin, storefront | POS, purchasing, accounting, expenses, HR, marketplace and seller portal, support, gift cards, reward points, quotations, agents, subscriptions, installments, approvals, AI assistant, projects, manufacturing, restaurant and kitchen, booking, repair, integrations, reports | Per-module feature tests; POS and support end to end | Each module's routes in §40.2 have screens gated by module state |
-| 15 | Realtime | 6, 14 (support) | `realtime` | tenant-admin, platform-admin, storefront | Echo, the helpdesk on realtime, tenant support polling until BG-04 | End-to-end chat | Messages arrive under 1 s with realtime, under 5 s with polling |
+| 15 | Realtime | 6, 14 (support) | `realtime` | tenant-admin, platform-admin, storefront | Echo; support and helpdesk on realtime | End-to-end chat | Messages arrive under 1 s |
 | 16 | Observability and hardening | all | all | all | Sentry, OTel, Web Vitals, CSP per §31.3, secret scan, headers | Security header tests; CSP report-only week, then enforced | No CSP violations in staging; alerts wired |
-| 17 | Production readiness | 16, BG-01 | all | all | Deploy pipelines, scaling, rollback drill, runbooks | Full end-to-end in staging | Launch checklist signed; BG-01 deployed |
+| 17 | Production readiness | 16 | all | all | Deploy pipelines, scaling, rollback drill, runbooks, `TRUSTED_PROXIES` set per environment | Full end-to-end in staging | Launch checklist signed |
 
-Admin navigation from phase 6 uses the interim manifest (§13.4) and switches to generated BG-07 artefacts when they arrive, with no feature rewrites.
+Admin navigation from phase 6 uses the generated route manifest (§13.4, BG-07 resolved in D-142).
 
 ---
 
@@ -3210,15 +3212,15 @@ Admin navigation from phase 6 uses the interim manifest (§13.4) and switches to
 | ADR-04 | Affiliate portal | Its own app on `affiliates.ROOT` | Inside `platform-web`; inside `platform-admin` | `platform-web` runs analytics (origin risk); `platform-admin` must not ship to external partners | One more deployable, and a small one |
 | ADR-05 | Backend for frontend | Thin Next.js route-handler BFF with sealed HttpOnly cookies | Browser-to-API with bearer tokens in storage; Auth.js | Tokens never in JavaScript; server rendering of authenticated pages; host-based tenant identity for the admin origin | One extra private hop; owned session code |
 | ADR-06 | Tenant resolution | From the request `Host` only; the BFF sends `Host: {apiHost}` to Laravel | `X-Forwarded-Host`, headers or parameters | Matches Laravel's resolver exactly (§3.1); nothing spoofable by the client | Needs an HTTP client that can set `Host` (undici) |
-| ADR-07 | Host layout | `platform.ROOT`, `affiliates.ROOT`, `{slug}.admin.ROOT`, `{slug}.ROOT` and custom domains, `cdn.ROOT`, Reverb on `ROOT/app` | Admin under `{store}/admin` (the backend's current links); `admin.ROOT/{slug}` | Origin isolation from tenant third-party scripts; host-only cookies per tenant; uses already-reserved labels | Backend link change BG-02; storefront redirects meanwhile |
+| ADR-07 | Host layout | `platform.ROOT`, `affiliates.ROOT`, `{slug}.admin.ROOT`, `{slug}.ROOT` and custom domains, `cdn.ROOT`, Reverb on `ROOT/app` | Admin under `{store}/admin`; `admin.ROOT/{slug}` | Origin isolation from tenant third-party scripts; host-only cookies per tenant; uses already-reserved labels | The backend builds admin links from `TENANT_ADMIN_URL` (D-141) |
 | ADR-08 | Staff session lifetime | Token lifetime with proactive refresh and single-tab refresh through Web Locks | Refresh on every request; long-lived without refresh | Backend refresh revokes the old token; one refresher avoids races | Customers and platform users re-login at expiry until BG-10 |
 | ADR-09 | Customer social login | Full-page redirect; platform-wide relay on `platform-web`; sealed per-flow cookie; relay validates the target is a live tenant store | Popup; per-tenant redirect URIs; the relay trusting the state prefix | One redirect URI per provider (backend design); works in in-app browsers; prevents open redirect and code exfiltration | One extra redirect hop |
-| ADR-10 | API client | `openapi-fetch` over native `fetch`, with envelope and error middleware and typed helpers | Axios; a generated SDK; hand-written fetch wrappers | Zero runtime weight; typed paths and bodies; one place to unwrap the envelope | Needs a response overlay until BG-06 |
-| ADR-11 | Type generation | Hybrid: generated paths and request types, and a hand-maintained, contract-tested response overlay | Generated only (response data would be `string`); fully manual | Uses what OpenAPI types well; tests keep the overlay honest | Overlay maintenance until BG-06 |
+| ADR-10 | API client | `openapi-fetch` over native `fetch`, with envelope and error middleware and typed helpers | Axios; a generated SDK; hand-written fetch wrappers | Zero runtime weight; typed paths and bodies; one place to unwrap the envelope | A small response overlay remains for the operations Scramble cannot type |
+| ADR-11 | Type generation | Generated paths, request and response types (BG-06, D-142), plus a small contract-tested overlay for the operations still typed as `string` | Hand-maintained overlay for everything; fully manual | Uses what OpenAPI types; tests keep the overlay honest | About 35 overlay entries to maintain |
 | ADR-12 | Server state | TanStack Query (client) and Next Cache Components (server, public data only) | SWR; RTK Query; a global store | Mature invalidation, SSR hydration, infinite queries | Two caches with strictly separated responsibilities |
 | ADR-13 | URL state | nuqs, with API query names as URL names | Hand-parsed `searchParams`; in-memory filters | Shareable, back-button-safe lists; no renaming layer | URL names follow the API naming |
 | ADR-14 | Forms | React Hook Form + Zod for shape; Laravel 422 authoritative, mapped by `applyApiErrors` | TanStack Form; mirrored backend rules | Fast large forms; no rule drift | Some errors appear only after submit |
-| ADR-15 | Permissions and module access | Interpret backend snapshot and manifest; gates by route name; no frontend rules | A frontend permission or plan model | One source of truth; gating is UX only | Needs BG-07, with an interim checked declaration |
+| ADR-15 | Permissions and module access | Interpret backend snapshot and manifest; gates by route name; no frontend rules | A frontend permission or plan model | One source of truth; gating is UX only | The contract bundle must be re-pulled when routes change (BG-07, D-142) |
 | ADR-16 | UI system | shadcn `base-nova` on Base UI in `packages/ui`, HugeIcons behind a facade, Tailwind v4 tokens | Radix-based shadcn; MUI; per-app components | Already installed; accessible primitives; owned code | Maintained copies of components |
 | ADR-17 | Bulk actions | A synchronous bulk bar with per-item results; per-page selection only | Async bulk jobs; cross-page selection | Matches the backend's 100-item synchronous contract | Large changes use imports instead |
 | ADR-18 | Imports | Upload, then a queued status page with polling and an error-row table; no preview or mapping | A client-side parse and preview; column mapping | The backend validates per row and provides no preview endpoint; templates fix the headings | Users fix files and re-upload |

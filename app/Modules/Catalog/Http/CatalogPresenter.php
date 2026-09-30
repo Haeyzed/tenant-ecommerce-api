@@ -259,6 +259,7 @@ final readonly class CatalogPresenter
             'is_active' => $variant->is_active,
             'low_stock_threshold' => $variant->low_stock_threshold,
             'options' => $variant->optionValues->map(static fn (ProductOptionValue $v): array => ['option' => $v->option?->name, 'value_id' => $v->id, 'value' => $v->value])->values()->all(),
+            'image_url' => $variant->getFirstMediaUrl('image') ?: null,
             'custom_fields' => $this->customFields->valuesFor($variant, ProductService::VARIANT_ENTITY, CustomFieldService::ADMIN),
         ];
     }

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Support\ApiDocs\ApiResponseTypeExtension;
+use App\Support\ApiDocs\ErrorEnvelopeTransformer;
 use App\Support\ApiDocs\ServiceValidationParametersExtractor;
 use Dedoc\Scramble\Scramble;
 use Dedoc\Scramble\Support\Generator\OpenApi;
@@ -15,7 +17,7 @@ use Illuminate\Support\Str;
 
 /**
  * API documentation (dedoc/scramble), one OpenAPI document per context
- * (spec §70.2):
+ * (spec Â§70.2):
  *
  * - landlord (the default API): routes named landlord.*, on the landlord
  *   domain. UI /docs/api, JSON /docs/api.json.
@@ -36,13 +38,16 @@ final class ApiDocsServiceProvider extends ServiceProvider
 
         $root = (string) config('tenancy.root_domain');
 
+        // The response envelope: typed data, pagination and errors (BG-06).
+        Scramble::registerExtension(ApiResponseTypeExtension::class);
+
         // Bodies validated inside services (both APIs; registered first so
         // the tenant API, cloned from the default, inherits it).
         Scramble::configure()->parametersExtractors->append(ServiceValidationParametersExtractor::class);
 
         Scramble::configure()
             // Everything on the landlord domain, including the tenant
-            // payment webhooks (named tenant.* but served here, §40.3).
+            // payment webhooks (named tenant.* but served here, Â§40.3).
             ->routes(static fn (Route $route): bool => (self::named($route, 'landlord.') || self::onLandlordDomain($route)) && self::withoutDomainParameter($route))
             ->withDocumentTransformers(static fn (OpenApi $openApi) => self::describe($openApi, 'Landlord API',
                 'The platform API on the landlord domain: registration, platform admin, billing, affiliates, the website CMS and tenant payment webhooks. '
@@ -100,5 +105,6 @@ final class ApiDocsServiceProvider extends ServiceProvider
         $openApi->info->title = $title;
         $openApi->info->description = $description;
         $openApi->secure(SecurityScheme::http('bearer'));
+        (new ErrorEnvelopeTransformer)($openApi);
     }
 }

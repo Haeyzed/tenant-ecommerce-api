@@ -44,6 +44,8 @@ Route::middleware(['tenant.admin', 'module.notice:core'])->prefix('admin')->name
         Route::post('variants', [ProductVariantController::class, 'store'])->name('variants.store');
         Route::patch('variants/{variant}', [ProductVariantController::class, 'update'])->whereNumber('variant')->name('variants.update');
         Route::delete('variants/{variant}', [ProductVariantController::class, 'destroy'])->whereNumber('variant')->name('variants.destroy');
+        Route::post('variants/{variant}/image', [ProductVariantController::class, 'image'])->whereNumber('variant')->middleware('usage.limit:max_storage_mb')->name('variants.image');
+        Route::delete('variants/{variant}/image', [ProductVariantController::class, 'removeImage'])->whereNumber('variant')->name('variants.image.destroy');
 
         Route::post('bundle-items', [ProductBundleItemController::class, 'store'])->name('bundle-items.store');
         Route::delete('bundle-items/{item}', [ProductBundleItemController::class, 'destroy'])->whereNumber('item')->name('bundle-items.destroy');

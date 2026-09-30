@@ -10,6 +10,7 @@ use App\Modules\Support\Models\SupportConversation;
 use App\Modules\Support\Services\SupportConversationService;
 use App\Modules\Users\Models\User;
 use App\Shared\Http\APIResponse;
+use App\Shared\Support\TenantChannel;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -40,8 +41,12 @@ final class ConversationController extends Controller
         /** @var User $user */
         $user = $request->user();
 
+        // Channels the inbox screen subscribes to (BG-05): Echo.private() and Echo.join().
         return APIResponse::success($this->conversations->listConversations($filters, $user)
-            ->through(fn (SupportConversation $c): array => $this->presenter->conversation($c, true)));
+            ->through(fn (SupportConversation $c): array => $this->presenter->conversation($c, true)), meta: [
+                'inbox_channel' => TenantChannel::name('support-inbox'),
+                'presence_channel' => TenantChannel::name('support-agents-online'),
+            ]);
     }
 
     public function show(SupportConversation $conversation): JsonResponse
