@@ -1436,6 +1436,7 @@ It does not query the API on open. A "Search records" section calls the products
 
 - **Status transitions** (approve, cancel, finalise, ship, publish) are explicit actions with a confirmation that states the consequence. They are never field edits. A 422 `invalid_transition` refetches the record and explains that its state changed.
 - **Destructive actions** name the record in the confirmation. Delete is offered only where the API has a `DELETE` route. Where the API offers deactivation instead (products, users, custom fields, plans, coupons), the UI offers deactivation, plus reactivation where a route exists.
+- **Confirmation surface.** Confirmations use `ConfirmDialog` from `@workspace/ui`. With `variant="auto"` (the default) it is a bottom drawer on mobile and an alert dialog elsewhere; `"dialog"` or `"drawer"` forces one. On a drawer the primary action sits above Cancel. It cannot be dismissed while the action is pending.
 - **Save behaviour:**
   - send only the fields the typed body accepts, including `custom_fields`;
   - on 201, navigate to the new record; on 200, stay and toast;
@@ -1957,6 +1958,15 @@ The site-wide layout (header, footer, menus) uses `GET /api/platform/config` and
 | 5. Provisioning | `/signup/status?registration={public_id}` | Polls `GET /api/register/{registration}/status` every 15 seconds. After 10 minutes it stops and says the owner will receive an email. |
 | 6. Done | same page | When `active`, a button opens `https://{slug}.admin.ROOT/login?email={email}`. The slug is the first label of the returned `domain`. |
 
+**As built (slice 2).** Implemented in `apps/platform-web/src/features/signup` and verified end to end against the backend (Basic plan with a trial: sign-up, verification by link, provisioning, sign-in to the new store's admin).
+
+- **Admin URL.** The done link is built from `TENANT_ADMIN_URL`, a template with `{slug}` (§37.2). Locally it is `http://{slug}.admin.localhost:3001`.
+- **Email for the done link.** The owner's email is kept in `sessionStorage` for the tab, never the password. A different browser or tab gets the link without `?email=`.
+- **Referral.** Until §24.4 capture ships, `ref` is read from the `?ref=` query and carried from `/pricing` to `/signup`. `referral_token` is not sent yet.
+- **Payment methods.** Step 4 offers Paystack, Flutterwave and Stripe as fixed options, because no public route lists the enabled gateways (BG-19). An unavailable gateway shows the backend's error.
+- **Rendering.** Prices are formatted with one fixed locale (`SITE_LOCALE`), so server and browser output hydrate identically.
+- **Homepage.** `/` is a static hero until the CMS homepage ships.
+
 
 ### 24.4 Affiliate Referral Capture
 
@@ -2008,11 +2018,33 @@ Only a short-lived authorisation code passes through, bound to the relay's redir
 
 Platform-user roles are assigned from lookups. The landlord API has no role CRUD, so none is shown.
 
+#### 25.1.1 Build Status
+
+| Screen | Status | Verified by |
+|---|---|---|
+| Dashboard, Settings, Registrations | Built | Browser QA; `console.mobile.spec.ts` |
+| Payment gateways | Built | `payment-gateways.spec.ts`, `console.mobile.spec.ts`, `payment-gateways/api.test.ts` |
+| Every other §25.1 entry | Not built yet | — |
+
+**Payment gateways, as built:**
+
+- **Layout.** Test and Live tabs (`?mode=`) open on the current billing mode. Each card shows its status (Not connected, Needs a test, Ready to enable, Enabled), the Default badge, the masked public key, whether each secret is stored, currencies, countries, and when keys were last verified and a webhook was last received.
+- **Webhook URL.** Every card shows `webhook_url` with a copy button, to paste into the provider's dashboard.
+- **Webhook secret per provider.** Paystack signs webhooks with the secret key, so its card says "Not needed" and its form has no webhook-secret field. Flutterwave (secret hash) and Stripe (`whsec_…`) show a warning when the secret is missing, because their webhooks would be rejected.
+- **Enable rule.** Enable is offered only within 24 hours of a successful test, mirroring the backend's `gateway_not_verified` rule.
+- **Credentials form.** A side sheet (a bottom sheet on phones). Secrets are write-only, and an empty field keeps the stored value. A save makes the backend check the keys with the provider; `gateway_credentials_invalid` and `payment_mode_mismatch` appear under the secret-key field.
+- **Billing mode.** Switching needs a reason (§15.9 safeguard 5). The page warns when no gateway is enabled in the current mode.
+- **Gating.** Every action is gated by its route name (`useCan`).
+- **Contract note.** `has_secret_key` and `has_webhook_secret` are generated as strings; the client reads them as truthy values (`normalizeGateway`).
+
+**platform-admin tests.** `pnpm --filter platform-admin test` runs vitest. `E2E_PASSWORD=… pnpm --filter platform-admin test:e2e` runs Playwright on one worker against the dev server. It signs in once and saves the session in the git-ignored `e2e/.auth/`. Desktop specs run at 1440 px, and every console page is checked at phone width for page errors and horizontal overflow.
+
 ### 25.2 Session and Access
 
 - **Snapshot:** `GET /api/admin/auth/me` (`user`, `roles`, `permissions`, `display`).
 - **Gating:** navigation and actions are gated by permission. There are no modules on the landlord.
-- **Session:** it lasts the token lifetime, with no refresh (BG-10). The shell warns 10 minutes before `expiresAt` and asks the user to sign in again.
+- **Session:** the 12-hour token is refreshed at 75% of its lifetime through `POST /api/admin/auth/refresh` (BG-10, D-143). This uses the same `SessionKeeper` as staff (`@workspace/admin-kit/auth`), with a cross-tab lock and a logout broadcast.
+- **Auth pages:** login, forgot password and reset password share `@workspace/admin-kit/auth` with tenant-admin. The dashboard shares `@workspace/admin-kit/dashboard` (`SectionDashboard`).
 - **Preferences:** `PATCH /api/admin/auth/preferences` sets date and time format.
 
 ---
@@ -2682,7 +2714,7 @@ Each app validates its environment at boot with a Zod schema in `src/env.ts`. Th
 
 | App | Variables |
 |---|---|
-| `platform-web` | `PLATFORM_ADMIN_URL`, `AFFILIATE_PORTAL_URL` (links), `REDIS_URL` (remote cache), `NEXT_PUBLIC_ANALYTICS_ID` (optional) |
+| `platform-web` | `TENANT_ADMIN_URL` (a template with `{slug}` for the sign-up done link, §24.3), `PLATFORM_ADMIN_URL`, `AFFILIATE_PORTAL_URL` (links), `REDIS_URL` (remote cache), `NEXT_PUBLIC_ANALYTICS_ID` (optional) |
 | `platform-admin` | `NEXT_PUBLIC_REVERB_KEY`, `NEXT_PUBLIC_REVERB_HOST`, `NEXT_PUBLIC_REVERB_PORT`, `NEXT_PUBLIC_REVERB_SCHEME`, `PLATFORM_WEBSITE_URL` (the registration redirect, §24.3) |
 | `affiliate-portal` | `PLATFORM_WEBSITE_URL` (referral link base) |
 | `tenant-admin` | `NEXT_PUBLIC_REVERB_*`, `SANCTUM_TTL_MINUTES` (fallback expiry) |
@@ -2769,6 +2801,7 @@ Nightly runs execute the full end-to-end and visual suites. Turborepo remote cac
 - **App ports behind the edge:** platform-admin 3000, tenant-admin 3001, storefront 3002, platform-web 3003, affiliate-portal 3004.
 - **Hosts:** `https://ecommerce.localhost`, `https://platform.ecommerce.localhost`, `https://affiliates.ecommerce.localhost`, `https://{slug}.admin.ecommerce.localhost` and `https://{slug}.ecommerce.localhost`.
 - **Without the edge.** For work on one app, the app can run on its own port against Laravel Herd: `LARAVEL_INTERNAL_URL=http://127.0.0.1` (Herd's nginx serves every `*.{root}` host, and the BFF sets `Host` itself), `DEV_TENANT_SLUG={slug}` maps `localhost` to that store, and `INSECURE_COOKIES=true` drops the `__Host-` prefix and `Secure` so cookies work over plain http. Both variables are honoured only when `APP_ENV=local` and refused in production (`src/env.ts`).
+- **Several stores without the edge.** tenant-admin also accepts `DEV_ADMIN_HOST=admin.localhost`. The BFF then maps `http://{slug}.admin.localhost:3001` to the store `{slug}.{ROOT}`, so any store's admin opens on its own host without Caddy. The backend's `TENANT_ADMIN_URL` is set to that pattern locally, so email links match. The same local-only guard applies.
 - **Mock mode.** `pnpm dev:mock` runs any app against the MSW handlers of `packages/testing` for UI work without a backend.
 - **Queues.** `php artisan queue:work` runs so imports, exports and notifications complete.
 
@@ -3165,6 +3198,31 @@ Resolved gaps keep their section and number, with a **Status** row, so reference
 | **Reason** | Scramble documents the validated filters and `per_page` but not the paginator's `page`, which Laravel reads directly from the request. The frontend passes `page` through a cast. |
 | **Required change** | Document `page` (integer, min 1) on every operation whose response has `meta.pagination` with `current_page`, for example in the `ApiResponseTypeExtension` document pass. |
 | **Priority** | P3 |
+
+### BG-18: Platform Setting Constraints
+
+| | |
+|---|---|
+| **Found** | While building the platform-admin settings screen |
+| **Capability** | Render each setting with the right control and client validation |
+| **Reason** | `GET /api/admin/platform-settings/{group}` returned the type but not the allowed options or bounds. |
+| **Required change** | Each entry also returns `nullable`, `options`, `min` and `max`, parsed from its validation rules. The `values` body of the group update is documented as a map. |
+| **Priority** | P2 |
+| **Status** | **Resolved** in the backend (`PlatformSettingsService::group`, `PlatformSettingsConstraintsTest`). |
+
+### BG-19: Public List of Enabled Payment Gateways
+
+| | |
+|---|---|
+| **Found** | While building sign-up step 4 (§24.3) |
+| **Capability** | Offer only the gateways that can take a new store's first payment |
+| **Reason** | `POST /api/register/{registration}/checkout` accepts `flutterwave`, `paystack` or `stripe`, but no public route says which are enabled for the plan's currency. The page offers all three and shows the backend's error for an unavailable one. |
+| **Required change** | Add `available_gateways` (provider and label) to `GET /api/register/{registration}/status` while the tenant is `awaiting_payment`, from `PlatformPaymentGatewayService::availableFor`. |
+| **Priority** | P2 |
+
+### Contract Note: Public Plan Shape
+
+The OpenAPI document types `prices` and `features` of `GET /api/plans` as strings, because `PlanService::presentPublic` builds them inline. platform-web normalises the response at runtime (`features/signup/model.ts`) instead of casting. A `@return` array shape on `presentPublic` would let the generated type match.
 
 ---
 
