@@ -132,6 +132,14 @@ return [
     // Comma-separated origins of the platform admin frontend (spec §70.9).
     'platform_admin_origins' => env('PLATFORM_ADMIN_ORIGINS', ''),
 
+    /*
+    | Proxies whose X-Forwarded-For / X-Forwarded-Proto are trusted (BG-01):
+    | the edge and the frontend (BFF) servers, as IPs or CIDRs, comma-
+    | separated. Empty trusts nobody. X-Forwarded-Host is never trusted: the
+    | tenant is always resolved from the Host header itself (spec §6.2).
+    */
+    'trusted_proxies' => env('TRUSTED_PROXIES', ''),
+
     // Live payment credentials and charges are refused unless true (spec §15.9).
     'payments_live_allowed' => (bool) env('PAYMENTS_LIVE_ALLOWED', env('APP_ENV') === 'production'),
 
@@ -146,7 +154,9 @@ return [
         // The public marketing website; affiliate referral links point here (§21A.2).
         'website_url' => env('PLATFORM_WEBSITE_URL', 'http://localhost:3002'),
         'tenant_scheme' => env('TENANT_FRONTEND_SCHEME', 'https'),
-        'tenant_admin_path' => env('TENANT_ADMIN_PATH', '/admin'),
+        // The store admin and seller portal run on their own origin, isolated
+        // from storefront scripts (BG-02): {slug} and {root} are replaced.
+        'tenant_admin_url' => env('TENANT_ADMIN_URL', 'https://{slug}.admin.{root}'),
     ],
 
     'platform_admin_email' => env('PLATFORM_ADMIN_EMAIL'),

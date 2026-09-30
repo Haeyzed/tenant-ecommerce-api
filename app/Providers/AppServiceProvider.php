@@ -6,6 +6,7 @@ namespace App\Providers;
 
 use App\Modules\Notifications\Support\NotificationCatalog;
 use App\Modules\Plans\Services\PlanLimitService;
+use App\Shared\Http\TrustedProxies;
 use App\Shared\Support\MorphMap;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -27,10 +28,12 @@ final class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        Model::shouldBeStrict(! $this->app->isProduction());
+        Model::shouldBeStrict(! app()->isProduction());
         Model::automaticallyEagerLoadRelationships(false);
 
         Relation::enforceMorphMap(MorphMap::MAP);
+
+        TrustedProxies::configure();
 
         Password::defaults(fn () => Password::min(8)->letters()->numbers());
 

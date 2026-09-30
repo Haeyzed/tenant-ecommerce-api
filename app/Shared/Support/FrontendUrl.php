@@ -8,7 +8,8 @@ use App\Modules\Tenancy\Models\Tenant;
 
 /**
  * Links placed in emails point at the frontends, never at the API
- * (config app.frontend).
+ * (config app.frontend). The storefront is on the tenant's primary domain;
+ * the store admin and seller portal on {slug}.admin.{root} (BG-02).
  */
 final class FrontendUrl
 {
@@ -41,7 +42,22 @@ final class FrontendUrl
      */
     public static function tenantAdmin(Tenant $tenant, string $path, array $query = []): string
     {
-        return self::build(self::tenantBase($tenant).rtrim((string) config('app.frontend.tenant_admin_path'), '/'), $path, $query);
+        $base = strtr((string) config('app.frontend.tenant_admin_url'), [
+            '{slug}' => (string) $tenant->slug,
+            '{root}' => (string) config('tenancy.root_domain'),
+        ]);
+
+        return self::build($base, $path, $query);
+    }
+
+    /**
+     * The marketplace seller portal, served under /seller on the admin origin.
+     *
+     * @param  array<string, scalar>  $query
+     */
+    public static function sellerPortal(Tenant $tenant, string $path, array $query = []): string
+    {
+        return self::tenantAdmin($tenant, '/seller/'.ltrim($path, '/'), $query);
     }
 
     /**
