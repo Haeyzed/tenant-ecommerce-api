@@ -780,15 +780,12 @@ final readonly class SubscriptionService
     }
 
     /**
-     * Appends an MRR movement for a live subscription when the normalised
-     * amount changes (§14.10).
+     * Appends an MRR movement when the normalised amount changes (§14.10).
+     * Test-mode subscriptions keep their own ledger (mode = test), which the
+     * money metrics read only when asked for test figures.
      */
     public function recordMrrMovement(Subscription $subscription, string $before, string $after, string $reason, ?string $type = null): void
     {
-        if (! $subscription->isLive()) {
-            return;
-        }
-
         $delta = Money::sub($after, $before);
 
         if (Money::cmp($delta, '0') === 0 && $type === null) {
@@ -801,6 +798,7 @@ final readonly class SubscriptionService
             'plan_id' => $subscription->plan_id,
             'type' => $type ?? (Money::isPositive($delta) ? 'expansion' : 'contraction'),
             'currency_code' => $subscription->currency_code,
+            'mode' => $subscription->gateway_mode,
             'mrr_before' => $before,
             'mrr_after' => $after,
             'mrr_delta' => $delta,
@@ -857,10 +855,13 @@ final readonly class SubscriptionService
             }
 
             $isPaid = Money::isPositive((string) $locked->amount);
-            $isFirstPaid = $isPaid && $locked->mode === 'live' && ! PaymentTransaction::query()
+            // The first paid charge within the charge's own mode, so test
+            // billing has its own "new" movement. Affiliate commissions stay
+            // live-only: AffiliateCommissionService re-checks the mode.
+            $isFirstPaid = $isPaid && ! PaymentTransaction::query()
                 ->where('tenant_id', $tenant->getTenantKey())
                 ->where('type', PaymentTransaction::CHARGE)
-                ->where('mode', 'live')
+                ->where('mode', $locked->mode)
                 ->where('status', PaymentTransaction::SUCCESSFUL)
                 ->where('amount', '>', 0)
                 ->exists();
@@ -936,7 +937,7 @@ final readonly class SubscriptionService
             $mrrAfter = $isPaid ? $this->billing->monthlyRecurringAmount($subscription) : $mrrBefore;
 
             if ($isPaid) {
-                $churned = Money::cmp($mrrBefore, '0') === 0 && SubscriptionMrrMovement::query()->where('tenant_id', $tenant->getTenantKey())->where('type', 'churn')->exists();
+                $churned = Money::cmp($mrrBefore, '0') === 0 && SubscriptionMrrMovement::query()->where('tenant_id', $tenant->getTenantKey())->where('mode', $subscription->gateway_mode)->where('type', 'churn')->exists();
 
                 $this->recordMrrMovement($subscription, $mrrBefore, $mrrAfter, match (true) {
                     $isFirstPaid => 'first_payment',

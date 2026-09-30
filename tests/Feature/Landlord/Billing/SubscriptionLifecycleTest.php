@@ -81,9 +81,11 @@ it('charges the first cycle through checkout and activates on the signed webhook
         ->and($subscription->renews_at->isSameDay(now()->addMonth()))->toBeTrue()
         ->and($charge->status)->toBe('successful')
         ->and($charge->fee)->toBe('1.5000')
-        // Test mode never counts as a first paid charge or as MRR.
-        ->and($charge->is_first_paid_charge)->toBeFalse()
-        ->and(SubscriptionMrrMovement::query()->count())->toBe(0)
+        // A test charge is the first paid charge within test mode and lands
+        // in the test ledger only; live MRR is untouched (§22.1 `mode`).
+        ->and($charge->is_first_paid_charge)->toBeTrue()
+        ->and(SubscriptionMrrMovement::query()->where('mode', 'live')->count())->toBe(0)
+        ->and(SubscriptionMrrMovement::query()->where('mode', 'test')->where('type', 'new')->count())->toBe(1)
         ->and(WebhookLog::landlord()->whereNotNull('processed_at')->count())->toBe(1);
 });
 
@@ -282,5 +284,6 @@ it('records a live first paid charge and its MRR', function (): void {
 
     expect(PaymentTransaction::query()->where('reference', $result['reference'])->value('is_first_paid_charge'))->toBeTrue()
         ->and($movement->type)->toBe('new')
+        ->and($movement->mode)->toBe('live')
         ->and((string) $movement->mrr_after)->toBe('31.6666');
 });

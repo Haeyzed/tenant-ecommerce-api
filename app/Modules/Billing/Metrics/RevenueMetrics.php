@@ -43,7 +43,7 @@ final readonly class RevenueMetrics
         return new SectionResult(
             kpis: $this->settings->reportingTotals()->kpis('net_collected_revenue', 'Net collected revenue', $net, $range,
                 $comparison === null ? null : $this->netCollected($comparison)),
-            tables: [$this->latestPayments()],
+            tables: [$this->latestPayments($range->mode)],
         );
     }
 
@@ -52,8 +52,8 @@ final readonly class RevenueMetrics
         $totals = $this->settings->reportingTotals();
         $comparison = $range->comparison();
 
-        $gross = TimeSeries::aggregate($this->moneyRows(), 'paid_at', $range, self::GROSS, 'currency_code');
-        $deductions = TimeSeries::aggregate($this->moneyRows(), 'paid_at', $range, self::REFUNDS.' + '.self::CHARGEBACKS, 'currency_code');
+        $gross = TimeSeries::aggregate($this->moneyRows($range->mode), 'paid_at', $range, self::GROSS, 'currency_code');
+        $deductions = TimeSeries::aggregate($this->moneyRows($range->mode), 'paid_at', $range, self::REFUNDS.' + '.self::CHARGEBACKS, 'currency_code');
         $current = $this->figures($range);
         $previous = $comparison === null ? null : $this->figures($comparison);
         $pick = static fn (?array $figures, string $key): ?array => $figures === null ? null : $figures[$key];
@@ -115,7 +115,7 @@ final readonly class RevenueMetrics
         return DB::connection('landlord')->table('payment_transactions as pt')
             ->crossJoin(DB::raw("JSON_TABLE(pt.line_items, '$[*]' COLUMNS (line_type VARCHAR(32) PATH '$.type', line_amount DECIMAL(18,4) PATH '$.amount')) as li"))
             ->where('pt.type', PaymentTransaction::CHARGE)
-            ->where('pt.mode', 'live')
+            ->where('pt.mode', $range->mode)
             ->where('pt.status', PaymentTransaction::SUCCESSFUL)
             ->whereBetween('pt.paid_at', [$range->startUtc(), $range->endUtc()])
             ->where('li.line_type', 'coupon_discount')
@@ -131,7 +131,7 @@ final readonly class RevenueMetrics
      */
     private function figures(DateRange $range): array
     {
-        $rows = (clone $this->moneyRows())
+        $rows = (clone $this->moneyRows($range->mode))
             ->whereBetween('paid_at', [$range->startUtc(), $range->endUtc()])
             ->groupBy('currency_code')
             ->selectRaw('currency_code, '.self::GROSS.' as gross, '.self::REFUNDS.' as refunds, '.self::CHARGEBACKS.' as chargebacks, '.self::FEES.' as fees')
@@ -170,7 +170,7 @@ final readonly class RevenueMetrics
     {
         return DB::connection('landlord')->table('payment_transactions')
             ->where('type', PaymentTransaction::CHARGE)
-            ->where('mode', 'live')
+            ->where('mode', $range->mode)
             ->where('status', PaymentTransaction::SUCCESSFUL)
             ->whereBetween('paid_at', [$range->startUtc(), $range->endUtc()])
             ->whereNull('fee')
@@ -215,7 +215,7 @@ final readonly class RevenueMetrics
             ->crossJoin(DB::raw("JSON_TABLE(pt.line_items, '$[*]' COLUMNS (line_type VARCHAR(32) PATH '$.type', plan_slug VARCHAR(120) PATH '$.key')) as li"))
             ->leftJoin('plans', 'plans.slug', '=', 'li.plan_slug')
             ->where('pt.type', PaymentTransaction::CHARGE)
-            ->where('pt.mode', 'live')
+            ->where('pt.mode', $range->mode)
             ->where('pt.status', PaymentTransaction::SUCCESSFUL)
             ->whereBetween('pt.paid_at', [$range->startUtc(), $range->endUtc()])
             ->where('li.line_type', 'plan')
@@ -247,7 +247,7 @@ final readonly class RevenueMetrics
 
     private function topTenants(DateRange $range): TableBlock
     {
-        $rows = (clone $this->moneyRows())
+        $rows = (clone $this->moneyRows($range->mode))
             ->join('tenants', 'tenants.id', '=', 'payment_transactions.tenant_id')
             ->whereBetween('payment_transactions.paid_at', [$range->startUtc(), $range->endUtc()])
             ->groupBy('payment_transactions.tenant_id', 'tenants.name', 'payment_transactions.currency_code')
@@ -268,12 +268,12 @@ final readonly class RevenueMetrics
         ], $rows, '/admin/payment-transactions');
     }
 
-    private function latestPayments(): TableBlock
+    private function latestPayments(string $mode): TableBlock
     {
         $rows = DB::connection('landlord')->table('payment_transactions')
             ->join('tenants', 'tenants.id', '=', 'payment_transactions.tenant_id')
             ->where('payment_transactions.type', PaymentTransaction::CHARGE)
-            ->where('payment_transactions.mode', 'live')
+            ->where('payment_transactions.mode', $mode)
             ->where('payment_transactions.status', PaymentTransaction::SUCCESSFUL)
             ->orderByDesc('payment_transactions.paid_at')
             ->limit(TableBlock::MAX_ROWS)
@@ -297,13 +297,14 @@ final readonly class RevenueMetrics
     }
 
     /**
-     * Successful live charges, refunds and chargebacks.
+     * Successful charges, refunds and chargebacks of one billing mode (live
+     * by default, §22.1 `mode`).
      */
-    private function moneyRows(): Builder
+    private function moneyRows(string $mode): Builder
     {
         return DB::connection('landlord')->table('payment_transactions')
             ->whereIn('payment_transactions.type', [PaymentTransaction::CHARGE, PaymentTransaction::REFUND, PaymentTransaction::CHARGEBACK])
-            ->where('payment_transactions.mode', 'live')
+            ->where('payment_transactions.mode', $mode)
             ->where('payment_transactions.status', PaymentTransaction::SUCCESSFUL);
     }
 }

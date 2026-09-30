@@ -22,8 +22,8 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * Subscription and recurring-revenue figures (spec §22.5). MRR comes only
- * from the append-only subscription_mrr_movements ledger, which holds live
- * subscriptions only, so test-mode activity never reaches these figures.
+ * from the append-only subscription_mrr_movements ledger. Every figure reads
+ * one billing mode: live by default, test when the range asks for it.
  */
 final readonly class SubscriptionMetrics
 {
@@ -37,15 +37,15 @@ final readonly class SubscriptionMetrics
         $comparison = $range->comparison();
         [$mrrPoints, $mrrNow] = $this->mrrSeries($range);
 
-        $netNew = TimeSeries::total($this->movements(), 'occurred_at', $range, 'SUM(mrr_delta)', 'currency_code');
-        $prevNetNew = $comparison === null ? null : TimeSeries::total($this->movements(), 'occurred_at', $comparison, 'SUM(mrr_delta)', 'currency_code');
+        $netNew = TimeSeries::total($this->movements($range->mode), 'occurred_at', $range, 'SUM(mrr_delta)', 'currency_code');
+        $prevNetNew = $comparison === null ? null : TimeSeries::total($this->movements($range->mode), 'occurred_at', $comparison, 'SUM(mrr_delta)', 'currency_code');
         $conversion = $this->trialConversion($range);
 
         return new SectionResult(
             kpis: [
-                KpiValue::count('paying_tenants', 'Paying tenants', $this->payingTenants($range->endUtc()), $range,
-                    $comparison === null ? null : $this->payingTenants($comparison->endUtc())),
-                ...$totals->kpis('mrr', 'MRR', $mrrNow, $range, $comparison === null ? null : $this->mrrAsOf($comparison->endUtc()),
+                KpiValue::count('paying_tenants', 'Paying tenants', $this->payingTenants($range->endUtc(), $range->mode), $range,
+                    $comparison === null ? null : $this->payingTenants($comparison->endUtc(), $range->mode)),
+                ...$totals->kpis('mrr', 'MRR', $mrrNow, $range, $comparison === null ? null : $this->mrrAsOf($comparison->endUtc(), $range->mode),
                     KpiValue::UP_IS_GOOD, array_map(static fn (array $p): array => TimeSeries::sparkline($p), $mrrPoints)),
                 ...$totals->kpis('net_new_mrr', 'Net new MRR', $netNew, $range, $prevNetNew),
                 KpiValue::rate('trial_conversion_rate', 'Trial conversion rate', $conversion[0], $conversion[1], $range,
@@ -73,15 +73,15 @@ final readonly class SubscriptionMetrics
     public function subscriptions(DateRange $range): SectionResult
     {
         $comparison = $range->comparison();
-        $status = $this->statusCounts();
+        $status = $this->statusCounts($range->mode);
         $history = $range->comparisonTo === null ? null : PlatformDailyMetric::valuesOn('subscriptions_by_status', $range->comparisonTo);
         $stock = static fn (string $s): ?int => $history === null ? null : (int) ($history[$s] ?? 0);
 
         $conversion = $this->trialConversion($range);
-        $renewals = TimeSeries::aggregate($this->renewalCharges(), 'paid_at', $range, 'COUNT(*)')[''] ?? array_fill_keys($range->buckets(), '0');
+        $renewals = TimeSeries::aggregate($this->renewalCharges($range->mode), 'paid_at', $range, 'COUNT(*)')[''] ?? array_fill_keys($range->buckets(), '0');
         [$upgrades, $downgrades] = $this->planChanges($range);
         $previousChanges = $comparison === null ? null : $this->planChanges($comparison);
-        $cancellations = TimeSeries::aggregate($this->subscriptionsTable(), 'cancelled_at', $range, 'COUNT(*)')[''] ?? array_fill_keys($range->buckets(), '0');
+        $cancellations = TimeSeries::aggregate($this->subscriptionsTable($range->mode), 'cancelled_at', $range, 'COUNT(*)')[''] ?? array_fill_keys($range->buckets(), '0');
 
         return new SectionResult(
             kpis: [
@@ -90,12 +90,12 @@ final readonly class SubscriptionMetrics
                 KpiValue::count('past_due_subscriptions', 'Past due subscriptions', $status['past_due'], $range, $stock('past_due'), KpiValue::DOWN_IS_GOOD),
                 KpiValue::rate('trial_conversion_rate', 'Trial conversion rate', $conversion[0], $conversion[1], $range, $comparison === null ? null : $this->trialConversion($comparison)),
                 KpiValue::count('renewals', 'Renewals', (int) TimeSeries::sum($renewals), $range,
-                    $comparison === null ? null : (int) (TimeSeries::total($this->renewalCharges(), 'paid_at', $comparison, 'COUNT(*)')[''] ?? 0),
+                    $comparison === null ? null : (int) (TimeSeries::total($this->renewalCharges($range->mode), 'paid_at', $comparison, 'COUNT(*)')[''] ?? 0),
                     KpiValue::UP_IS_GOOD, TimeSeries::sparkline($renewals, true)),
                 KpiValue::count('upgrades', 'Upgrades', $upgrades, $range, $previousChanges[0] ?? null),
                 KpiValue::count('downgrades', 'Downgrades', $downgrades, $range, $previousChanges[1] ?? null, KpiValue::DOWN_IS_GOOD),
                 KpiValue::count('cancellations', 'Cancellations', (int) TimeSeries::sum($cancellations), $range,
-                    $comparison === null ? null : (int) (TimeSeries::total($this->subscriptionsTable(), 'cancelled_at', $comparison, 'COUNT(*)')[''] ?? 0),
+                    $comparison === null ? null : (int) (TimeSeries::total($this->subscriptionsTable($range->mode), 'cancelled_at', $comparison, 'COUNT(*)')[''] ?? 0),
                     KpiValue::DOWN_IS_GOOD, TimeSeries::sparkline($cancellations, true)),
             ],
             charts: [
@@ -106,7 +106,7 @@ final readonly class SubscriptionMetrics
                     'points' => array_map(static fn (string $s, int $c): array => ['x' => $s, 'y' => $c], array_keys($status), array_values($status)),
                 ]]),
             ],
-            tables: [$this->upcomingRenewals(), $this->trialsEndingSoon()],
+            tables: [$this->upcomingRenewals($range->mode), $this->trialsEndingSoon($range->mode)],
         );
     }
 
@@ -117,12 +117,12 @@ final readonly class SubscriptionMetrics
     {
         $totals = $this->settings->reportingTotals();
         $comparison = $range->comparison();
-        $mrr = $this->mrrAsOf($range->endUtc());
-        $prevMrr = $comparison === null ? null : $this->mrrAsOf($comparison->endUtc());
+        $mrr = $this->mrrAsOf($range->endUtc(), $range->mode);
+        $prevMrr = $comparison === null ? null : $this->mrrAsOf($comparison->endUtc(), $range->mode);
         $times12 = static fn (?array $v): ?array => $v === null ? null : array_map(static fn (string $a): string => bcmul($a, '12', 4), $v);
 
-        $arpa = $this->arpa($mrr, $this->payingTenantsByCurrency($range->endUtc()));
-        $prevArpa = $comparison === null || $prevMrr === null ? null : $this->arpa($prevMrr, $this->payingTenantsByCurrency($comparison->endUtc()));
+        $arpa = $this->arpa($mrr, $this->payingTenantsByCurrency($range->endUtc(), $range->mode));
+        $prevArpa = $comparison === null || $prevMrr === null ? null : $this->arpa($prevMrr, $this->payingTenantsByCurrency($comparison->endUtc(), $range->mode));
 
         return new SectionResult(kpis: [
             ...$totals->kpis('mrr', 'MRR', $mrr, $range, $prevMrr),
@@ -141,7 +141,7 @@ final readonly class SubscriptionMetrics
     public function alerts(): array
     {
         $grace = (int) $this->settings->get('past_due_grace_days', 7);
-        $count = $this->subscriptionsTable()
+        $count = $this->subscriptionsTable('live')
             ->where('status', SubscriptionStatus::PastDue->value)
             ->where('past_due_at', '<', now()->subDays($grace))
             ->count();
@@ -158,8 +158,8 @@ final readonly class SubscriptionMetrics
      */
     public function contextual(DateRange $range): array
     {
-        $status = $this->statusCounts();
-        $cancelling = $this->subscriptionsTable()
+        $status = $this->statusCounts($range->mode);
+        $cancelling = $this->subscriptionsTable($range->mode)
             ->where('status', SubscriptionStatus::Cancelled->value)
             ->where('ends_at', '>', now())
             ->count();
@@ -169,7 +169,7 @@ final readonly class SubscriptionMetrics
             KpiValue::count('trialing', 'Trialing', $status['trialing'], $range, null, KpiValue::NEUTRAL),
             KpiValue::count('past_due', 'Past due', $status['past_due'], $range, null, KpiValue::NEUTRAL),
             KpiValue::count('cancelling', 'Cancelling', $cancelling, $range, null, KpiValue::NEUTRAL),
-            ...$this->settings->reportingTotals()->kpis('mrr', 'MRR', $this->mrrAsOf(CarbonImmutable::now()), $range),
+            ...$this->settings->reportingTotals()->kpis('mrr', 'MRR', $this->mrrAsOf(CarbonImmutable::now(), $range->mode), $range),
         ];
     }
 
@@ -178,9 +178,9 @@ final readonly class SubscriptionMetrics
      *
      * @return array<string, string>
      */
-    public function mrrAsOf(CarbonInterface $at): array
+    public function mrrAsOf(CarbonInterface $at, string $mode = 'live'): array
     {
-        return $this->movements()
+        return $this->movements($mode)
             ->where('occurred_at', '<=', $at)
             ->groupBy('currency_code')
             ->selectRaw('currency_code, SUM(mrr_delta) as mrr')
@@ -192,10 +192,10 @@ final readonly class SubscriptionMetrics
     /**
      * Tenants whose MRR at the instant is greater than zero.
      */
-    public function payingTenants(CarbonInterface $at): int
+    public function payingTenants(CarbonInterface $at, string $mode = 'live'): int
     {
         return DB::connection('landlord')->query()->fromSub(
-            $this->movements()->where('occurred_at', '<=', $at)->groupBy('tenant_id')->havingRaw('SUM(mrr_delta) > 0')->select('tenant_id'),
+            $this->movements($mode)->where('occurred_at', '<=', $at)->groupBy('tenant_id')->havingRaw('SUM(mrr_delta) > 0')->select('tenant_id'),
             'paying',
         )->count();
     }
@@ -205,11 +205,11 @@ final readonly class SubscriptionMetrics
      *
      * @return array<string, int>
      */
-    public function statusCounts(): array
+    public function statusCounts(string $mode = 'live'): array
     {
         $counts = array_fill_keys(array_map(static fn (SubscriptionStatus $s): string => $s->value, SubscriptionStatus::cases()), 0);
 
-        foreach ($this->subscriptionsTable()->groupBy('status')->selectRaw('status, COUNT(*) as aggregate')->pluck('aggregate', 'status') as $status => $count) {
+        foreach ($this->subscriptionsTable($mode)->groupBy('status')->selectRaw('status, COUNT(*) as aggregate')->pluck('aggregate', 'status') as $status => $count) {
             $counts[(string) $status] = (int) $count;
         }
 
@@ -219,10 +219,10 @@ final readonly class SubscriptionMetrics
     /**
      * @return array<string, int> currency => paying tenants
      */
-    private function payingTenantsByCurrency(CarbonInterface $at): array
+    private function payingTenantsByCurrency(CarbonInterface $at, string $mode): array
     {
         return DB::connection('landlord')->query()->fromSub(
-            $this->movements()->where('occurred_at', '<=', $at)->groupBy('tenant_id', 'currency_code')->havingRaw('SUM(mrr_delta) > 0')->select('tenant_id', 'currency_code'),
+            $this->movements($mode)->where('occurred_at', '<=', $at)->groupBy('tenant_id', 'currency_code')->havingRaw('SUM(mrr_delta) > 0')->select('tenant_id', 'currency_code'),
             'paying',
         )->groupBy('currency_code')->selectRaw('currency_code, COUNT(*) as tenants')->pluck('tenants', 'currency_code')
             ->map(static fn ($v): int => (int) $v)->all();
@@ -253,8 +253,8 @@ final readonly class SubscriptionMetrics
      */
     private function mrrSeries(DateRange $range): array
     {
-        $opening = $this->mrrAsOf($range->startUtc()->subSecond());
-        $deltas = TimeSeries::aggregate($this->movements(), 'occurred_at', $range, 'SUM(mrr_delta)', 'currency_code');
+        $opening = $this->mrrAsOf($range->startUtc()->subSecond(), $range->mode);
+        $deltas = TimeSeries::aggregate($this->movements($range->mode), 'occurred_at', $range, 'SUM(mrr_delta)', 'currency_code');
         $series = [];
         $closing = [];
 
@@ -302,7 +302,7 @@ final readonly class SubscriptionMetrics
         $byCurrency = [];
 
         foreach (self::MOVEMENT_TYPES as $type) {
-            foreach (TimeSeries::aggregate((clone $this->movements())->where('type', $type), 'occurred_at', $range, 'SUM(mrr_delta)', 'currency_code') as $currency => $points) {
+            foreach (TimeSeries::aggregate((clone $this->movements($range->mode))->where('type', $type), 'occurred_at', $range, 'SUM(mrr_delta)', 'currency_code') as $currency => $points) {
                 $byCurrency[$currency][$type] = $points;
             }
         }
@@ -337,15 +337,15 @@ final readonly class SubscriptionMetrics
     private function trialConversion(DateRange $range): array
     {
         $grace = (int) $this->settings->get('past_due_grace_days', 7);
-        $trials = $this->subscriptionsTable()
-            ->where('gateway_mode', 'live')
+        $trials = $this->subscriptionsTable($range->mode)
             ->whereNotNull('trial_ends_at')
             ->whereBetween('trial_ends_at', [$range->startUtc(), $range->endUtc()]);
 
+        $mode = $range->mode;
         $converted = (clone $trials)->whereExists(static fn (Builder $q) => $q->from('payment_transactions')
             ->whereColumn('payment_transactions.tenant_id', 'subscriptions.tenant_id')
             ->where('payment_transactions.type', PaymentTransaction::CHARGE)
-            ->where('payment_transactions.mode', 'live')
+            ->where('payment_transactions.mode', $mode)
             ->where('payment_transactions.status', PaymentTransaction::SUCCESSFUL)
             ->where('payment_transactions.is_first_paid_charge', true)
             ->whereRaw('payment_transactions.paid_at <= DATE_ADD(subscriptions.trial_ends_at, INTERVAL ? DAY)', [$grace]));
@@ -358,13 +358,13 @@ final readonly class SubscriptionMetrics
      */
     private function logoChurn(DateRange $range): array
     {
-        $churned = (clone $this->movements())
+        $churned = (clone $this->movements($range->mode))
             ->where('type', 'churn')
             ->whereBetween('occurred_at', [$range->startUtc(), $range->endUtc()])
             ->distinct()
             ->count('tenant_id');
 
-        return [(string) $churned, (string) $this->payingTenants($range->startUtc()->subSecond())];
+        return [(string) $churned, (string) $this->payingTenants($range->startUtc()->subSecond(), $range->mode)];
     }
 
     /**
@@ -375,7 +375,7 @@ final readonly class SubscriptionMetrics
      */
     public function planChanges(DateRange $range): array
     {
-        $counts = (clone $this->movements())
+        $counts = (clone $this->movements($range->mode))
             ->where('reason', 'plan_change')
             ->whereIn('type', ['expansion', 'contraction'])
             ->whereBetween('occurred_at', [$range->startUtc(), $range->endUtc()])
@@ -386,9 +386,9 @@ final readonly class SubscriptionMetrics
         return [(int) ($counts['expansion'] ?? 0), (int) ($counts['contraction'] ?? 0)];
     }
 
-    private function upcomingRenewals(): TableBlock
+    private function upcomingRenewals(string $mode): TableBlock
     {
-        $rows = $this->subscriptionsTable()
+        $rows = $this->subscriptionsTable($mode)
             ->join('tenants', 'tenants.id', '=', 'subscriptions.tenant_id')
             ->join('plans', 'plans.id', '=', 'subscriptions.plan_id')
             ->where('subscriptions.status', SubscriptionStatus::Active->value)
@@ -412,9 +412,9 @@ final readonly class SubscriptionMetrics
         ], $rows, '/admin/subscriptions?status=active');
     }
 
-    private function trialsEndingSoon(): TableBlock
+    private function trialsEndingSoon(string $mode): TableBlock
     {
-        $rows = $this->subscriptionsTable()
+        $rows = $this->subscriptionsTable($mode)
             ->join('tenants', 'tenants.id', '=', 'subscriptions.tenant_id')
             ->join('plans', 'plans.id', '=', 'subscriptions.plan_id')
             ->where('subscriptions.status', SubscriptionStatus::Trialing->value)
@@ -437,23 +437,29 @@ final readonly class SubscriptionMetrics
         ], $rows, '/admin/subscriptions?status=trialing');
     }
 
-    private function renewalCharges(): Builder
+    private function renewalCharges(string $mode): Builder
     {
         return DB::connection('landlord')->table('payment_transactions')
             ->where('type', PaymentTransaction::CHARGE)
-            ->where('mode', 'live')
+            ->where('mode', $mode)
             ->where('status', PaymentTransaction::SUCCESSFUL)
             ->where('is_first_paid_charge', false)
             ->where('amount', '>', 0);
     }
 
-    private function movements(): Builder
+    /**
+     * The MRR ledger of one billing mode (live by default, §22.1 `mode`).
+     */
+    private function movements(string $mode): Builder
     {
-        return DB::connection('landlord')->table('subscription_mrr_movements');
+        return DB::connection('landlord')->table('subscription_mrr_movements')->where('subscription_mrr_movements.mode', $mode);
     }
 
-    private function subscriptionsTable(): Builder
+    /**
+     * Subscriptions of one billing mode (their gateway mode).
+     */
+    private function subscriptionsTable(string $mode): Builder
     {
-        return DB::connection('landlord')->table('subscriptions');
+        return DB::connection('landlord')->table('subscriptions')->where('subscriptions.gateway_mode', $mode);
     }
 }

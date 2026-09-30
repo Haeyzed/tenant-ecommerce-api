@@ -26,6 +26,13 @@ final readonly class DateRange
     public const int MAX_CUSTOM_DAYS = 731;
 
     /**
+     * Which platform billing records the landlord money metrics read:
+     * live (the default, real money) or test (sandbox gateways). Tenant
+     * metrics ignore it.
+     */
+    public const array MODES = ['live', 'test'];
+
+    /**
      * A chart never has more buckets than this; a finer interval asked for
      * a long range is coarsened.
      */
@@ -50,10 +57,11 @@ final readonly class DateRange
         public ?CarbonImmutable $comparisonFrom,
         public ?CarbonImmutable $comparisonTo,
         public ?string $currency = null,
+        public string $mode = 'live',
     ) {}
 
     /**
-     * @param  array{range?: string|null, from?: string|null, to?: string|null, compare?: string|null, interval?: string|null, currency?: string|null}  $input  validated input
+     * @param  array{range?: string|null, from?: string|null, to?: string|null, compare?: string|null, interval?: string|null, currency?: string|null, mode?: string|null}  $input  validated input
      */
     public static function fromInput(array $input, string $timezone, ?CarbonImmutable $now = null): self
     {
@@ -90,6 +98,7 @@ final readonly class DateRange
             $cFrom,
             $cTo,
             isset($input['currency']) ? strtoupper((string) $input['currency']) : null,
+            in_array($input['mode'] ?? null, self::MODES, true) ? (string) $input['mode'] : 'live',
         );
     }
 
@@ -116,7 +125,7 @@ final readonly class DateRange
             return null;
         }
 
-        return new self($this->preset, $this->comparisonFrom, $this->comparisonTo, $this->timezone, $this->interval, 'none', null, null, $this->currency);
+        return new self($this->preset, $this->comparisonFrom, $this->comparisonTo, $this->timezone, $this->interval, 'none', null, null, $this->currency, $this->mode);
     }
 
     public function startUtc(): CarbonImmutable
@@ -163,7 +172,7 @@ final readonly class DateRange
     }
 
     /**
-     * @return array{preset: string, from: string, to: string, timezone: string, interval: string, compare: string}
+     * @return array{preset: string, from: string, to: string, timezone: string, interval: string, compare: string, mode: string}
      */
     public function toArray(): array
     {
@@ -174,6 +183,7 @@ final readonly class DateRange
             'timezone' => $this->timezone,
             'interval' => $this->interval,
             'compare' => $this->compare,
+            'mode' => $this->mode,
         ];
     }
 
@@ -197,7 +207,7 @@ final readonly class DateRange
             $this->preset, $this->from->toIso8601String(), $this->preset === 'custom' || ! in_array($this->preset, self::TO_DATE, true)
                 ? $this->to->toIso8601String()
                 : $this->to->format('Y-m-d H'), // to-date ranges move with "now"; the TTL bounds staleness
-            $this->timezone, $this->interval, $this->compare, (string) $this->currency,
+            $this->timezone, $this->interval, $this->compare, (string) $this->currency, $this->mode,
         ]);
     }
 

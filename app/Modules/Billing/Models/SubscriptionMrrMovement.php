@@ -17,6 +17,7 @@ use Illuminate\Support\Carbon;
  * @property int|null $plan_id the plan after the movement
  * @property string $type new | expansion | contraction | churn | reactivation
  * @property string $currency_code
+ * @property string $mode live | test, the subscription's gateway mode
  * @property string $mrr_before
  * @property string $mrr_after
  * @property string $mrr_delta
@@ -29,7 +30,7 @@ class SubscriptionMrrMovement extends Model
 
     protected $connection = 'landlord';
 
-    protected $fillable = ['tenant_id', 'subscription_id', 'plan_id', 'type', 'currency_code', 'mrr_before', 'mrr_after', 'mrr_delta', 'reason', 'occurred_at'];
+    protected $fillable = ['tenant_id', 'subscription_id', 'plan_id', 'type', 'currency_code', 'mode', 'mrr_before', 'mrr_after', 'mrr_delta', 'reason', 'occurred_at'];
 
     protected $casts = [
         'mrr_before' => 'decimal:4',

@@ -100,7 +100,8 @@ final class ProcessSubscriptionRenewal implements ShouldBeUnique, ShouldQueue
         $graceDays = (int) $settings->get('past_due_grace_days', 7);
 
         $this->eachSubscription(
-            Subscription::query()->where('gateway_mode', 'live')->where(static fn ($q) => $q
+            // Both modes: each subscription's churn lands in its own mode's ledger.
+            Subscription::query()->where(static fn ($q) => $q
                 ->where(static fn ($q) => $q->where('status', SubscriptionStatus::Cancelled->value)->where('ends_at', '<=', now()))
                 ->orWhere(static fn ($q) => $q->where('status', SubscriptionStatus::PastDue->value)->where('past_due_at', '<=', now()->subDays($graceDays)))),
             static function (Subscription $s) use ($subscriptions): void {

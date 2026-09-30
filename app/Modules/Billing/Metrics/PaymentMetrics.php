@@ -35,12 +35,12 @@ final readonly class PaymentMetrics
     public function payments(DateRange $range): SectionResult
     {
         $comparison = $range->comparison();
-        $byStatus = TimeSeries::aggregate($this->charges(), 'created_at', $range, 'COUNT(*)', 'status');
+        $byStatus = TimeSeries::aggregate($this->charges($range->mode), 'created_at', $range, 'COUNT(*)', 'status');
         $empty = array_fill_keys($range->buckets(), '0');
         $successful = $byStatus[PaymentTransaction::SUCCESSFUL] ?? $empty;
         $failed = $byStatus[PaymentTransaction::FAILED] ?? $empty;
         $pending = $byStatus[PaymentTransaction::PENDING] ?? $empty;
-        $previous = $comparison === null ? null : TimeSeries::total($this->charges(), 'created_at', $comparison, 'COUNT(*)', 'status');
+        $previous = $comparison === null ? null : TimeSeries::total($this->charges($range->mode), 'created_at', $comparison, 'COUNT(*)', 'status');
         $prev = static fn (string $status): ?int => $previous === null ? null : (int) ($previous[$status] ?? 0);
 
         $reversals = $this->reversalCounts($range);
@@ -70,7 +70,7 @@ final readonly class PaymentMetrics
                 ]], $range->interval),
                 $this->volumeByProvider($range),
             ],
-            tables: [$this->recentFailures()],
+            tables: [$this->recentFailures($range->mode)],
         );
     }
 
@@ -80,12 +80,12 @@ final readonly class PaymentMetrics
     public function failedCharges(DateRange $range): SectionResult
     {
         $comparison = $range->comparison();
-        $failed = TimeSeries::aggregate((clone $this->charges())->where('status', PaymentTransaction::FAILED), 'created_at', $range, 'COUNT(*)')['']
+        $failed = TimeSeries::aggregate((clone $this->charges($range->mode))->where('status', PaymentTransaction::FAILED), 'created_at', $range, 'COUNT(*)')['']
             ?? array_fill_keys($range->buckets(), '0');
 
         return new SectionResult(kpis: [
             KpiValue::count('failed_payments', 'Failed payments', (int) TimeSeries::sum($failed), $range,
-                $comparison === null ? null : (int) (TimeSeries::total((clone $this->charges())->where('status', PaymentTransaction::FAILED), 'created_at', $comparison, 'COUNT(*)')[''] ?? 0),
+                $comparison === null ? null : (int) (TimeSeries::total((clone $this->charges($range->mode))->where('status', PaymentTransaction::FAILED), 'created_at', $comparison, 'COUNT(*)')[''] ?? 0),
                 KpiValue::DOWN_IS_GOOD, TimeSeries::sparkline($failed, true)),
         ]);
     }
@@ -95,7 +95,7 @@ final readonly class PaymentMetrics
      */
     public function alerts(): array
     {
-        $rows = (clone $this->charges())
+        $rows = (clone $this->charges('live'))
             ->where('created_at', '>=', now()->subDay())
             ->whereIn('status', [PaymentTransaction::SUCCESSFUL, PaymentTransaction::FAILED])
             ->groupBy('provider')
@@ -125,8 +125,8 @@ final readonly class PaymentMetrics
     public function contextual(DateRange $range): array
     {
         $comparison = $range->comparison();
-        $current = TimeSeries::total($this->charges(), 'created_at', $range, 'COUNT(*)', 'status');
-        $previous = $comparison === null ? null : TimeSeries::total($this->charges(), 'created_at', $comparison, 'COUNT(*)', 'status');
+        $current = TimeSeries::total($this->charges($range->mode), 'created_at', $range, 'COUNT(*)', 'status');
+        $previous = $comparison === null ? null : TimeSeries::total($this->charges($range->mode), 'created_at', $comparison, 'COUNT(*)', 'status');
         $reversals = $this->reversalCounts($range);
         $prevReversals = $comparison === null ? null : $this->reversalCounts($comparison);
         $s = (string) (int) ($current[PaymentTransaction::SUCCESSFUL] ?? 0);
@@ -153,7 +153,7 @@ final readonly class PaymentMetrics
     {
         $counts = DB::connection('landlord')->table('payment_transactions')
             ->whereIn('type', [PaymentTransaction::REFUND, PaymentTransaction::CHARGEBACK])
-            ->where('mode', 'live')
+            ->where('mode', $range->mode)
             ->where('status', PaymentTransaction::SUCCESSFUL)
             ->whereBetween('paid_at', [$range->startUtc(), $range->endUtc()])
             ->groupBy('type')
@@ -165,7 +165,7 @@ final readonly class PaymentMetrics
 
     private function volumeByProvider(DateRange $range): ChartSeries
     {
-        $rows = (clone $this->charges())
+        $rows = (clone $this->charges($range->mode))
             ->whereBetween('created_at', [$range->startUtc(), $range->endUtc()])
             ->groupBy('provider', 'status')
             ->selectRaw('provider, status, COUNT(*) as aggregate')
@@ -188,9 +188,9 @@ final readonly class PaymentMetrics
         return new ChartSeries('volume_by_provider', 'Charges by provider', ChartSeries::STACKED_BAR, KpiValue::COUNT, $series);
     }
 
-    private function recentFailures(): TableBlock
+    private function recentFailures(string $mode): TableBlock
     {
-        $rows = (clone $this->charges())
+        $rows = (clone $this->charges($mode))
             ->join('tenants', 'tenants.id', '=', 'payment_transactions.tenant_id')
             ->where('payment_transactions.status', PaymentTransaction::FAILED)
             ->orderByDesc('payment_transactions.created_at')
@@ -217,12 +217,12 @@ final readonly class PaymentMetrics
     }
 
     /**
-     * Live charge attempts.
+     * Charge attempts of one billing mode (live by default, §22.1 `mode`).
      */
-    private function charges(): Builder
+    private function charges(string $mode): Builder
     {
         return DB::connection('landlord')->table('payment_transactions')
             ->where('payment_transactions.type', PaymentTransaction::CHARGE)
-            ->where('payment_transactions.mode', 'live');
+            ->where('payment_transactions.mode', $mode);
     }
 }

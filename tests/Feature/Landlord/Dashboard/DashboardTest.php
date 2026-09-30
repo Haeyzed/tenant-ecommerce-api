@@ -328,3 +328,53 @@ it('shows operations health and surfaces critical alerts on the overview', funct
     expect(collect($tenants)->firstWhere('key', 'top_tenants_by_storage')['rows'][0]['storage_mb'])->toBe(512)
         ->and(collect($tenants)->firstWhere('key', 'top_tenants_by_orders')['rows'][0]['orders'])->toBe(3);
 });
+
+it('reads test billing only when asked with mode=test', function (): void {
+    $live = dashboardSubscription($this->createTenantRow('a'), $this->basic);
+    $test = dashboardSubscription($this->createTenantRow('b'), $this->basic, ['gateway_mode' => 'test']);
+
+    dashboardTransaction($live, '100.0000');
+    dashboardTransaction($test, '999.0000', ['mode' => 'test']);
+    dashboardMovement($live, 'new', '100.0000', '2026-09-01 10:00:00');
+    DB::connection('landlord')->table('subscription_mrr_movements')->insert([
+        'tenant_id' => $test->tenant_id, 'subscription_id' => $test->id, 'plan_id' => $test->plan_id, 'type' => 'new',
+        'currency_code' => 'USD', 'mode' => 'test', 'mrr_before' => '0', 'mrr_after' => '999.0000', 'mrr_delta' => '999.0000',
+        'reason' => 'first_payment', 'occurred_at' => '2026-09-02 10:00:00', 'created_at' => '2026-09-02 10:00:00',
+    ]);
+
+    // Live by default: test rows are left out everywhere.
+    $default = $this->landlordJson('GET', '/api/admin/dashboard/overview', [], $this->auth)->assertOk()
+        ->assertJsonPath('data.range.mode', 'live')->json('data.kpis');
+    expect(kpi($default, 'mrr', 'USD')['value'])->toBe('100.0000')
+        ->and(kpi($default, 'paying_tenants')['value'])->toBe(1)
+        ->and(kpi($default, 'net_collected_revenue', 'USD')['value'])->toBe('100.0000');
+
+    // mode=test: only test rows, cached separately from live.
+    $testData = $this->landlordJson('GET', '/api/admin/dashboard/overview?mode=test', [], $this->auth)->assertOk()
+        ->assertJsonPath('data.range.mode', 'test')->assertJsonPath('meta.cached', false)->json('data.kpis');
+    expect(kpi($testData, 'mrr', 'USD')['value'])->toBe('999.0000')
+        ->and(kpi($testData, 'paying_tenants')['value'])->toBe(1)
+        ->and(kpi($testData, 'net_collected_revenue', 'USD')['value'])->toBe('999.0000');
+
+    $subscriptions = $this->landlordJson('GET', '/api/admin/dashboard/subscriptions?mode=test', [], $this->auth)->assertOk()->json('data.kpis');
+    expect(kpi($subscriptions, 'active_subscriptions')['value'])->toBe(1);
+
+    $this->landlordJson('GET', '/api/admin/dashboard/overview?mode=sandbox', [], $this->auth)->assertUnprocessable();
+});
+
+it('backfills the test MRR ledger once and never touches live subscriptions', function (): void {
+    $test = dashboardSubscription($this->createTenantRow('a'), $this->basic, ['gateway_mode' => 'test']);
+    $live = dashboardSubscription($this->createTenantRow('b'), $this->basic);
+    dashboardTransaction($test, '20.0000', ['mode' => 'test', 'paid_at' => '2026-09-10 09:00:00']);
+    dashboardTransaction($live, '20.0000', ['paid_at' => '2026-09-10 09:00:00']);
+
+    $this->artisan('billing:backfill-test-mrr')->assertSuccessful();
+    $this->artisan('billing:backfill-test-mrr')->expectsOutputToContain('Added 0 movement(s).')->assertSuccessful();
+
+    $movements = DB::connection('landlord')->table('subscription_mrr_movements')->get();
+    expect($movements)->toHaveCount(1)
+        ->and($movements[0]->subscription_id)->toBe($test->id)
+        ->and($movements[0]->mode)->toBe('test')
+        ->and($movements[0]->type)->toBe('new')
+        ->and(CarbonImmutable::parse($movements[0]->occurred_at)->toDateTimeString())->toBe('2026-09-10 09:00:00');
+});

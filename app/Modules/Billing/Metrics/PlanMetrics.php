@@ -26,7 +26,7 @@ final readonly class PlanMetrics
     public function plans(DateRange $range): SectionResult
     {
         $comparison = $range->comparison();
-        $paying = $this->payingTenantsByPlan();
+        $paying = $this->payingTenantsByPlan($range->mode);
         [$upgrades, $downgrades] = $this->subscriptions->planChanges($range);
         $previous = $comparison === null ? null : $this->subscriptions->planChanges($comparison);
 
@@ -42,7 +42,7 @@ final readonly class PlanMetrics
                 KpiValue::count('upgrades', 'Upgrades', $upgrades, $range, $previous[0] ?? null),
                 KpiValue::count('downgrades', 'Downgrades', $downgrades, $range, $previous[1] ?? null, KpiValue::DOWN_IS_GOOD),
             ],
-            charts: [$this->distribution()],
+            charts: [$this->distribution($range->mode)],
             tables: [$this->movementMatrix($range)],
         );
     }
@@ -53,15 +53,16 @@ final readonly class PlanMetrics
      *
      * @return list<array{plan_id: int, slug: string, name: string, tenants: int}>
      */
-    public function payingTenantsByPlan(): array
+    public function payingTenantsByPlan(string $mode = 'live'): array
     {
         $paying = DB::connection('landlord')->table('subscription_mrr_movements')
+            ->where('mode', $mode)
             ->groupBy('tenant_id')
             ->havingRaw('SUM(mrr_delta) > 0')
             ->select('tenant_id');
 
         return DB::connection('landlord')->table('plans')
-            ->leftJoin('subscriptions', static fn ($j) => $j->on('subscriptions.plan_id', '=', 'plans.id')->whereIn('subscriptions.status', self::CURRENT))
+            ->leftJoin('subscriptions', static fn ($j) => $j->on('subscriptions.plan_id', '=', 'plans.id')->whereIn('subscriptions.status', self::CURRENT)->where('subscriptions.gateway_mode', $mode))
             ->leftJoinSub($paying, 'paying', 'paying.tenant_id', '=', 'subscriptions.tenant_id')
             ->groupBy('plans.id', 'plans.slug', 'plans.name', 'plans.sort_order')
             ->orderBy('plans.sort_order')
@@ -71,11 +72,12 @@ final readonly class PlanMetrics
             ->all();
     }
 
-    private function distribution(): ChartSeries
+    private function distribution(string $mode): ChartSeries
     {
         $points = DB::connection('landlord')->table('subscriptions')
             ->join('plans', 'plans.id', '=', 'subscriptions.plan_id')
             ->whereIn('subscriptions.status', self::CURRENT)
+            ->where('subscriptions.gateway_mode', $mode)
             ->groupBy('plans.id', 'plans.name', 'plans.sort_order')
             ->orderBy('plans.sort_order')
             ->selectRaw('plans.name, COUNT(DISTINCT subscriptions.tenant_id) as tenants')
@@ -95,6 +97,7 @@ final readonly class PlanMetrics
     private function movementMatrix(DateRange $range): TableBlock
     {
         $sequenced = DB::connection('landlord')->table('subscription_mrr_movements')
+            ->where('mode', $range->mode)
             ->selectRaw('plan_id, reason, occurred_at, LAG(plan_id) OVER (PARTITION BY tenant_id ORDER BY occurred_at, id) as from_plan_id');
 
         $rows = DB::connection('landlord')->query()->fromSub($sequenced, 'm')

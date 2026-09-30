@@ -1799,7 +1799,14 @@ The backend serves dashboards per section with one KPI shape (UD-39):
 
 - `/dashboard` renders tabs from the section list. The section list endpoint already filters out sections whose module the tenant cannot read.
 - **One request per visible section.** The active tab fetches its section. Other tabs fetch when selected. No page issues more than 3 dashboard requests on load.
-- **Range selector:** a `range` and `compare` pair in the URL (nuqs), shared by all sections on the page.
+- **Range selector:** `range`, `from`, `to` and `compare` in the URL (nuqs), shared by all sections on the page (`admin-kit` `RangeControl`).
+  - One button opens every preset plus a range calendar for `custom` (days after today are disabled, at most 731 days). A separate select sets `compare`.
+  - An incomplete or invalid custom range in the URL falls back to `last_30_days`.
+  - Under the tabs, the page states the resolved dates from `data.range` and `data.comparison_range` ("Showing … compared with …").
+- **Range semantics to keep visible** (from `DateRange::fromInput`):
+  - `last_7_days` and `last_30_days` are complete days and **end yesterday**, so today's activity is not in them. `today` and the `this_…` presets run up to now.
+  - A range that ends before today is cached for an hour; one that includes today, for five minutes (`MetricsCache`).
+- **Live money only (landlord).** Subscription, MRR, revenue, payment and trial-conversion figures count live-mode records only, and test subscriptions record no MRR movements (§14.10). While `billing_payment_mode` is `test`, the platform dashboard shows a notice that test sign-ups and payments are excluded from those figures. Tenant counts include every tenant.
 - **Rendering.**
   - `admin-kit` `KpiGrid` renders `KpiValue`s: value, `comparison.change_percent` coloured by `comparison.sentiment` (positive, negative, neutral), sparkline, and an "Estimated" badge when `is_estimated`. The frontend never computes the change or its sentiment.
   - Charts use the shadcn `chart` wrapper and are loaded with `next/dynamic`.
@@ -2024,6 +2031,7 @@ Platform-user roles are assigned from lookups. The landlord API has no role CRUD
 |---|---|---|
 | Dashboard, Settings, Registrations | Built | Browser QA; `console.mobile.spec.ts` |
 | Payment gateways | Built | `payment-gateways.spec.ts`, `console.mobile.spec.ts`, `payment-gateways/api.test.ts` |
+| Plans (list, new, editor with details, prices, features, limits) | Built | `plans.spec.ts`, `console.mobile.spec.ts` |
 | Every other §25.1 entry | Not built yet | — |
 
 **Payment gateways, as built:**
@@ -2036,6 +2044,22 @@ Platform-user roles are assigned from lookups. The landlord API has no role CRUD
 - **Billing mode.** Switching needs a reason (§15.9 safeguard 5). The page warns when no gateway is enabled in the current mode.
 - **Gating.** Every action is gated by its route name (`useCan`).
 - **Contract note.** `has_secret_key` and `has_webhook_secret` are generated as strings; the client reads them as truthy values (`normalizeGateway`).
+
+**Plans, as built:**
+
+- **Routes.** `/plans` (list), `/plans/new`, and `/plans/[plan]` with tabs (`?tab=details|prices|features|limits`).
+- **Create.** New plans are created inactive. The editor opens on Prices, and **Activate plan** needs an active price. `plan_limits_incomplete` is shown as a form error. Deactivating asks for confirmation and states that existing subscribers keep their plan.
+- **Prices.** Amounts are immutable (§11.6): the tab offers **Add price** and a trial edit only. The add dialog warns when the new price replaces the active one for the same currency and interval. Retire and reactivate ask for confirmation. An empty trial means the platform default, and the table shows the resolved trial.
+- **Features.** A switch per entry of the admin `features` lookup, grouped by module, capability and integration, with search. An included feature whose `requires` are missing shows a warning.
+- **Limits.** Every registered limit, with **Unlimited** where `unlimited_allowed`, saved as one request per changed key.
+- **Contract notes.** `PlanResource.limits` is generated as an array but is a key→value map; `resolved_trial_days` and `limit_value` are generated as strings but are integers. Scramble ignored `@var` annotations on these fields, so the client normalises them (`features/plans/api.ts`).
+- **Test data.** Writes in `plans.spec.ts` go to one dedicated, inactive, hidden plan (slug `e2e-test-plan`, order 9999), created once and reused, because the API has no plan delete. Feature and limit changes are reverted in the same test.
+
+**Shared conventions from these slices:**
+
+- **Links styled as buttons** use `ButtonLink` (`@workspace/ui/components/button-link`), so they are announced as links. A Base UI `Button` rendering an anchor announces itself as a button. `PaginationLink` is a plain anchor for the same reason.
+- **After a mutation**, the response is written into the query cache and the refetch runs in the background (not awaited), so dialogs close at once.
+- **Short static lists** use `StaticCombobox` or `MultiCombobox` from `@workspace/admin-kit/lookup`. API-backed records keep `EntityCombobox`.
 
 **platform-admin tests.** `pnpm --filter platform-admin test` runs vitest. `E2E_PASSWORD=… pnpm --filter platform-admin test:e2e` runs Playwright on one worker against the dev server. It signs in once and saves the session in the git-ignored `e2e/.auth/`. Desktop specs run at 1440 px, and every console page is checked at phone width for page errors and horizontal overflow.
 

@@ -27,6 +27,8 @@ final class MetricsRangeRequest extends FormRequest
             'compare' => ['sometimes', Rule::in(DateRange::COMPARES)],
             'interval' => ['sometimes', Rule::in(DateRange::INTERVALS)],
             'currency' => ['sometimes', 'string', 'size:3', 'alpha'],
+            // Landlord money metrics: live (default) or test billing records.
+            'mode' => ['sometimes', Rule::in(DateRange::MODES)],
         ];
     }
 
@@ -53,11 +55,11 @@ final class MetricsRangeRequest extends FormRequest
     }
 
     /**
-     * @return array{range?: string, from?: string, to?: string, compare?: string, interval?: string, currency?: string}
+     * @return array{range?: string, from?: string, to?: string, compare?: string, interval?: string, currency?: string, mode?: string}
      */
     public function rangeInput(): array
     {
-        /** @var array{range?: string, from?: string, to?: string, compare?: string, interval?: string, currency?: string} $input */
+        /** @var array{range?: string, from?: string, to?: string, compare?: string, interval?: string, currency?: string, mode?: string} $input */
         $input = $this->validated();
 
         return $input;
