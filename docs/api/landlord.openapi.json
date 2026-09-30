@@ -18874,11 +18874,9 @@
                                 "type": "object",
                                 "properties": {
                                     "values": {
-                                        "type": "array",
-                                        "items": {
-                                            "type": "string"
-                                        },
-                                        "minItems": 1
+                                        "type": "object",
+                                        "description": "Setting key to new value, only the keys being changed.",
+                                        "additionalProperties": {}
                                     },
                                     "reason": {
                                         "type": [

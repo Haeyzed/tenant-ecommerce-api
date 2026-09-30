@@ -37,6 +37,11 @@ final class PlatformSettingsController extends Controller
     public function update(Request $request, string $group): JsonResponse
     {
         $validated = $request->validate([
+            /**
+             * Setting key to new value, only the keys being changed.
+             *
+             * @var array<string, mixed>
+             */
             'values' => ['required', 'array', 'min:1'],
             'reason' => ['sometimes', 'nullable', 'string', 'max:500'],
         ]);

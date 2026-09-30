@@ -81,9 +81,12 @@ final class PlatformSettingsService
     }
 
     /**
-     * Keys of one group with value, type, default and public flag.
+     * Keys of one group with value, type, default and public flag, plus the
+     * input constraints taken from the key's own rules (allowed options,
+     * min, max, nullable), so the admin can render the right input without
+     * repeating the rules (frontend spec BG-18).
      *
-     * @return array<string, array{value: mixed, type: string, default: mixed, public: bool, reason_required: bool, own_route: bool}>
+     * @return array<string, array{value: mixed, type: string, default: mixed, public: bool, reason_required: bool, own_route: bool, nullable: bool, options: list<string>|null, min: int|float|null, max: int|float|null}>
      */
     public function group(string $group): array
     {
@@ -100,10 +103,40 @@ final class PlatformSettingsService
                 'public' => $definition['public'],
                 'reason_required' => $definition['reason'],
                 'own_route' => $definition['own_route'],
+                ...self::constraints($definition['rules']),
             ];
         }
 
         return $result;
+    }
+
+    /**
+     * Input constraints from string rules: `in:` options, `min:`/`max:` and
+     * `nullable`. Rule objects are ignored; the server still validates.
+     *
+     * @param  list<mixed>  $rules
+     * @return array{nullable: bool, options: list<string>|null, min: int|float|null, max: int|float|null}
+     */
+    private static function constraints(array $rules): array
+    {
+        $constraints = ['nullable' => false, 'options' => null, 'min' => null, 'max' => null];
+
+        foreach ($rules as $rule) {
+            if (! is_string($rule)) {
+                continue;
+            }
+
+            [$name, $argument] = array_pad(explode(':', $rule, 2), 2, null);
+
+            match (true) {
+                $name === 'nullable' => $constraints['nullable'] = true,
+                $name === 'in' && $argument !== null => $constraints['options'] = array_values(array_map('strval', str_getcsv($argument, ',', '"', '\\'))),
+                in_array($name, ['min', 'max'], true) && is_numeric($argument) => $constraints[$name] = $argument + 0,
+                default => null,
+            };
+        }
+
+        return $constraints;
     }
 
     /**
