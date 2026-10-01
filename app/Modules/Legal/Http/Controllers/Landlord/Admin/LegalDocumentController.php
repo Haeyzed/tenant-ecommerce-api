@@ -33,6 +33,11 @@ final class LegalDocumentController extends Controller
             ->paginate((int) ($filters['per_page'] ?? 25))));
     }
 
+    public function show(LegalDocument $document): JsonResponse
+    {
+        return APIResponse::success(new LegalDocumentResource($document));
+    }
+
     public function store(Request $request): JsonResponse
     {
         return APIResponse::created(new LegalDocumentResource($this->legal->createDraft($request->all())));

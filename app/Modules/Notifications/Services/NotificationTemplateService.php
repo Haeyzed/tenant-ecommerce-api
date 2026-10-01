@@ -118,6 +118,7 @@ final class NotificationTemplateService
         }
 
         $content = array_intersect_key($data, array_flip(['subject', 'body']));
+        $this->assertKnownPlaceholders($key, $content, $scope ?? NotificationScope::current());
 
         $template->fill($content + array_intersect_key($data, ['is_active' => true]));
 
@@ -198,6 +199,44 @@ final class NotificationTemplateService
     /**
      * @return array<string, string>
      */
+    /**
+     * Placeholders a template's subject and body may use: those of its
+     * default text plus the scope-wide ones such as {{platform_name}}.
+     *
+     * @return list<string>
+     */
+    public function placeholders(string $key, NotificationScope $scope): array
+    {
+        $own = $this->catalog->has($key, $scope) ? $this->catalog->variables($key, $scope) : [];
+
+        return array_values(array_unique([...$own, ...array_keys($this->globalVariables($scope))]));
+    }
+
+    /**
+     * An edited text may only use known placeholders; an unknown one would
+     * be sent to recipients as raw braces.
+     *
+     * @param  array{subject?: string|null, body?: string}  $content
+     */
+    private function assertKnownPlaceholders(string $key, array $content, NotificationScope $scope): void
+    {
+        $allowed = $this->placeholders($key, $scope);
+        $errors = [];
+
+        foreach ($content as $field => $text) {
+            preg_match_all('/\{\{\s*([a-z0-9_]+)\s*\}\}/', (string) $text, $matches);
+            $unknown = array_values(array_unique(array_diff($matches[1], $allowed)));
+
+            if ($unknown !== []) {
+                $errors[$field] = ['Unknown placeholder '.implode(', ', array_map(static fn (string $v): string => '{{'.$v.'}}', $unknown)).'. Use one of the listed placeholders.'];
+            }
+        }
+
+        if ($errors !== []) {
+            throw ValidationException::withMessages($errors);
+        }
+    }
+
     private function globalVariables(NotificationScope $scope): array
     {
         $platformName = (string) app(PlatformSettingsService::class)->get('platform_name', config('app.name'));

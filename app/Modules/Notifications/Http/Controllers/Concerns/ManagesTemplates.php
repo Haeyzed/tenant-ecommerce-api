@@ -7,7 +7,6 @@ namespace App\Modules\Notifications\Http\Controllers\Concerns;
 use App\Modules\Notifications\Enums\NotificationScope;
 use App\Modules\Notifications\Models\NotificationTemplate;
 use App\Modules\Notifications\Services\NotificationTemplateService;
-use App\Modules\Notifications\Support\NotificationCatalog;
 use App\Shared\Http\APIResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -17,7 +16,7 @@ use Illuminate\Http\Request;
  */
 trait ManagesTemplates
 {
-    public function index(Request $request, NotificationTemplateService $templates, NotificationCatalog $catalog): JsonResponse
+    public function index(Request $request, NotificationTemplateService $templates): JsonResponse
     {
         $filters = $request->validate([
             'search' => ['sometimes', 'nullable', 'string', 'max:100'],
@@ -32,11 +31,11 @@ trait ManagesTemplates
         $scope = NotificationScope::current();
 
         return APIResponse::success($templates->listTemplates($filters, $scope)
-            ->map(fn (NotificationTemplate $t): array => $this->presentTemplate($t, $templates, $catalog, $scope))
+            ->map(fn (NotificationTemplate $t): array => $this->presentTemplate($t, $templates, $scope))
             ->values());
     }
 
-    public function update(Request $request, string $key, NotificationTemplateService $templates, NotificationCatalog $catalog): JsonResponse
+    public function update(Request $request, string $key, NotificationTemplateService $templates): JsonResponse
     {
         $validated = $request->validate([
             'subject' => ['sometimes', 'nullable', 'string', 'max:255'],
@@ -47,22 +46,22 @@ trait ManagesTemplates
         $scope = NotificationScope::current();
         $template = $templates->updateTemplate($key, $validated, $scope);
 
-        return APIResponse::success($this->presentTemplate($template, $templates, $catalog, $scope), 'Template updated');
+        return APIResponse::success($this->presentTemplate($template, $templates, $scope), 'Template updated');
     }
 
-    public function reset(string $key, NotificationTemplateService $templates, NotificationCatalog $catalog): JsonResponse
+    public function reset(string $key, NotificationTemplateService $templates): JsonResponse
     {
         $scope = NotificationScope::current();
 
-        return APIResponse::success($this->presentTemplate($templates->resetToDefault($key, $scope), $templates, $catalog, $scope), 'Template reset');
+        return APIResponse::success($this->presentTemplate($templates->resetToDefault($key, $scope), $templates, $scope), 'Template reset');
     }
 
     /**
      * @return array<string, mixed>
      */
-    private function presentTemplate(NotificationTemplate $template, NotificationTemplateService $templates, NotificationCatalog $catalog, NotificationScope $scope): array
+    private function presentTemplate(NotificationTemplate $template, NotificationTemplateService $templates, NotificationScope $scope): array
     {
-        $variables = $catalog->has($template->key, $scope) ? $catalog->variables($template->key, $scope) : [];
+        $variables = $templates->placeholders($template->key, $scope);
         $samples = array_combine($variables, array_map(static fn (string $v): string => '['.$v.']', $variables)) ?: [];
 
         return [

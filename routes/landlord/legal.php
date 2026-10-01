@@ -19,6 +19,7 @@ Route::middleware(['landlord.public', 'throttle:auth-sensitive'])->prefix('legal
 Route::middleware('landlord.admin')->prefix('admin/legal-documents')->name('landlord.legal.')->group(function (): void {
     Route::get('/', [AdminLegalDocumentController::class, 'index'])->name('index');
     Route::post('/', [AdminLegalDocumentController::class, 'store'])->name('store');
+    Route::get('{document}', [AdminLegalDocumentController::class, 'show'])->name('show');
     Route::patch('{document}', [AdminLegalDocumentController::class, 'update'])->name('update');
     Route::post('{document}/publish', [AdminLegalDocumentController::class, 'publish'])->name('publish');
     Route::get('{document}/acceptances', [LegalAcceptanceController::class, 'index'])->name('acceptances.index');

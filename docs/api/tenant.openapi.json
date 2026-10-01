@@ -56636,8 +56636,10 @@
                                                         }
                                                     },
                                                     "channels": {
-                                                        "type": "array",
-                                                        "items": {}
+                                                        "type": "object",
+                                                        "additionalProperties": {
+                                                            "type": "boolean"
+                                                        }
                                                     }
                                                 },
                                                 "required": [
@@ -56695,9 +56697,9 @@
                                 "type": "object",
                                 "properties": {
                                     "channels": {
-                                        "type": "array",
-                                        "items": {
-                                            "type": "string"
+                                        "type": "object",
+                                        "additionalProperties": {
+                                            "type": "boolean"
                                         }
                                     },
                                     "audience": {
@@ -56748,8 +56750,10 @@
                                                     }
                                                 },
                                                 "channels": {
-                                                    "type": "array",
-                                                    "items": {}
+                                                    "type": "object",
+                                                    "additionalProperties": {
+                                                        "type": "boolean"
+                                                    }
                                                 }
                                             },
                                             "required": [
@@ -57402,14 +57406,18 @@
                                                         "type": "boolean"
                                                     },
                                                     "channels": {
-                                                        "type": "array",
-                                                        "items": {
+                                                        "type": "object",
+                                                        "description": "Channel to on/off",
+                                                        "additionalProperties": {
                                                             "type": "boolean"
                                                         }
                                                     },
                                                     "variables": {
                                                         "type": "array",
-                                                        "items": {}
+                                                        "description": "Placeholders the subject and body may use",
+                                                        "items": {
+                                                            "type": "string"
+                                                        }
                                                     },
                                                     "preview": {
                                                         "type": "object",
@@ -57556,14 +57564,18 @@
                                                     "type": "boolean"
                                                 },
                                                 "channels": {
-                                                    "type": "array",
-                                                    "items": {
+                                                    "type": "object",
+                                                    "description": "Channel to on/off",
+                                                    "additionalProperties": {
                                                         "type": "boolean"
                                                     }
                                                 },
                                                 "variables": {
                                                     "type": "array",
-                                                    "items": {}
+                                                    "description": "Placeholders the subject and body may use",
+                                                    "items": {
+                                                        "type": "string"
+                                                    }
                                                 },
                                                 "preview": {
                                                     "type": "object",
@@ -57684,14 +57696,18 @@
                                                     "type": "boolean"
                                                 },
                                                 "channels": {
-                                                    "type": "array",
-                                                    "items": {
+                                                    "type": "object",
+                                                    "description": "Channel to on/off",
+                                                    "additionalProperties": {
                                                         "type": "boolean"
                                                     }
                                                 },
                                                 "variables": {
                                                     "type": "array",
-                                                    "items": {}
+                                                    "description": "Placeholders the subject and body may use",
+                                                    "items": {
+                                                        "type": "string"
+                                                    }
                                                 },
                                                 "preview": {
                                                     "type": "object",

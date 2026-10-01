@@ -9440,11 +9440,20 @@
                         }
                     },
                     {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
                         "name": "per_page",
                         "in": "query",
                         "schema": {
                             "type": "integer",
-                            "default": 25
+                            "minimum": 1,
+                            "maximum": 100
                         }
                     }
                 ],
@@ -9610,6 +9619,9 @@
                             }
                         }
                     },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    },
                     "404": {
                         "$ref": "#/components/responses/ModelNotFoundException"
                     }
@@ -9751,11 +9763,20 @@
                         }
                     },
                     {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
                         "name": "per_page",
                         "in": "query",
                         "schema": {
                             "type": "integer",
-                            "default": 25
+                            "minimum": 1,
+                            "maximum": 100
                         }
                     }
                 ],
@@ -9980,6 +10001,64 @@
             }
         },
         "/admin/legal-documents/{document}": {
+            "get": {
+                "operationId": "landlord.legal.show",
+                "tags": [
+                    "LegalDocument"
+                ],
+                "parameters": [
+                    {
+                        "name": "document",
+                        "in": "path",
+                        "required": true,
+                        "description": "The document ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "message": {
+                                            "type": "string"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/LegalDocumentResource"
+                                        },
+                                        "meta": {
+                                            "type": "object",
+                                            "additionalProperties": {}
+                                        },
+                                        "errors": {
+                                            "type": "object",
+                                            "additionalProperties": {}
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "message",
+                                        "data",
+                                        "meta",
+                                        "errors"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    }
+                }
+            },
             "patch": {
                 "operationId": "landlord.legal.update",
                 "tags": [
@@ -12358,8 +12437,10 @@
                                                         }
                                                     },
                                                     "channels": {
-                                                        "type": "array",
-                                                        "items": {}
+                                                        "type": "object",
+                                                        "additionalProperties": {
+                                                            "type": "boolean"
+                                                        }
                                                     }
                                                 },
                                                 "required": [
@@ -12417,9 +12498,9 @@
                                 "type": "object",
                                 "properties": {
                                     "channels": {
-                                        "type": "array",
-                                        "items": {
-                                            "type": "string"
+                                        "type": "object",
+                                        "additionalProperties": {
+                                            "type": "boolean"
                                         }
                                     },
                                     "audience": {
@@ -12470,8 +12551,10 @@
                                                     }
                                                 },
                                                 "channels": {
-                                                    "type": "array",
-                                                    "items": {}
+                                                    "type": "object",
+                                                    "additionalProperties": {
+                                                        "type": "boolean"
+                                                    }
                                                 }
                                             },
                                             "required": [
@@ -12592,14 +12675,18 @@
                                                         "type": "boolean"
                                                     },
                                                     "channels": {
-                                                        "type": "array",
-                                                        "items": {
+                                                        "type": "object",
+                                                        "description": "Channel to on/off",
+                                                        "additionalProperties": {
                                                             "type": "boolean"
                                                         }
                                                     },
                                                     "variables": {
                                                         "type": "array",
-                                                        "items": {}
+                                                        "description": "Placeholders the subject and body may use",
+                                                        "items": {
+                                                            "type": "string"
+                                                        }
                                                     },
                                                     "preview": {
                                                         "type": "object",
@@ -12746,14 +12833,18 @@
                                                     "type": "boolean"
                                                 },
                                                 "channels": {
-                                                    "type": "array",
-                                                    "items": {
+                                                    "type": "object",
+                                                    "description": "Channel to on/off",
+                                                    "additionalProperties": {
                                                         "type": "boolean"
                                                     }
                                                 },
                                                 "variables": {
                                                     "type": "array",
-                                                    "items": {}
+                                                    "description": "Placeholders the subject and body may use",
+                                                    "items": {
+                                                        "type": "string"
+                                                    }
                                                 },
                                                 "preview": {
                                                     "type": "object",
@@ -12874,14 +12965,18 @@
                                                     "type": "boolean"
                                                 },
                                                 "channels": {
-                                                    "type": "array",
-                                                    "items": {
+                                                    "type": "object",
+                                                    "description": "Channel to on/off",
+                                                    "additionalProperties": {
                                                         "type": "boolean"
                                                     }
                                                 },
                                                 "variables": {
                                                     "type": "array",
-                                                    "items": {}
+                                                    "description": "Placeholders the subject and body may use",
+                                                    "items": {
+                                                        "type": "string"
+                                                    }
                                                 },
                                                 "preview": {
                                                     "type": "object",
@@ -19238,11 +19333,20 @@
                         }
                     },
                     {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
                         "name": "per_page",
                         "in": "query",
                         "schema": {
                             "type": "integer",
-                            "default": 25
+                            "minimum": 1,
+                            "maximum": 100
                         }
                     }
                 ],
@@ -19289,23 +19393,7 @@
                                                     "roles": {
                                                         "type": "array",
                                                         "items": {
-                                                            "type": "object",
-                                                            "properties": {
-                                                                "relations": {
-                                                                    "type": "array",
-                                                                    "prefixItems": [
-                                                                        {
-                                                                            "type": "string",
-                                                                            "const": "roles"
-                                                                        }
-                                                                    ],
-                                                                    "minItems": 1,
-                                                                    "maxItems": 1
-                                                                }
-                                                            },
-                                                            "required": [
-                                                                "relations"
-                                                            ]
+                                                            "type": "string"
                                                         }
                                                     },
                                                     "last_login_at": {
@@ -19513,23 +19601,7 @@
                                                 "roles": {
                                                     "type": "array",
                                                     "items": {
-                                                        "type": "object",
-                                                        "properties": {
-                                                            "relations": {
-                                                                "type": "array",
-                                                                "prefixItems": [
-                                                                    {
-                                                                        "type": "string",
-                                                                        "const": "roles"
-                                                                    }
-                                                                ],
-                                                                "minItems": 1,
-                                                                "maxItems": 1
-                                                            }
-                                                        },
-                                                        "required": [
-                                                            "relations"
-                                                        ]
+                                                        "type": "string"
                                                     }
                                                 },
                                                 "last_login_at": {
@@ -19661,23 +19733,7 @@
                                                 "roles": {
                                                     "type": "array",
                                                     "items": {
-                                                        "type": "object",
-                                                        "properties": {
-                                                            "relations": {
-                                                                "type": "array",
-                                                                "prefixItems": [
-                                                                    {
-                                                                        "type": "string",
-                                                                        "const": "roles"
-                                                                    }
-                                                                ],
-                                                                "minItems": 1,
-                                                                "maxItems": 1
-                                                            }
-                                                        },
-                                                        "required": [
-                                                            "relations"
-                                                        ]
+                                                        "type": "string"
                                                     }
                                                 },
                                                 "last_login_at": {
@@ -19789,23 +19845,7 @@
                                                 "roles": {
                                                     "type": "array",
                                                     "items": {
-                                                        "type": "object",
-                                                        "properties": {
-                                                            "relations": {
-                                                                "type": "array",
-                                                                "prefixItems": [
-                                                                    {
-                                                                        "type": "string",
-                                                                        "const": "roles"
-                                                                    }
-                                                                ],
-                                                                "minItems": 1,
-                                                                "maxItems": 1
-                                                            }
-                                                        },
-                                                        "required": [
-                                                            "relations"
-                                                        ]
+                                                        "type": "string"
                                                     }
                                                 },
                                                 "last_login_at": {
@@ -19936,23 +19976,7 @@
                                                 "roles": {
                                                     "type": "array",
                                                     "items": {
-                                                        "type": "object",
-                                                        "properties": {
-                                                            "relations": {
-                                                                "type": "array",
-                                                                "prefixItems": [
-                                                                    {
-                                                                        "type": "string",
-                                                                        "const": "roles"
-                                                                    }
-                                                                ],
-                                                                "minItems": 1,
-                                                                "maxItems": 1
-                                                            }
-                                                        },
-                                                        "required": [
-                                                            "relations"
-                                                        ]
+                                                        "type": "string"
                                                     }
                                                 },
                                                 "last_login_at": {
@@ -20075,23 +20099,7 @@
                                                 "roles": {
                                                     "type": "array",
                                                     "items": {
-                                                        "type": "object",
-                                                        "properties": {
-                                                            "relations": {
-                                                                "type": "array",
-                                                                "prefixItems": [
-                                                                    {
-                                                                        "type": "string",
-                                                                        "const": "roles"
-                                                                    }
-                                                                ],
-                                                                "minItems": 1,
-                                                                "maxItems": 1
-                                                            }
-                                                        },
-                                                        "required": [
-                                                            "relations"
-                                                        ]
+                                                        "type": "string"
                                                     }
                                                 },
                                                 "last_login_at": {
