@@ -62,7 +62,7 @@ final class AffiliatePayoutController extends Controller
      */
     public function show(Request $request, AffiliatePayout $payout): JsonResponse
     {
-        $resource = new AffiliatePayoutResource($payout->load(['affiliate:id,name', 'commissions']));
+        $resource = new AffiliatePayoutResource($payout->load(['affiliate:id,name', 'commissions.referral.tenant:id,name']));
         $canPay = PlatformUser::query()->whereKey($this->user($request)->id)->withPlatformRole(['billing-admin', 'super-admin'])->exists();
 
         return APIResponse::success($canPay ? $resource->withPayoutDetails() : $resource);

@@ -82,12 +82,16 @@ final class AffiliateController extends Controller
 
     public function reject(Request $request, Affiliate $affiliate): JsonResponse
     {
-        return APIResponse::success(new AffiliateResource($this->affiliates->reject($affiliate, $this->reason($request), $this->user($request))), 'Application rejected');
+        $reason = (string) $request->validate(['reason' => ['required', 'string', 'max:255']])['reason'];
+
+        return APIResponse::success(new AffiliateResource($this->affiliates->reject($affiliate, $reason, $this->user($request))), 'Application rejected');
     }
 
     public function suspend(Request $request, Affiliate $affiliate): JsonResponse
     {
-        return APIResponse::success(new AffiliateResource($this->affiliates->suspend($affiliate, $this->reason($request), $this->user($request))), 'Affiliate suspended');
+        $reason = (string) $request->validate(['reason' => ['required', 'string', 'max:255']])['reason'];
+
+        return APIResponse::success(new AffiliateResource($this->affiliates->suspend($affiliate, $reason, $this->user($request))), 'Affiliate suspended');
     }
 
     public function reinstate(Request $request, Affiliate $affiliate): JsonResponse
@@ -97,7 +101,9 @@ final class AffiliateController extends Controller
 
     public function close(Request $request, Affiliate $affiliate): JsonResponse
     {
-        return APIResponse::success(new AffiliateResource($this->affiliates->close($affiliate, $this->reason($request), $this->user($request))), 'Affiliate closed');
+        $reason = (string) $request->validate(['reason' => ['required', 'string', 'max:255']])['reason'];
+
+        return APIResponse::success(new AffiliateResource($this->affiliates->close($affiliate, $reason, $this->user($request))), 'Affiliate closed');
     }
 
     public function commissionRate(Request $request, Affiliate $affiliate): JsonResponse
@@ -117,11 +123,6 @@ final class AffiliateController extends Controller
         $code = $request->validate(['referral_code' => ['required', 'string', 'max:20']])['referral_code'];
 
         return APIResponse::success(new AffiliateResource($this->affiliates->changeReferralCode($affiliate, $code, $this->user($request))), 'Referral code changed');
-    }
-
-    private function reason(Request $request): string
-    {
-        return (string) $request->validate(['reason' => ['required', 'string', 'max:255']])['reason'];
     }
 
     private function user(Request $request): PlatformUser

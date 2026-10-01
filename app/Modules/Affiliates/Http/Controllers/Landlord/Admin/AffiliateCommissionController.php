@@ -67,17 +67,16 @@ final class AffiliateCommissionController extends Controller
 
     public function reject(Request $request, AffiliateCommission $commission): JsonResponse
     {
-        return APIResponse::success(new AffiliateCommissionResource($this->commissions->reject($commission, $this->reason($request), $this->user($request))), 'Commission rejected');
+        $reason = (string) $request->validate(['reason' => ['required', 'string', 'max:255']])['reason'];
+
+        return APIResponse::success(new AffiliateCommissionResource($this->commissions->reject($commission, $reason, $this->user($request))), 'Commission rejected');
     }
 
     public function reverse(Request $request, AffiliateCommission $commission): JsonResponse
     {
-        return APIResponse::success(new AffiliateCommissionResource($this->commissions->reverse($commission, $this->reason($request), $this->user($request))), 'Commission reversed');
-    }
+        $reason = (string) $request->validate(['reason' => ['required', 'string', 'max:255']])['reason'];
 
-    private function reason(Request $request): string
-    {
-        return (string) $request->validate(['reason' => ['required', 'string', 'max:255']])['reason'];
+        return APIResponse::success(new AffiliateCommissionResource($this->commissions->reverse($commission, $reason, $this->user($request))), 'Commission reversed');
     }
 
     private function user(Request $request): PlatformUser
