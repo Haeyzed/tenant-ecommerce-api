@@ -17,6 +17,9 @@ final class PaymentTransactionResource extends JsonResource
 {
     public bool $includeProviderData = false;
 
+    /** Set on the detail view of a refundable charge (null otherwise). */
+    public ?string $refundableAmount = null;
+
     /**
      * @return array<string, mixed>
      */
@@ -25,6 +28,8 @@ final class PaymentTransactionResource extends JsonResource
         return [
             'id' => $this->id,
             'tenant_id' => $this->tenant_id,
+            /** @var array{id: string, name: string, slug: string}|null */
+            'tenant' => $this->whenLoaded('tenant', fn (): ?array => $this->tenant === null ? null : ['id' => (string) $this->tenant->id, 'name' => (string) $this->tenant->name, 'slug' => (string) $this->tenant->slug]),
             'subscription_id' => $this->subscription_id,
             'type' => $this->type,
             'mode' => $this->mode,
@@ -42,13 +47,17 @@ final class PaymentTransactionResource extends JsonResource
             'reason' => $this->reason,
             'paid_at' => $this->paid_at?->toIso8601String(),
             'created_at' => $this->created_at?->toIso8601String(),
+            /** @var array<string, mixed> */
             'meta' => $this->when($this->includeProviderData, fn (): array => (array) $this->meta),
+            /** @var string|null */
+            'refundable_amount' => $this->when($this->includeProviderData, fn (): ?string => $this->refundableAmount),
         ];
     }
 
-    public function withProviderData(): self
+    public function withProviderData(?string $refundableAmount = null): self
     {
         $this->includeProviderData = true;
+        $this->refundableAmount = $refundableAmount;
 
         return $this;
     }

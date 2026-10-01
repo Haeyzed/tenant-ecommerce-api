@@ -120,3 +120,39 @@ it('validates coupons publicly without an account', function (): void {
     $this->landlordJson('POST', '/api/platform-coupons/validate', ['code' => 'NOPE', 'plan_price_id' => $price->id])
         ->assertOk()->assertJsonPath('data.valid', false)->assertJsonPath('data.reason', 'not_found');
 });
+
+it('names the tenant on billing lists and gives a charge its refundable amount', function (): void {
+    $this->seedPlans();
+    $tenantId = $this->createTenantRow('a');
+    $plan = Plan::query()->where('slug', 'basic')->firstOrFail();
+    $price = $plan->prices()->where('currency_code', 'USD')->where('billing_interval', 'monthly')->firstOrFail();
+    $subscriptionId = DB::connection('landlord')->table('subscriptions')->insertGetId([
+        'tenant_id' => $tenantId, 'plan_id' => $plan->id, 'plan_price_id' => $price->id, 'currency_code' => 'USD',
+        'billing_interval' => 'monthly', 'gateway_mode' => 'test', 'status' => 'active', 'trial_days' => 0,
+        'starts_at' => now(), 'created_at' => now(), 'updated_at' => now(),
+    ]);
+    $charge = PaymentTransaction::query()->create([
+        'tenant_id' => $tenantId, 'subscription_id' => $subscriptionId, 'type' => PaymentTransaction::CHARGE, 'mode' => 'test',
+        'provider' => 'paystack', 'reference' => 'REF-1', 'provider_reference' => 'PSK-1', 'amount' => '20.0000',
+        'currency_code' => 'USD', 'status' => PaymentTransaction::SUCCESSFUL, 'paid_at' => now(),
+    ]);
+    PaymentTransaction::query()->create([
+        'tenant_id' => $tenantId, 'subscription_id' => $subscriptionId, 'type' => PaymentTransaction::REFUND, 'mode' => 'test',
+        'provider' => 'paystack', 'reference' => 'RFD-1', 'amount' => '-5.0000', 'currency_code' => 'USD',
+        'status' => PaymentTransaction::SUCCESSFUL, 'refund_of_payment_transaction_id' => $charge->id, 'paid_at' => now(),
+    ]);
+
+    $tenant = ['id' => $tenantId, 'name' => 'Tenant A', 'slug' => 'tenant-a'];
+
+    $this->landlordJson('GET', '/api/admin/subscriptions', [], $this->token)->assertOk()->assertJsonPath('data.0.tenant', $tenant);
+    $this->landlordJson('GET', '/api/admin/payment-transactions?type=charge', [], $this->token)->assertOk()->assertJsonPath('data.0.tenant', $tenant);
+
+    $this->landlordJson('GET', "/api/admin/payment-transactions/{$charge->id}", [], $this->token)->assertOk()
+        ->assertJsonPath('data.tenant', $tenant)
+        ->assertJsonPath('data.refundable_amount', '15.0000');
+
+    // Only a successful gateway charge is refundable.
+    $refund = PaymentTransaction::query()->where('type', PaymentTransaction::REFUND)->firstOrFail();
+    $this->landlordJson('GET', "/api/admin/payment-transactions/{$refund->id}", [], $this->token)->assertOk()
+        ->assertJsonPath('data.refundable_amount', null);
+});

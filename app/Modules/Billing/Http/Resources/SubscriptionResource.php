@@ -21,6 +21,8 @@ final class SubscriptionResource extends JsonResource
         return [
             'id' => $this->id,
             'tenant_id' => $this->tenant_id,
+            /** @var array{id: string, name: string, slug: string}|null */
+            'tenant' => $this->whenLoaded('tenant', fn (): ?array => $this->tenant === null ? null : ['id' => (string) $this->tenant->id, 'name' => (string) $this->tenant->name, 'slug' => (string) $this->tenant->slug]),
             'plan' => $this->whenLoaded('plan', fn (): array => ['id' => $this->plan->id, 'name' => $this->plan->name, 'slug' => $this->plan->slug]),
             'plan_price_id' => $this->plan_price_id,
             'currency_code' => $this->currency_code,

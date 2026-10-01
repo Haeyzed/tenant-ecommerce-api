@@ -41,10 +41,12 @@ final class PaymentTransactionController extends Controller
             'tenant' => ['sometimes', 'string', 'max:255'],
             'from' => ['sometimes', 'date'],
             'to' => ['sometimes', 'date', 'after_or_equal:from'],
+            'page' => ['sometimes', 'integer', 'min:1'],
             'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'],
         ]);
 
         $page = PaymentTransaction::query()
+            ->with('tenant:id,name,slug')
             ->when($filters['type'] ?? null, static fn ($q, $v) => $q->where('type', $v))
             ->when($filters['status'] ?? null, static fn ($q, $v) => $q->where('status', $v))
             ->when($filters['mode'] ?? null, static fn ($q, $v) => $q->where('mode', $v))
@@ -60,7 +62,11 @@ final class PaymentTransactionController extends Controller
 
     public function show(PaymentTransaction $transaction): JsonResponse
     {
-        return APIResponse::success((new PaymentTransactionResource($transaction))->withProviderData());
+        $refundable = $transaction->type === PaymentTransaction::CHARGE && $transaction->status === PaymentTransaction::SUCCESSFUL && filled($transaction->provider_reference)
+            ? $this->subscriptions->refundableAmount($transaction)
+            : null;
+
+        return APIResponse::success((new PaymentTransactionResource($transaction->load('tenant:id,name,slug')))->withProviderData($refundable));
     }
 
     /**
@@ -82,6 +88,6 @@ final class PaymentTransactionController extends Controller
             $user,
         );
 
-        return APIResponse::created((new PaymentTransactionResource($refund))->withProviderData(), 'Refund recorded');
+        return APIResponse::created((new PaymentTransactionResource($refund->load('tenant:id,name,slug')))->withProviderData(), 'Refund recorded');
     }
 }

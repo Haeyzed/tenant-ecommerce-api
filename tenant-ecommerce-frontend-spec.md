@@ -1167,7 +1167,7 @@ type CursorPage<T> = { items: T[]; pagination: CursorPagination; links: CursorLi
   - `routes.{landlord,tenant}.json`, `modules.json`, `limits.json`, `permissions.{landlord,tenant}.json`, `error-codes.json` and `storefront.json` (themes, fonts).
 - All of them come from one backend command (BG-07, resolved in D-142): `php artisan frontend:contract --path={absolute bundle path} [--openapi]`. `--openapi` re-exports the OpenAPI documents first. The bundle is not committed in the backend.
 - `contract.lock.json` records the backend commit SHA and the SHA-256 of each file.
-- `pnpm contract:pull --from ../tenant-ecommerce-api` runs that command into `packages/contract/bundle/` and updates the lock.
+- `pnpm contract:pull --from ../tenant-ecommerce-api` runs that command into `packages/contract/bundle/` and updates the lock. It re-exports the OpenAPI documents from the current backend code (`frontend:contract --openapi`) by default; `--no-openapi` copies the last exported documents, which can be stale and hide new annotations.
 - `pnpm contract:generate` writes `packages/contract/src/generated/**`: `paths` types, the `ModuleKey`, `LimitKey`, `Permission` and `RouteName` unions, the route manifest, and theme and font identifier lists.
 - Generated output is committed, marked generated, and excluded from lint.
 - CI regenerates and fails when the committed output differs (§38.3). Upgrading the contract is an ordinary pull request: bump, regenerate, fix type errors. The type errors are the list of affected screens.
@@ -1806,7 +1806,11 @@ The backend serves dashboards per section with one KPI shape (UD-39):
 - **Range semantics to keep visible** (from `DateRange::fromInput`):
   - `last_7_days` and `last_30_days` are complete days and **end yesterday**, so today's activity is not in them. `today` and the `this_…` presets run up to now.
   - A range that ends before today is cached for an hour; one that includes today, for five minutes (`MetricsCache`).
-- **Live money only (landlord).** Subscription, MRR, revenue, payment and trial-conversion figures count live-mode records only, and test subscriptions record no MRR movements (§14.10). While `billing_payment_mode` is `test`, the platform dashboard shows a notice that test sign-ups and payments are excluded from those figures. Tenant counts include every tenant.
+- **Live or test money (landlord).** Subscription, MRR, revenue, payment, trial-conversion and plan figures read one billing mode, chosen by `mode=live|test` (default `live`), which is part of the cache key and echoed in `data.range.mode`.
+  - The MRR ledger records both modes in `subscription_mrr_movements.mode` (the subscription's `gateway_mode`). `is_first_paid_charge` is scoped to the charge's mode; affiliate commissions stay live-only because `AffiliateCommissionService` checks the mode itself.
+  - Alerts and the daily snapshot job stay live. Tenant counts include every tenant.
+  - `php artisan billing:backfill-test-mrr` adds the missing "new" movement for test subscriptions paid before the ledger recorded test billing (idempotent; `--dry-run` lists them).
+  - The platform dashboard has a **Live data / Test data** switch (`mode` in the URL). Test data is always flagged ("Showing test data"). While billing is in test mode, the live view offers the switch.
 - **Rendering.**
   - `admin-kit` `KpiGrid` renders `KpiValue`s: value, `comparison.change_percent` coloured by `comparison.sentiment` (positive, negative, neutral), sparkline, and an "Estimated" badge when `is_estimated`. The frontend never computes the change or its sentiment.
   - Charts use the shadcn `chart` wrapper and are loaded with `next/dynamic`.
@@ -2043,7 +2047,7 @@ Platform-user roles are assigned from lookups. The landlord API has no role CRUD
 - **Credentials form.** A side sheet (a bottom sheet on phones). Secrets are write-only, and an empty field keeps the stored value. A save makes the backend check the keys with the provider; `gateway_credentials_invalid` and `payment_mode_mismatch` appear under the secret-key field.
 - **Billing mode.** Switching needs a reason (§15.9 safeguard 5). The page warns when no gateway is enabled in the current mode.
 - **Gating.** Every action is gated by its route name (`useCan`).
-- **Contract note.** `has_secret_key` and `has_webhook_secret` are generated as strings; the client reads them as truthy values (`normalizeGateway`).
+- **Contract types.** `has_secret_key` and `has_webhook_secret` are booleans in the contract. Scramble infers resource arrays from the method body, so the backend casts them with `(bool)`; a return docblock alone is not enough.
 
 **Plans, as built:**
 
@@ -2052,7 +2056,7 @@ Platform-user roles are assigned from lookups. The landlord API has no role CRUD
 - **Prices.** Amounts are immutable (§11.6): the tab offers **Add price** and a trial edit only. The add dialog warns when the new price replaces the active one for the same currency and interval. Retire and reactivate ask for confirmation. An empty trial means the platform default, and the table shows the resolved trial.
 - **Features.** A switch per entry of the admin `features` lookup, grouped by module, capability and integration, with search. An included feature whose `requires` are missing shows a warning.
 - **Limits.** Every registered limit, with **Unlimited** where `unlimited_allowed`, saved as one request per changed key.
-- **Contract notes.** `PlanResource.limits` is generated as an array but is a key→value map; `resolved_trial_days` and `limit_value` are generated as strings but are integers. Scramble ignored `@var` annotations on these fields, so the client normalises them (`features/plans/api.ts`).
+- **Contract types.** `PlanResource.limits` (a key→value map), `resolved_trial_days` and `limit_value` (integers) are typed through `@var` annotations and an explicit cast in the backend. An earlier "Scramble ignores @var" note was wrong: the pull was copying a stale document (see §13.3).
 - **Test data.** Writes in `plans.spec.ts` go to one dedicated, inactive, hidden plan (slug `e2e-test-plan`, order 9999), created once and reused, because the API has no plan delete. Feature and limit changes are reverted in the same test.
 
 **Shared conventions from these slices:**

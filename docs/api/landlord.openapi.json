@@ -14858,6 +14858,14 @@
                         }
                     },
                     {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
                         "name": "per_page",
                         "in": "query",
                         "schema": {
@@ -16892,6 +16900,14 @@
                         }
                     },
                     {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
                         "name": "per_page",
                         "in": "query",
                         "schema": {
@@ -17324,6 +17340,14 @@
                         "in": "query",
                         "schema": {
                             "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
                         }
                     },
                     {
@@ -17816,17 +17840,7 @@
                                             "type": "object",
                                             "properties": {
                                                 "coupon": {
-                                                    "allOf": [
-                                                        {
-                                                            "$ref": "#/components/schemas/PlatformCouponResource"
-                                                        },
-                                                        {
-                                                            "type": "object",
-                                                            "required": [
-                                                                "targets"
-                                                            ]
-                                                        }
-                                                    ]
+                                                    "$ref": "#/components/schemas/PlatformCouponResource"
                                                 },
                                                 "usage": {
                                                     "type": "object",
@@ -17834,10 +17848,16 @@
                                                         "times_redeemed": {
                                                             "type": "integer"
                                                         },
-                                                        "remaining": {},
+                                                        "remaining": {
+                                                            "type": [
+                                                                "integer",
+                                                                "null"
+                                                            ]
+                                                        },
                                                         "by_status": {
-                                                            "type": "array",
-                                                            "items": {
+                                                            "type": "object",
+                                                            "description": "Redemptions per status",
+                                                            "additionalProperties": {
                                                                 "type": "integer"
                                                             }
                                                         },
@@ -18163,11 +18183,20 @@
                         }
                     },
                     {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
                         "name": "per_page",
                         "in": "query",
                         "schema": {
                             "type": "integer",
-                            "default": 25
+                            "minimum": 1,
+                            "maximum": 100
                         }
                     }
                 ],
@@ -18194,6 +18223,9 @@
                                                         "type": "integer"
                                                     },
                                                     "tenant_id": {
+                                                        "type": "string"
+                                                    },
+                                                    "tenant_name": {
                                                         "type": "string"
                                                     },
                                                     "subscription_id": {
@@ -18239,6 +18271,7 @@
                                                 "required": [
                                                     "id",
                                                     "tenant_id",
+                                                    "tenant_name",
                                                     "subscription_id",
                                                     "owner_email",
                                                     "status",
@@ -18348,6 +18381,9 @@
                                 }
                             }
                         }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
                     },
                     "404": {
                         "$ref": "#/components/responses/ModelNotFoundException"
@@ -21027,6 +21063,14 @@
                         }
                     },
                     {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
                         "name": "per_page",
                         "in": "query",
                         "schema": {
@@ -23699,11 +23743,20 @@
                         }
                     },
                     {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
                         "name": "per_page",
                         "in": "query",
                         "schema": {
                             "type": "integer",
-                            "default": 25
+                            "minimum": 1,
+                            "maximum": 100
                         }
                     }
                 ],
@@ -25039,6 +25092,28 @@
                     "tenant_id": {
                         "type": "string"
                     },
+                    "tenant": {
+                        "type": [
+                            "object",
+                            "null"
+                        ],
+                        "properties": {
+                            "id": {
+                                "type": "string"
+                            },
+                            "name": {
+                                "type": "string"
+                            },
+                            "slug": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "id",
+                            "name",
+                            "slug"
+                        ]
+                    },
                     "subscription_id": {
                         "type": "integer"
                     },
@@ -25116,7 +25191,14 @@
                         ]
                     },
                     "meta": {
-                        "type": "string"
+                        "type": "object",
+                        "additionalProperties": {}
+                    },
+                    "refundable_amount": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
                     }
                 },
                 "required": [
@@ -25314,6 +25396,28 @@
                     },
                     "tenant_id": {
                         "type": "string"
+                    },
+                    "tenant": {
+                        "type": [
+                            "object",
+                            "null"
+                        ],
+                        "properties": {
+                            "id": {
+                                "type": "string"
+                            },
+                            "name": {
+                                "type": "string"
+                            },
+                            "slug": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "id",
+                            "name",
+                            "slug"
+                        ]
                     },
                     "kind": {
                         "type": "string"
@@ -25612,6 +25716,28 @@
                     },
                     "tenant_id": {
                         "type": "string"
+                    },
+                    "tenant": {
+                        "type": [
+                            "object",
+                            "null"
+                        ],
+                        "properties": {
+                            "id": {
+                                "type": "string"
+                            },
+                            "name": {
+                                "type": "string"
+                            },
+                            "slug": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "id",
+                            "name",
+                            "slug"
+                        ]
                     },
                     "plan": {
                         "type": "object",

@@ -9781,6 +9781,7 @@
                                                 {
                                                     "type": "object",
                                                     "required": [
+                                                        "tenant",
                                                         "plan"
                                                     ]
                                                 }
@@ -165868,6 +165869,28 @@
                     "tenant_id": {
                         "type": "string"
                     },
+                    "tenant": {
+                        "type": [
+                            "object",
+                            "null"
+                        ],
+                        "properties": {
+                            "id": {
+                                "type": "string"
+                            },
+                            "name": {
+                                "type": "string"
+                            },
+                            "slug": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "id",
+                            "name",
+                            "slug"
+                        ]
+                    },
                     "subscription_id": {
                         "type": "integer"
                     },
@@ -165945,7 +165968,14 @@
                         ]
                     },
                     "meta": {
-                        "type": "string"
+                        "type": "object",
+                        "additionalProperties": {}
+                    },
+                    "refundable_amount": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
                     }
                 },
                 "required": [
@@ -165979,6 +166009,28 @@
                     },
                     "tenant_id": {
                         "type": "string"
+                    },
+                    "tenant": {
+                        "type": [
+                            "object",
+                            "null"
+                        ],
+                        "properties": {
+                            "id": {
+                                "type": "string"
+                            },
+                            "name": {
+                                "type": "string"
+                            },
+                            "slug": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "id",
+                            "name",
+                            "slug"
+                        ]
                     },
                     "kind": {
                         "type": "string"
@@ -166353,6 +166405,28 @@
                     },
                     "tenant_id": {
                         "type": "string"
+                    },
+                    "tenant": {
+                        "type": [
+                            "object",
+                            "null"
+                        ],
+                        "properties": {
+                            "id": {
+                                "type": "string"
+                            },
+                            "name": {
+                                "type": "string"
+                            },
+                            "slug": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "id",
+                            "name",
+                            "slug"
+                        ]
                     },
                     "plan": {
                         "type": "object",

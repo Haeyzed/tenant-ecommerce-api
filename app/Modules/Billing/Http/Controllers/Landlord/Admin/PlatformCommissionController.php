@@ -25,10 +25,12 @@ final class PlatformCommissionController extends Controller
             'tenant' => ['sometimes', 'string', 'max:255'],
             'status' => ['sometimes', Rule::in([PlatformCommission::PENDING, PlatformCommission::BILLED, PlatformCommission::COLLECTED, PlatformCommission::WAIVED])],
             'currency' => ['sometimes', 'string', 'size:3'],
+            'page' => ['sometimes', 'integer', 'min:1'],
             'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'],
         ]);
 
         $page = PlatformCommission::query()
+            ->with('tenant:id,name,slug')
             ->when($filters['tenant'] ?? null, static fn ($q, $v) => $q->where('tenant_id', $v))
             ->when($filters['status'] ?? null, static fn ($q, $v) => $q->where('status', $v))
             ->when($filters['currency'] ?? null, static fn ($q, $v) => $q->where('currency_code', strtoupper($v)))
@@ -45,6 +47,6 @@ final class PlatformCommissionController extends Controller
         /** @var PlatformUser $user */
         $user = $request->user();
 
-        return APIResponse::success(new PlatformCommissionResource($commissions->waive($commission, (int) $user->id, $reason)), 'Commission waived');
+        return APIResponse::success(new PlatformCommissionResource($commissions->waive($commission, (int) $user->id, $reason)->load('tenant:id,name,slug')), 'Commission waived');
     }
 }

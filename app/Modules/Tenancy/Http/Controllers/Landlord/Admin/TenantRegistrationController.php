@@ -17,6 +17,8 @@ final class TenantRegistrationController extends Controller
         $filters = $request->validate([
             'status' => ['sometimes', 'in:pending_verification,converted,expired'],
             'email' => ['sometimes', 'string', 'max:255'],
+            'page' => ['sometimes', 'integer', 'min:1'],
+            'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'],
         ]);
 
         $page = TenantRegistration::query()
@@ -24,7 +26,7 @@ final class TenantRegistrationController extends Controller
             ->when($filters['status'] ?? null, static fn ($q, $v) => $q->where('status', $v))
             ->when($filters['email'] ?? null, static fn ($q, $v) => $q->where('email', 'like', '%'.addcslashes(strtolower($v), '%_\\').'%'))
             ->orderByDesc('id')
-            ->paginate(min(100, max(1, $request->integer('per_page', 25))))
+            ->paginate((int) ($filters['per_page'] ?? 25))
             ->through(static fn (TenantRegistration $r): array => [
                 'id' => $r->public_id,
                 'business_name' => $r->business_name,

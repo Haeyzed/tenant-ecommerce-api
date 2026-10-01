@@ -38,11 +38,12 @@ final class SubscriptionController extends Controller
             'mode' => ['sometimes', 'in:test,live'],
             'tenant' => ['sometimes', 'string', 'max:255'],
             'plan_id' => ['sometimes', 'integer'],
+            'page' => ['sometimes', 'integer', 'min:1'],
             'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'],
         ]);
 
         $page = Subscription::query()
-            ->with('plan')
+            ->with(['plan', 'tenant:id,name,slug'])
             ->when($filters['status'] ?? null, static fn ($q, $v) => $q->where('status', $v))
             ->when($filters['mode'] ?? null, static fn ($q, $v) => $q->where('gateway_mode', $v))
             ->when($filters['tenant'] ?? null, static fn ($q, $v) => $q->where('tenant_id', $v))
@@ -55,7 +56,7 @@ final class SubscriptionController extends Controller
 
     public function show(Subscription $subscription): JsonResponse
     {
-        return APIResponse::success(new SubscriptionResource($subscription->load('plan')));
+        return APIResponse::success(new SubscriptionResource($subscription->load(['plan', 'tenant:id,name,slug'])));
     }
 
     public function extendTrial(Request $request, Subscription $subscription): JsonResponse
@@ -69,6 +70,6 @@ final class SubscriptionController extends Controller
         $user = $request->user();
         $subscription = $this->subscriptions->extendTrial($subscription, (int) $validated['days'], $validated['reason'], $user);
 
-        return APIResponse::success(new SubscriptionResource($subscription->load('plan')), 'Trial extended');
+        return APIResponse::success(new SubscriptionResource($subscription->load(['plan', 'tenant:id,name,slug'])), 'Trial extended');
     }
 }

@@ -36,6 +36,7 @@ final class PlatformCouponController extends Controller
             'is_active' => ['sometimes', 'boolean'],
             'status' => ['sometimes', 'in:scheduled,running,ended'],
             'affiliate_id' => ['sometimes', 'integer'],
+            'page' => ['sometimes', 'integer', 'min:1'],
             'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'],
         ]);
 
@@ -61,6 +62,7 @@ final class PlatformCouponController extends Controller
     public function show(PlatformCoupon $coupon): JsonResponse
     {
         return APIResponse::success([
+            /** @var PlatformCouponResource */
             'coupon' => new PlatformCouponResource($coupon->load('targets')),
             'usage' => $this->coupons->usageStats($coupon),
         ]);

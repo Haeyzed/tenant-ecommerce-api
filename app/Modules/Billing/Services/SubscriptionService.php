@@ -1292,7 +1292,11 @@ final readonly class SubscriptionService
             ->first();
     }
 
-    private function refundableAmount(PaymentTransaction $charge): string
+    /**
+     * What is left to refund on a charge: its amount less pending and
+     * successful refunds and chargebacks against it.
+     */
+    public function refundableAmount(PaymentTransaction $charge): string
     {
         $reversed = PaymentTransaction::query()
             ->where('refund_of_payment_transaction_id', $charge->id)

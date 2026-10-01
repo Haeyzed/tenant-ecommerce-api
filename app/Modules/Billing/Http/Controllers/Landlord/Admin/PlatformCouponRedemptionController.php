@@ -15,13 +15,20 @@ final class PlatformCouponRedemptionController extends Controller
 {
     public function index(Request $request, PlatformCoupon $coupon): JsonResponse
     {
+        $filters = $request->validate([
+            'page' => ['sometimes', 'integer', 'min:1'],
+            'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'],
+        ]);
+
         $page = PlatformCouponRedemption::query()
+            ->with('tenant:id,name,slug')
             ->where('platform_coupon_id', $coupon->id)
             ->orderByDesc('id')
-            ->paginate(min(100, max(1, $request->integer('per_page', 25))))
+            ->paginate((int) ($filters['per_page'] ?? 25))
             ->through(static fn (PlatformCouponRedemption $r): array => [
                 'id' => $r->id,
                 'tenant_id' => $r->tenant_id,
+                'tenant_name' => $r->tenant?->name,
                 'subscription_id' => $r->subscription_id,
                 'owner_email' => $r->owner_email,
                 'status' => $r->status,

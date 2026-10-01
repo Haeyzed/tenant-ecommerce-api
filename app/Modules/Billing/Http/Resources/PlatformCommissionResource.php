@@ -21,6 +21,8 @@ final class PlatformCommissionResource extends JsonResource
         return [
             'id' => $this->id,
             'tenant_id' => $this->tenant_id,
+            /** @var array{id: string, name: string, slug: string}|null */
+            'tenant' => $this->whenLoaded('tenant', fn (): ?array => $this->tenant === null ? null : ['id' => (string) $this->tenant->id, 'name' => (string) $this->tenant->name, 'slug' => (string) $this->tenant->slug]),
             'kind' => $this->kind,
             'order_number' => $this->order_number,
             'base_amount' => (string) $this->base_amount,

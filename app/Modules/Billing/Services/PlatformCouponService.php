@@ -250,7 +250,7 @@ final readonly class PlatformCouponService
     }
 
     /**
-     * @return array<string, mixed>
+     * @return array{times_redeemed: int, remaining: int|null, by_status: array<string, int>, total_discount_amount: string}
      */
     public function usageStats(PlatformCoupon $coupon): array
     {
@@ -262,7 +262,9 @@ final readonly class PlatformCouponService
 
         return [
             'times_redeemed' => $coupon->times_redeemed,
+            /** @var int|null */
             'remaining' => $coupon->usage_limit_total === null ? null : max(0, $coupon->usage_limit_total - $coupon->times_redeemed),
+            /** @var array<string, int> Redemptions per status */
             'by_status' => $rows->mapWithKeys(static fn ($row): array => [$row->status => (int) $row->total])->all(),
             'total_discount_amount' => $rows->reduce(static fn (string $sum, $row): string => Money::add($sum, Money::normalize((string) $row->discount)), '0.0000'),
         ];
