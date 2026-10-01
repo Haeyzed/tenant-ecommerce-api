@@ -26,6 +26,7 @@ final class PlanPriceResource extends JsonResource
             'billing_interval' => $this->billing_interval,
             'amount' => (string) $this->amount,
             'trial_days' => $this->trial_days,
+            /** @var int */
             'resolved_trial_days' => app(PlanService::class)->resolveTrialDays($this->resource),
             'trial_requires_payment_method' => $this->trial_requires_payment_method,
             'is_active' => $this->is_active,

@@ -35,6 +35,7 @@ final class PlanResource extends JsonResource
             'sort_order' => $this->sort_order,
             'prices' => PlanPriceResource::collection($this->whenLoaded('prices')),
             'features' => $this->whenLoaded('features', fn () => $this->features->map(static fn (PlanFeature $f): string => $f->feature_key)->values()->all()),
+            /** @var array<string, int|null> Limit key to value; null is unlimited. */
             'limits' => $this->whenLoaded('limits', fn () => $this->limits->mapWithKeys(static fn (PlanLimit $l): array => [$l->limit_key => $l->limit_value])->all()),
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),

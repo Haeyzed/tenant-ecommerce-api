@@ -98,6 +98,18 @@
                             "minLength": 3,
                             "maxLength": 3
                         }
+                    },
+                    {
+                        "name": "mode",
+                        "in": "query",
+                        "description": "Landlord money metrics: live (default) or test billing records.",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "live",
+                                "test"
+                            ]
+                        }
                     }
                 ],
                 "responses": {
@@ -1568,6 +1580,18 @@
                             "minLength": 3,
                             "maxLength": 3
                         }
+                    },
+                    {
+                        "name": "mode",
+                        "in": "query",
+                        "description": "Landlord money metrics: live (default) or test billing records.",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "live",
+                                "test"
+                            ]
+                        }
                     }
                 ],
                 "responses": {
@@ -2137,6 +2161,18 @@
                             "type": "string",
                             "minLength": 3,
                             "maxLength": 3
+                        }
+                    },
+                    {
+                        "name": "mode",
+                        "in": "query",
+                        "description": "Landlord money metrics: live (default) or test billing records.",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "live",
+                                "test"
+                            ]
                         }
                     }
                 ],
@@ -7614,6 +7650,18 @@
                             "minLength": 3,
                             "maxLength": 3
                         }
+                    },
+                    {
+                        "name": "mode",
+                        "in": "query",
+                        "description": "Landlord money metrics: live (default) or test billing records.",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "live",
+                                "test"
+                            ]
+                        }
                     }
                 ],
                 "responses": {
@@ -7811,6 +7859,18 @@
                             "type": "string",
                             "minLength": 3,
                             "maxLength": 3
+                        }
+                    },
+                    {
+                        "name": "mode",
+                        "in": "query",
+                        "description": "Landlord money metrics: live (default) or test billing records.",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "live",
+                                "test"
+                            ]
                         }
                     }
                 ],
@@ -13803,10 +13863,10 @@
                                                                 ]
                                                             },
                                                             "has_secret_key": {
-                                                                "type": "string"
+                                                                "type": "boolean"
                                                             },
                                                             "has_webhook_secret": {
-                                                                "type": "string"
+                                                                "type": "boolean"
                                                             },
                                                             "is_enabled": {
                                                                 "type": "boolean"
@@ -14115,10 +14175,10 @@
                                                     ]
                                                 },
                                                 "has_secret_key": {
-                                                    "type": "string"
+                                                    "type": "boolean"
                                                 },
                                                 "has_webhook_secret": {
-                                                    "type": "string"
+                                                    "type": "boolean"
                                                 },
                                                 "is_enabled": {
                                                     "type": "boolean"
@@ -14343,10 +14403,10 @@
                                                     ]
                                                 },
                                                 "has_secret_key": {
-                                                    "type": "string"
+                                                    "type": "boolean"
                                                 },
                                                 "has_webhook_secret": {
-                                                    "type": "string"
+                                                    "type": "boolean"
                                                 },
                                                 "is_enabled": {
                                                     "type": "boolean"
@@ -14488,10 +14548,10 @@
                                                     ]
                                                 },
                                                 "has_secret_key": {
-                                                    "type": "string"
+                                                    "type": "boolean"
                                                 },
                                                 "has_webhook_secret": {
-                                                    "type": "string"
+                                                    "type": "boolean"
                                                 },
                                                 "is_enabled": {
                                                     "type": "boolean"
@@ -14633,10 +14693,10 @@
                                                     ]
                                                 },
                                                 "has_secret_key": {
-                                                    "type": "string"
+                                                    "type": "boolean"
                                                 },
                                                 "has_webhook_secret": {
-                                                    "type": "string"
+                                                    "type": "boolean"
                                                 },
                                                 "is_enabled": {
                                                     "type": "boolean"
@@ -15006,6 +15066,18 @@
                             "type": "string",
                             "minLength": 3,
                             "maxLength": 3
+                        }
+                    },
+                    {
+                        "name": "mode",
+                        "in": "query",
+                        "description": "Landlord money metrics: live (default) or test billing records.",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "live",
+                                "test"
+                            ]
                         }
                     }
                 ],
@@ -16341,7 +16413,7 @@
                                                     },
                                                     "limit_value": {
                                                         "type": [
-                                                            "string",
+                                                            "integer",
                                                             "null"
                                                         ]
                                                     },
@@ -16461,7 +16533,7 @@
                                                     },
                                                     "limit_value": {
                                                         "type": [
-                                                            "string",
+                                                            "integer",
                                                             "null"
                                                         ]
                                                     },
@@ -17651,6 +17723,18 @@
                             "type": "string",
                             "minLength": 3,
                             "maxLength": 3
+                        }
+                    },
+                    {
+                        "name": "mode",
+                        "in": "query",
+                        "description": "Landlord money metrics: live (default) or test billing records.",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "live",
+                                "test"
+                            ]
                         }
                     }
                 ],
@@ -21162,6 +21246,18 @@
                             "minLength": 3,
                             "maxLength": 3
                         }
+                    },
+                    {
+                        "name": "mode",
+                        "in": "query",
+                        "description": "Landlord money metrics: live (default) or test billing records.",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "live",
+                                "test"
+                            ]
+                        }
                     }
                 ],
                 "responses": {
@@ -22547,6 +22643,18 @@
                             "type": "string",
                             "minLength": 3,
                             "maxLength": 3
+                        }
+                    },
+                    {
+                        "name": "mode",
+                        "in": "query",
+                        "description": "Landlord money metrics: live (default) or test billing records.",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "live",
+                                "test"
+                            ]
                         }
                     }
                 ],
@@ -25059,7 +25167,7 @@
                         ]
                     },
                     "resolved_trial_days": {
-                        "type": "string"
+                        "type": "integer"
                     },
                     "trial_requires_payment_method": {
                         "type": "boolean"
@@ -25160,8 +25268,9 @@
                         }
                     },
                     "limits": {
-                        "type": "array",
-                        "items": {
+                        "type": "object",
+                        "description": "Limit key to value; null is unlimited.",
+                        "additionalProperties": {
                             "type": [
                                 "integer",
                                 "null"

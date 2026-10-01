@@ -50,7 +50,7 @@ final class PlanLimitController extends Controller
 
             $result[] = [
                 'limit_key' => $key,
-                'limit_value' => $row?->limit_value,
+                'limit_value' => $row?->limit_value === null ? null : (int) $row->limit_value,
                 'configured' => $row !== null,
                 'kind' => (string) $definition['kind'],
                 'unlimited_allowed' => (bool) $definition['unlimited_allowed'],

@@ -32,7 +32,7 @@ final readonly class PlatformPaymentGatewayService
     /**
      * Every provider and mode, configured or not, secrets masked.
      *
-     * @return list<array<string, mixed>>
+     * @return list<array{provider: string, mode: string, configured: bool, public_key: string|null, has_secret_key: bool, has_webhook_secret: bool, is_enabled: bool, is_default: bool, sort_order: int, supported_currencies: list<string>, supported_country_ids: list<int>|null, credentials_verified_at: string|null, last_webhook_at: string|null, webhook_url: string}>
      */
     public function list(): array
     {
@@ -256,7 +256,7 @@ final readonly class PlatformPaymentGatewayService
     }
 
     /**
-     * @return array<string, mixed>
+     * @return array{provider: string, mode: string, configured: bool, public_key: string|null, has_secret_key: bool, has_webhook_secret: bool, is_enabled: bool, is_default: bool, sort_order: int, supported_currencies: list<string>, supported_country_ids: list<int>|null, credentials_verified_at: string|null, last_webhook_at: string|null, webhook_url: string}
      */
     private function present(string $provider, string $mode, ?PlatformPaymentGateway $row): array
     {
@@ -265,8 +265,8 @@ final readonly class PlatformPaymentGatewayService
             'mode' => $mode,
             'configured' => $row !== null,
             'public_key' => $row?->maskedPublicKey(),
-            'has_secret_key' => $row !== null && filled($row->secret_key),
-            'has_webhook_secret' => $row !== null && filled($row->webhook_secret),
+            'has_secret_key' => (bool) ($row !== null && filled($row->secret_key)),
+            'has_webhook_secret' => (bool) ($row !== null && filled($row->webhook_secret)),
             'is_enabled' => (bool) $row?->is_enabled,
             'is_default' => (bool) $row?->is_default,
             'sort_order' => $row?->sort_order ?? 0,

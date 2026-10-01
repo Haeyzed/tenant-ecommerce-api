@@ -28697,6 +28697,18 @@
                             "minLength": 3,
                             "maxLength": 3
                         }
+                    },
+                    {
+                        "name": "mode",
+                        "in": "query",
+                        "description": "Landlord money metrics: live (default) or test billing records.",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "live",
+                                "test"
+                            ]
+                        }
                     }
                 ],
                 "responses": {
@@ -51073,6 +51085,9 @@
                                                         },
                                                         "compare": {
                                                             "type": "string"
+                                                        },
+                                                        "mode": {
+                                                            "type": "string"
                                                         }
                                                     },
                                                     "required": [
@@ -51081,7 +51096,8 @@
                                                         "to",
                                                         "timezone",
                                                         "interval",
-                                                        "compare"
+                                                        "compare",
+                                                        "mode"
                                                     ]
                                                 },
                                                 "average_preparation_minutes": {
@@ -111827,6 +111843,18 @@
                         }
                     },
                     {
+                        "name": "mode",
+                        "in": "query",
+                        "description": "Landlord money metrics: live (default) or test billing records.",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "live",
+                                "test"
+                            ]
+                        }
+                    },
+                    {
                         "name": "warehouse_id",
                         "in": "query",
                         "schema": {
@@ -111953,6 +111981,18 @@
                             "type": "string",
                             "minLength": 3,
                             "maxLength": 3
+                        }
+                    },
+                    {
+                        "name": "mode",
+                        "in": "query",
+                        "description": "Landlord money metrics: live (default) or test billing records.",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "live",
+                                "test"
+                            ]
                         }
                     },
                     {
@@ -112085,6 +112125,18 @@
                         }
                     },
                     {
+                        "name": "mode",
+                        "in": "query",
+                        "description": "Landlord money metrics: live (default) or test billing records.",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "live",
+                                "test"
+                            ]
+                        }
+                    },
+                    {
                         "name": "warehouse_id",
                         "in": "query",
                         "schema": {
@@ -112211,6 +112263,18 @@
                             "type": "string",
                             "minLength": 3,
                             "maxLength": 3
+                        }
+                    },
+                    {
+                        "name": "mode",
+                        "in": "query",
+                        "description": "Landlord money metrics: live (default) or test billing records.",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "live",
+                                "test"
+                            ]
                         }
                     },
                     {
@@ -112343,6 +112407,18 @@
                         }
                     },
                     {
+                        "name": "mode",
+                        "in": "query",
+                        "description": "Landlord money metrics: live (default) or test billing records.",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "live",
+                                "test"
+                            ]
+                        }
+                    },
+                    {
                         "name": "warehouse_id",
                         "in": "query",
                         "schema": {
@@ -112469,6 +112545,18 @@
                             "type": "string",
                             "minLength": 3,
                             "maxLength": 3
+                        }
+                    },
+                    {
+                        "name": "mode",
+                        "in": "query",
+                        "description": "Landlord money metrics: live (default) or test billing records.",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "live",
+                                "test"
+                            ]
                         }
                     },
                     {
@@ -112601,6 +112689,18 @@
                         }
                     },
                     {
+                        "name": "mode",
+                        "in": "query",
+                        "description": "Landlord money metrics: live (default) or test billing records.",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "live",
+                                "test"
+                            ]
+                        }
+                    },
+                    {
                         "name": "warehouse_id",
                         "in": "query",
                         "schema": {
@@ -112727,6 +112827,18 @@
                             "type": "string",
                             "minLength": 3,
                             "maxLength": 3
+                        }
+                    },
+                    {
+                        "name": "mode",
+                        "in": "query",
+                        "description": "Landlord money metrics: live (default) or test billing records.",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "live",
+                                "test"
+                            ]
                         }
                     },
                     {
@@ -112859,6 +112971,18 @@
                         }
                     },
                     {
+                        "name": "mode",
+                        "in": "query",
+                        "description": "Landlord money metrics: live (default) or test billing records.",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "live",
+                                "test"
+                            ]
+                        }
+                    },
+                    {
                         "name": "warehouse_id",
                         "in": "query",
                         "schema": {
@@ -112985,6 +113109,18 @@
                             "type": "string",
                             "minLength": 3,
                             "maxLength": 3
+                        }
+                    },
+                    {
+                        "name": "mode",
+                        "in": "query",
+                        "description": "Landlord money metrics: live (default) or test billing records.",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "live",
+                                "test"
+                            ]
                         }
                     },
                     {
@@ -113117,6 +113253,18 @@
                         }
                     },
                     {
+                        "name": "mode",
+                        "in": "query",
+                        "description": "Landlord money metrics: live (default) or test billing records.",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "live",
+                                "test"
+                            ]
+                        }
+                    },
+                    {
                         "name": "warehouse_id",
                         "in": "query",
                         "schema": {
@@ -113243,6 +113391,18 @@
                             "type": "string",
                             "minLength": 3,
                             "maxLength": 3
+                        }
+                    },
+                    {
+                        "name": "mode",
+                        "in": "query",
+                        "description": "Landlord money metrics: live (default) or test billing records.",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "live",
+                                "test"
+                            ]
                         }
                     },
                     {
@@ -113375,6 +113535,18 @@
                         }
                     },
                     {
+                        "name": "mode",
+                        "in": "query",
+                        "description": "Landlord money metrics: live (default) or test billing records.",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "live",
+                                "test"
+                            ]
+                        }
+                    },
+                    {
                         "name": "warehouse_id",
                         "in": "query",
                         "schema": {
@@ -113501,6 +113673,18 @@
                             "type": "string",
                             "minLength": 3,
                             "maxLength": 3
+                        }
+                    },
+                    {
+                        "name": "mode",
+                        "in": "query",
+                        "description": "Landlord money metrics: live (default) or test billing records.",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "live",
+                                "test"
+                            ]
                         }
                     },
                     {
@@ -113633,6 +113817,18 @@
                         }
                     },
                     {
+                        "name": "mode",
+                        "in": "query",
+                        "description": "Landlord money metrics: live (default) or test billing records.",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "live",
+                                "test"
+                            ]
+                        }
+                    },
+                    {
                         "name": "warehouse_id",
                         "in": "query",
                         "schema": {
@@ -113759,6 +113955,18 @@
                             "type": "string",
                             "minLength": 3,
                             "maxLength": 3
+                        }
+                    },
+                    {
+                        "name": "mode",
+                        "in": "query",
+                        "description": "Landlord money metrics: live (default) or test billing records.",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "live",
+                                "test"
+                            ]
                         }
                     },
                     {
@@ -113891,6 +114099,18 @@
                         }
                     },
                     {
+                        "name": "mode",
+                        "in": "query",
+                        "description": "Landlord money metrics: live (default) or test billing records.",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "live",
+                                "test"
+                            ]
+                        }
+                    },
+                    {
                         "name": "warehouse_id",
                         "in": "query",
                         "schema": {
@@ -114017,6 +114237,18 @@
                             "type": "string",
                             "minLength": 3,
                             "maxLength": 3
+                        }
+                    },
+                    {
+                        "name": "mode",
+                        "in": "query",
+                        "description": "Landlord money metrics: live (default) or test billing records.",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "live",
+                                "test"
+                            ]
                         }
                     },
                     {
@@ -114149,6 +114381,18 @@
                         }
                     },
                     {
+                        "name": "mode",
+                        "in": "query",
+                        "description": "Landlord money metrics: live (default) or test billing records.",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "live",
+                                "test"
+                            ]
+                        }
+                    },
+                    {
                         "name": "warehouse_id",
                         "in": "query",
                         "schema": {
@@ -114278,6 +114522,18 @@
                         }
                     },
                     {
+                        "name": "mode",
+                        "in": "query",
+                        "description": "Landlord money metrics: live (default) or test billing records.",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "live",
+                                "test"
+                            ]
+                        }
+                    },
+                    {
                         "name": "warehouse_id",
                         "in": "query",
                         "schema": {
@@ -114404,6 +114660,18 @@
                             "type": "string",
                             "minLength": 3,
                             "maxLength": 3
+                        }
+                    },
+                    {
+                        "name": "mode",
+                        "in": "query",
+                        "description": "Landlord money metrics: live (default) or test billing records.",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "live",
+                                "test"
+                            ]
                         }
                     },
                     {
