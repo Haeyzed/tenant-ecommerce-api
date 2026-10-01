@@ -53,6 +53,7 @@ final class AffiliatePayoutResource extends JsonResource
             'period_end' => $this->period_end->toDateString(),
             'status' => $this->status,
             'payout_method' => $this->payout_method,
+            /** @var array<string, string> The account the transfer goes to; billing admins only */
             'payout_details' => $this->when($this->withDetails, fn (): array => (array) $this->payout_details_snapshot),
             'external_reference' => $this->external_reference,
             'paid_at' => $this->paid_at?->toIso8601String(),

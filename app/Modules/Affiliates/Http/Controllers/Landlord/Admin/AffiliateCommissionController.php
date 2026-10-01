@@ -36,11 +36,12 @@ final class AffiliateCommissionController extends Controller
             'currency_code' => ['sometimes', 'string', 'size:3'],
             'affiliate_id' => ['sometimes', 'integer'],
             'eligible_only' => ['sometimes', 'boolean'],
+            'page' => ['sometimes', 'integer', 'min:1'],
             'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'],
         ]);
 
         $page = AffiliateCommission::query()
-            ->with('affiliate:id,name')
+            ->with(['affiliate:id,name', 'referral.tenant:id,name'])
             ->when($filters['status'] ?? null, static fn ($q, $v) => $q->where('status', $v))
             ->when($filters['type'] ?? null, static fn ($q, $v) => $q->where('type', $v))
             ->when($filters['currency_code'] ?? null, static fn ($q, $v) => $q->where('currency_code', strtoupper($v)))
@@ -54,7 +55,7 @@ final class AffiliateCommissionController extends Controller
 
     public function show(AffiliateCommission $commission): JsonResponse
     {
-        return APIResponse::success(new AffiliateCommissionResource($commission->load('affiliate:id,name')));
+        return APIResponse::success(new AffiliateCommissionResource($commission->load(['affiliate:id,name', 'referral.tenant:id,name'])));
     }
 
     public function approve(Request $request, AffiliateCommission $commission): JsonResponse

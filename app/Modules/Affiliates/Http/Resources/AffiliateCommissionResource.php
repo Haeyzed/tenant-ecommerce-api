@@ -36,6 +36,8 @@ final class AffiliateCommissionResource extends JsonResource
             ]),
             'affiliate_referral_id' => $this->affiliate_referral_id,
             'tenant_id' => $this->when(! $this->portal, $this->tenant_id),
+            /** @var string|null The referred store's name */
+            'tenant_name' => $this->when(! $this->portal && $this->relationLoaded('referral'), fn (): ?string => $this->referral?->tenant?->name),
             'payment_transaction_id' => $this->when(! $this->portal, $this->payment_transaction_id),
             'reverses_commission_id' => $this->reverses_commission_id,
             'base_amount' => (string) $this->base_amount,

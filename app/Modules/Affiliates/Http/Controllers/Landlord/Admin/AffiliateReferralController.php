@@ -23,6 +23,7 @@ final class AffiliateReferralController extends Controller
             'status' => ['sometimes', Rule::in(AffiliateReferral::STATUSES)],
             'requires_review' => ['sometimes', 'boolean'],
             'affiliate_id' => ['sometimes', 'integer'],
+            'page' => ['sometimes', 'integer', 'min:1'],
             'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'],
         ]);
 

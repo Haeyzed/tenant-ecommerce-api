@@ -51,6 +51,7 @@ final class AffiliateResource extends JsonResource
             'commission_rate' => $this->when(! $this->portal, fn (): ?string => $this->commission_rate !== null ? (string) $this->commission_rate : null),
             'effective_commission_rate' => $service->effectiveRate($this->resource),
             'promotion_methods' => $this->when(! $this->portal, $this->promotion_methods),
+            /** @var array{method: string|null, details: array<string, string>, updated_at: string|null} Account numbers show their last four digits only */
             'payout' => $service->maskedPayoutDetails($this->resource),
             'approved_at' => $this->approved_at?->toIso8601String(),
             'last_login_at' => $this->when(! $this->portal, fn (): ?string => $this->last_login_at?->toIso8601String()),

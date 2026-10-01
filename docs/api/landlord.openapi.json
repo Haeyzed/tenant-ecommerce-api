@@ -192,6 +192,14 @@
                         }
                     },
                     {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
                         "name": "per_page",
                         "in": "query",
                         "schema": {
@@ -362,8 +370,11 @@
                                                     "$ref": "#/components/schemas/AffiliateResource"
                                                 },
                                                 "referrals": {
-                                                    "type": "array",
-                                                    "items": {}
+                                                    "type": "object",
+                                                    "description": "Referral count per status",
+                                                    "additionalProperties": {
+                                                        "type": "integer"
+                                                    }
                                                 },
                                                 "balances": {
                                                     "type": "object",
@@ -1693,6 +1704,14 @@
                         }
                     },
                     {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
                         "name": "per_page",
                         "in": "query",
                         "schema": {
@@ -2261,6 +2280,14 @@
                         "schema": {
                             "type": "string",
                             "format": "date"
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
                         }
                     },
                     {
@@ -2893,6 +2920,14 @@
                         "in": "query",
                         "schema": {
                             "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
                         }
                     },
                     {
@@ -24374,6 +24409,13 @@
                     "tenant_id": {
                         "type": "string"
                     },
+                    "tenant_name": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "The referred store's name"
+                    },
                     "payment_transaction_id": {
                         "type": "integer"
                     },
@@ -24533,7 +24575,11 @@
                         "type": "string"
                     },
                     "payout_details": {
-                        "type": "string"
+                        "type": "object",
+                        "description": "The account the transfer goes to; billing admins only",
+                        "additionalProperties": {
+                            "type": "string"
+                        }
                     },
                     "external_reference": {
                         "type": [
@@ -24599,6 +24645,13 @@
                                 },
                                 "tenant_id": {
                                     "type": "string"
+                                },
+                                "tenant_name": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ],
+                                    "description": "The referred store's name"
                                 },
                                 "payment_transaction_id": {
                                     "type": "integer"
@@ -24775,7 +24828,26 @@
                         "type": "boolean"
                     },
                     "risk_flags": {
-                        "type": "string"
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "flag": {
+                                    "type": "string"
+                                },
+                                "detail": {
+                                    "type": "string"
+                                },
+                                "detected_at": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "flag",
+                                "detail",
+                                "detected_at"
+                            ]
+                        }
                     },
                     "attributed_at": {
                         "type": "string"
@@ -24890,7 +24962,33 @@
                         ]
                     },
                     "payout": {
-                        "type": "string"
+                        "type": "object",
+                        "description": "Account numbers show their last four digits only",
+                        "properties": {
+                            "method": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "details": {
+                                "type": "object",
+                                "additionalProperties": {
+                                    "type": "string"
+                                }
+                            },
+                            "updated_at": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            }
+                        },
+                        "required": [
+                            "method",
+                            "details",
+                            "updated_at"
+                        ]
                     },
                     "approved_at": {
                         "type": [

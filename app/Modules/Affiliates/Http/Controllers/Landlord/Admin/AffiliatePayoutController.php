@@ -40,6 +40,7 @@ final class AffiliatePayoutController extends Controller
             'currency_code' => ['sometimes', 'string', 'size:3'],
             'affiliate_id' => ['sometimes', 'integer'],
             'period_end' => ['sometimes', 'date_format:Y-m-d'],
+            'page' => ['sometimes', 'integer', 'min:1'],
             'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'],
         ]);
 

@@ -44,6 +44,7 @@ final class AffiliateReferralResource extends JsonResource
             'status' => $this->status,
             'ineligible_reason' => $this->ineligible_reason,
             'requires_review' => $this->when(! $this->portal, $this->requires_review),
+            /** @var list<array{flag: string, detail: string, detected_at: string}> */
             'risk_flags' => $this->when(! $this->portal, fn (): array => (array) $this->risk_flags),
             'attributed_at' => $this->attributed_at->toIso8601String(),
             'conversion_deadline' => $this->conversion_deadline?->toIso8601String(),

@@ -40,14 +40,15 @@ final class AffiliateController extends Controller
             'status' => ['sometimes', Rule::in(Affiliate::STATUSES)],
             'search' => ['sometimes', 'string', 'max:100'],
             'has_flags' => ['sometimes', 'boolean'],
+            'page' => ['sometimes', 'integer', 'min:1'],
             'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'],
         ]);
 
         $page = Affiliate::query()
             ->when($filters['status'] ?? null, static fn ($q, $v) => $q->where('status', $v))
             ->when($filters['search'] ?? null, static fn ($q, $v) => $q->where(static fn ($q) => $q
-                ->where('name', 'like', '%'.$v.'%')
-                ->orWhere('email', 'like', '%'.$v.'%')
+                ->where('name', 'like', '%'.addcslashes($v, '%_\\').'%')
+                ->orWhere('email', 'like', '%'.addcslashes($v, '%_\\').'%')
                 ->orWhere('referral_code', strtoupper($v))))
             ->when($request->boolean('has_flags'), static fn ($q) => $q->whereHas('referrals', static fn ($r) => $r
                 ->where('requires_review', true)->whereIn('status', [AffiliateReferral::REGISTERED, AffiliateReferral::CONVERTED])))
@@ -65,6 +66,7 @@ final class AffiliateController extends Controller
 
         return APIResponse::success([
             'affiliate' => new AffiliateResource($affiliate),
+            /** @var array<string, int> Referral count per status */
             'referrals' => array_merge(array_fill_keys(AffiliateReferral::STATUSES, 0), $referrals),
             'balances' => $commissions->balances($affiliate),
             'rapid_refund' => $fraud->hasRapidRefunds($affiliate->id),
