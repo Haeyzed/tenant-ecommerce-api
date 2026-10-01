@@ -22469,6 +22469,14 @@
                         }
                     },
                     {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
                         "name": "per_page",
                         "in": "query",
                         "schema": {
@@ -22780,28 +22788,15 @@
                                             "type": "object",
                                             "properties": {
                                                 "tenant": {
-                                                    "allOf": [
-                                                        {
-                                                            "$ref": "#/components/schemas/TenantResource"
-                                                        },
-                                                        {
-                                                            "type": "object",
-                                                            "required": [
-                                                                "domains"
-                                                            ]
-                                                        }
-                                                    ]
+                                                    "$ref": "#/components/schemas/TenantResource"
                                                 },
                                                 "subscription": {
-                                                    "allOf": [
+                                                    "anyOf": [
                                                         {
                                                             "$ref": "#/components/schemas/SubscriptionResource"
                                                         },
                                                         {
-                                                            "type": "object",
-                                                            "required": [
-                                                                "plan"
-                                                            ]
+                                                            "type": "null"
                                                         }
                                                     ]
                                                 },
@@ -22841,59 +22836,44 @@
                                                                 "type": "string"
                                                             },
                                                             "read_when_inactive": {
-                                                                "type": "string"
+                                                                "type": "boolean"
                                                             },
                                                             "requires": {
-                                                                "type": "string"
+                                                                "type": "array",
+                                                                "items": {
+                                                                    "type": "string"
+                                                                }
                                                             },
                                                             "dependents": {
                                                                 "type": "array",
-                                                                "items": {}
+                                                                "items": {
+                                                                    "type": "string"
+                                                                }
                                                             },
                                                             "missing_requirements": {
                                                                 "type": "array",
-                                                                "items": {}
+                                                                "items": {
+                                                                    "type": "string"
+                                                                }
                                                             },
                                                             "inactive_periods": {
                                                                 "type": "array",
                                                                 "items": {
-                                                                    "anyOf": [
-                                                                        {
-                                                                            "type": "object",
-                                                                            "properties": {
-                                                                                "from": {
-                                                                                    "type": [
-                                                                                        "string",
-                                                                                        "null"
-                                                                                    ]
-                                                                                },
-                                                                                "to": {
-                                                                                    "type": [
-                                                                                        "string",
-                                                                                        "null"
-                                                                                    ]
-                                                                                }
-                                                                            },
-                                                                            "required": [
-                                                                                "from",
-                                                                                "to"
-                                                                            ]
+                                                                    "type": "object",
+                                                                    "properties": {
+                                                                        "from": {
+                                                                            "type": "string"
                                                                         },
-                                                                        {
-                                                                            "type": "object",
-                                                                            "properties": {
-                                                                                "from": {
-                                                                                    "type": "null"
-                                                                                },
-                                                                                "to": {
-                                                                                    "type": "null"
-                                                                                }
-                                                                            },
-                                                                            "required": [
-                                                                                "from",
-                                                                                "to"
+                                                                        "to": {
+                                                                            "type": [
+                                                                                "string",
+                                                                                "null"
                                                                             ]
                                                                         }
+                                                                    },
+                                                                    "required": [
+                                                                        "from",
+                                                                        "to"
                                                                     ]
                                                                 }
                                                             }
@@ -22918,14 +22898,35 @@
                                                 },
                                                 "usage": {
                                                     "type": [
-                                                        "array",
+                                                        "object",
                                                         "null"
                                                     ],
-                                                    "items": {
-                                                        "type": "string"
-                                                    },
-                                                    "minItems": 0,
-                                                    "maxItems": 0
+                                                    "description": "Usage and limit per count and storage key; null before provisioning.",
+                                                    "additionalProperties": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "used": {
+                                                                "type": [
+                                                                    "integer",
+                                                                    "null"
+                                                                ]
+                                                            },
+                                                            "limit": {
+                                                                "type": [
+                                                                    "integer",
+                                                                    "null"
+                                                                ]
+                                                            },
+                                                            "label": {
+                                                                "type": "string"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "used",
+                                                            "limit",
+                                                            "label"
+                                                        ]
+                                                    }
                                                 }
                                             },
                                             "required": [
@@ -23371,59 +23372,44 @@
                                                         "type": "string"
                                                     },
                                                     "read_when_inactive": {
-                                                        "type": "string"
+                                                        "type": "boolean"
                                                     },
                                                     "requires": {
-                                                        "type": "string"
+                                                        "type": "array",
+                                                        "items": {
+                                                            "type": "string"
+                                                        }
                                                     },
                                                     "dependents": {
                                                         "type": "array",
-                                                        "items": {}
+                                                        "items": {
+                                                            "type": "string"
+                                                        }
                                                     },
                                                     "missing_requirements": {
                                                         "type": "array",
-                                                        "items": {}
+                                                        "items": {
+                                                            "type": "string"
+                                                        }
                                                     },
                                                     "inactive_periods": {
                                                         "type": "array",
                                                         "items": {
-                                                            "anyOf": [
-                                                                {
-                                                                    "type": "object",
-                                                                    "properties": {
-                                                                        "from": {
-                                                                            "type": [
-                                                                                "string",
-                                                                                "null"
-                                                                            ]
-                                                                        },
-                                                                        "to": {
-                                                                            "type": [
-                                                                                "string",
-                                                                                "null"
-                                                                            ]
-                                                                        }
-                                                                    },
-                                                                    "required": [
-                                                                        "from",
-                                                                        "to"
-                                                                    ]
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "from": {
+                                                                    "type": "string"
                                                                 },
-                                                                {
-                                                                    "type": "object",
-                                                                    "properties": {
-                                                                        "from": {
-                                                                            "type": "null"
-                                                                        },
-                                                                        "to": {
-                                                                            "type": "null"
-                                                                        }
-                                                                    },
-                                                                    "required": [
-                                                                        "from",
-                                                                        "to"
+                                                                "to": {
+                                                                    "type": [
+                                                                        "string",
+                                                                        "null"
                                                                     ]
                                                                 }
+                                                            },
+                                                            "required": [
+                                                                "from",
+                                                                "to"
                                                             ]
                                                         }
                                                     }
@@ -23656,6 +23642,26 @@
                         }
                     }
                 ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "values": {
+                                        "type": "object",
+                                        "description": "Setting key to value, e.g. {\"commission_rate\": \"2.5\"}; null resets to the platform default.",
+                                        "additionalProperties": {}
+                                    }
+                                },
+                                "required": [
+                                    "values"
+                                ]
+                            }
+                        }
+                    }
+                },
                 "responses": {
                     "200": {
                         "description": "",
@@ -23708,6 +23714,9 @@
                                 }
                             }
                         }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
                     },
                     "404": {
                         "$ref": "#/components/responses/ModelNotFoundException"

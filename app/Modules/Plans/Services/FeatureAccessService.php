@@ -126,13 +126,18 @@ final class FeatureAccessService
                 'source' => $resolved['sources'][$key],
                 'activation' => $rows->get($key)?->status,
                 'activation_mode' => $definition->activation,
+                /** @var bool */
                 'read_when_inactive' => $definition->readWhenInactive,
+                /** @var list<string> */
                 'requires' => $definition->requires,
+                /** @var list<string> */
                 'dependents' => $this->registry->dependents($key),
+                /** @var list<string> */
                 'missing_requirements' => array_values(array_filter(
                     $definition->requires,
                     static fn (string $required): bool => $resolved['states'][$required] !== ModuleState::Enabled->value,
                 )),
+                /** @var list<array{from: string, to: string|null}> */
                 'inactive_periods' => $this->inactivePeriods($tenant, $key),
             ];
         }

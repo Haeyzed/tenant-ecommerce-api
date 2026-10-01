@@ -42,6 +42,7 @@ final class TenantManagementController extends Controller
             'plan' => ['sometimes', 'string', 'max:120'],
             'country' => ['sometimes', 'integer'],
             'search' => ['sometimes', 'string', 'max:100'],
+            'page' => ['sometimes', 'integer', 'min:1'],
             'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'],
         ]);
 
@@ -53,9 +54,12 @@ final class TenantManagementController extends Controller
         $details = $this->tenants->getTenant($tenant);
 
         return APIResponse::success([
+            /** @var TenantResource */
             'tenant' => new TenantResource($details['tenant']),
+            /** @var SubscriptionResource|null */
             'subscription' => $details['subscription'] === null ? null : new SubscriptionResource($details['subscription']),
             'modules' => $details['modules'],
+            /** @var array<string, array{used: int|null, limit: int|null, label: string}>|null Usage and limit per count and storage key; null before provisioning. */
             'usage' => $details['usage'],
         ]);
     }

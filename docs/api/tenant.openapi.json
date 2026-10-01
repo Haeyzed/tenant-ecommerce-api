@@ -55803,59 +55803,44 @@
                                                         "type": "string"
                                                     },
                                                     "read_when_inactive": {
-                                                        "type": "string"
+                                                        "type": "boolean"
                                                     },
                                                     "requires": {
-                                                        "type": "string"
+                                                        "type": "array",
+                                                        "items": {
+                                                            "type": "string"
+                                                        }
                                                     },
                                                     "dependents": {
                                                         "type": "array",
-                                                        "items": {}
+                                                        "items": {
+                                                            "type": "string"
+                                                        }
                                                     },
                                                     "missing_requirements": {
                                                         "type": "array",
-                                                        "items": {}
+                                                        "items": {
+                                                            "type": "string"
+                                                        }
                                                     },
                                                     "inactive_periods": {
                                                         "type": "array",
                                                         "items": {
-                                                            "anyOf": [
-                                                                {
-                                                                    "type": "object",
-                                                                    "properties": {
-                                                                        "from": {
-                                                                            "type": [
-                                                                                "string",
-                                                                                "null"
-                                                                            ]
-                                                                        },
-                                                                        "to": {
-                                                                            "type": [
-                                                                                "string",
-                                                                                "null"
-                                                                            ]
-                                                                        }
-                                                                    },
-                                                                    "required": [
-                                                                        "from",
-                                                                        "to"
-                                                                    ]
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "from": {
+                                                                    "type": "string"
                                                                 },
-                                                                {
-                                                                    "type": "object",
-                                                                    "properties": {
-                                                                        "from": {
-                                                                            "type": "null"
-                                                                        },
-                                                                        "to": {
-                                                                            "type": "null"
-                                                                        }
-                                                                    },
-                                                                    "required": [
-                                                                        "from",
-                                                                        "to"
+                                                                "to": {
+                                                                    "type": [
+                                                                        "string",
+                                                                        "null"
                                                                     ]
                                                                 }
+                                                            },
+                                                            "required": [
+                                                                "from",
+                                                                "to"
                                                             ]
                                                         }
                                                     }
@@ -55968,59 +55953,44 @@
                                                     "type": "string"
                                                 },
                                                 "read_when_inactive": {
-                                                    "type": "string"
+                                                    "type": "boolean"
                                                 },
                                                 "requires": {
-                                                    "type": "string"
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    }
                                                 },
                                                 "dependents": {
                                                     "type": "array",
-                                                    "items": {}
+                                                    "items": {
+                                                        "type": "string"
+                                                    }
                                                 },
                                                 "missing_requirements": {
                                                     "type": "array",
-                                                    "items": {}
+                                                    "items": {
+                                                        "type": "string"
+                                                    }
                                                 },
                                                 "inactive_periods": {
                                                     "type": "array",
                                                     "items": {
-                                                        "anyOf": [
-                                                            {
-                                                                "type": "object",
-                                                                "properties": {
-                                                                    "from": {
-                                                                        "type": [
-                                                                            "string",
-                                                                            "null"
-                                                                        ]
-                                                                    },
-                                                                    "to": {
-                                                                        "type": [
-                                                                            "string",
-                                                                            "null"
-                                                                        ]
-                                                                    }
-                                                                },
-                                                                "required": [
-                                                                    "from",
-                                                                    "to"
-                                                                ]
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "from": {
+                                                                "type": "string"
                                                             },
-                                                            {
-                                                                "type": "object",
-                                                                "properties": {
-                                                                    "from": {
-                                                                        "type": "null"
-                                                                    },
-                                                                    "to": {
-                                                                        "type": "null"
-                                                                    }
-                                                                },
-                                                                "required": [
-                                                                    "from",
-                                                                    "to"
+                                                            "to": {
+                                                                "type": [
+                                                                    "string",
+                                                                    "null"
                                                                 ]
                                                             }
+                                                        },
+                                                        "required": [
+                                                            "from",
+                                                            "to"
                                                         ]
                                                     }
                                                 }
@@ -56132,59 +56102,44 @@
                                                     "type": "string"
                                                 },
                                                 "read_when_inactive": {
-                                                    "type": "string"
+                                                    "type": "boolean"
                                                 },
                                                 "requires": {
-                                                    "type": "string"
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    }
                                                 },
                                                 "dependents": {
                                                     "type": "array",
-                                                    "items": {}
+                                                    "items": {
+                                                        "type": "string"
+                                                    }
                                                 },
                                                 "missing_requirements": {
                                                     "type": "array",
-                                                    "items": {}
+                                                    "items": {
+                                                        "type": "string"
+                                                    }
                                                 },
                                                 "inactive_periods": {
                                                     "type": "array",
                                                     "items": {
-                                                        "anyOf": [
-                                                            {
-                                                                "type": "object",
-                                                                "properties": {
-                                                                    "from": {
-                                                                        "type": [
-                                                                            "string",
-                                                                            "null"
-                                                                        ]
-                                                                    },
-                                                                    "to": {
-                                                                        "type": [
-                                                                            "string",
-                                                                            "null"
-                                                                        ]
-                                                                    }
-                                                                },
-                                                                "required": [
-                                                                    "from",
-                                                                    "to"
-                                                                ]
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "from": {
+                                                                "type": "string"
                                                             },
-                                                            {
-                                                                "type": "object",
-                                                                "properties": {
-                                                                    "from": {
-                                                                        "type": "null"
-                                                                    },
-                                                                    "to": {
-                                                                        "type": "null"
-                                                                    }
-                                                                },
-                                                                "required": [
-                                                                    "from",
-                                                                    "to"
+                                                            "to": {
+                                                                "type": [
+                                                                    "string",
+                                                                    "null"
                                                                 ]
                                                             }
+                                                        },
+                                                        "required": [
+                                                            "from",
+                                                            "to"
                                                         ]
                                                     }
                                                 }

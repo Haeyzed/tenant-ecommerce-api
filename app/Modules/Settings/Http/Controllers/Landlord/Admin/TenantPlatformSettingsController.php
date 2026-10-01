@@ -25,7 +25,16 @@ final class TenantPlatformSettingsController extends Controller
 
     public function update(Request $request, Tenant $tenant): JsonResponse
     {
-        $this->settings->update($tenant, (array) $request->input('values', $request->all()));
+        $validated = $request->validate([
+            /**
+             * Setting key to value, e.g. {"commission_rate": "2.5"}; null resets to the platform default.
+             *
+             * @var array<string, mixed>
+             */
+            'values' => ['required', 'array', 'min:1'],
+        ]);
+
+        $this->settings->update($tenant, (array) $validated['values']);
 
         return APIResponse::success($this->present($tenant), 'Tenant settings updated');
     }

@@ -92,3 +92,21 @@ it('never lets an unauthorised caller reach the edge endpoint', function (): voi
 
     $this->landlordJson('GET', '/api/internal/domains/allowed?domain=shop.example.com', [], ['X-Edge-Secret' => 'edge-secret'])->assertOk();
 });
+
+it('overrides and resets a tenant commission rate', function (): void {
+    $this->landlordJson('GET', '/api/admin/tenants/test-tenant-a/settings', [], $this->auth)
+        ->assertOk()->assertJsonPath('data.values.commission_rate', null);
+
+    $this->landlordJson('PATCH', '/api/admin/tenants/test-tenant-a/settings', ['values' => ['commission_rate' => '2.5']], $this->auth)
+        ->assertOk()->assertJsonPath('data.values.commission_rate', '2.5');
+
+    $this->landlordJson('PATCH', '/api/admin/tenants/test-tenant-a/settings', ['values' => ['commission_rate' => 150]], $this->auth)
+        ->assertStatus(422)->assertJsonValidationErrors('commission_rate');
+    $this->landlordJson('PATCH', '/api/admin/tenants/test-tenant-a/settings', ['values' => ['colour' => 'red']], $this->auth)
+        ->assertStatus(422)->assertJsonValidationErrors('colour');
+    $this->landlordJson('PATCH', '/api/admin/tenants/test-tenant-a/settings', ['commission_rate' => '2'], $this->auth)
+        ->assertStatus(422)->assertJsonValidationErrors('values');
+
+    $this->landlordJson('PATCH', '/api/admin/tenants/test-tenant-a/settings', ['values' => ['commission_rate' => null]], $this->auth)
+        ->assertOk()->assertJsonPath('data.values.commission_rate', null);
+});
