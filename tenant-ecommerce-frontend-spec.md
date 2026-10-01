@@ -1731,12 +1731,12 @@ The backend queues imports, exports, tenant exports, tenant provisioning, paymen
 | `tenant-admin` templates | `/settings/notifications`: templates (`GET`, `PATCH`, reset) and the channel matrix | n/a |
 | `storefront` `/account/notifications` | `GET /api/notifications`, `POST /api/notifications/{id}/read` | `GET`, `PATCH /api/notification-preferences`, `POST …/reset` |
 | `affiliate-portal` | `GET /api/affiliate/notifications`, `POST …/{id}/read` | none |
-| `platform-admin` | **None** (BG-08). Platform users get email only. | Notification templates and matrix (`/notification-templates`, `/notifications/matrix`) |
+| `platform-admin` bell | `GET /api/admin/notifications`, `POST …/{id}/read`, `POST …/read-all` (BG-08, BG-09) | none; templates and the channel matrix are at `/notifications` (messages and channels tabs) |
 
 Behaviour:
 
 - **Polling.** The bell fetches the first page every 60 seconds while the tab is visible, and shows `meta.unread_count` (capped at "99+").
-- **Mark all read** is not offered until BG-09 ships.
+- **Mark all read** uses `POST …/notifications/read-all` (BG-09, resolved). It is optimistic and sets the count to zero.
 - **Reading.** Clicking a notification marks it read (optimistic) and navigates to the resource referenced in `data` when there is one, for example `import_url` or an export id. Platform-sourced notices show a "Platform" badge.
 - **Mandatory templates.** A preference `PATCH` on a mandatory template returns 422, and the UI renders those rows locked.
 - **No toasts for polled notifications.** The badge is the signal.
@@ -2038,6 +2038,7 @@ Platform-user roles are assigned from lookups. The landlord API has no role CRUD
 | Plans (list, new, editor with details, prices, features, limits) | Built | `plans.spec.ts`, `console.mobile.spec.ts` |
 | Subscriptions (list, detail, extend trial), Transactions (list, detail, refund), Commissions (list, waive), Coupons (list, new, edit, detail with usage and redemptions) | Built | `billing.spec.ts`, `console.mobile.spec.ts`, `coupons/api.test.ts`, `payment-transactions/api.test.ts` |
 | Tenants (list, detail with overview, subscription, modules, limits and settings tabs, lifecycle actions), Database servers | Built | `tenants.spec.ts`, `console.mobile.spec.ts`, `tenants/api.test.ts` |
+| Legal documents (list, new version, draft edit, detail with publish and acceptances), Platform users (list, invite, edit with roles, deactivate), Notifications (messages and channels tabs), header notification bell | Built | `administration.spec.ts`, `console.mobile.spec.ts`, `notifications/api.test.ts`, `inbox/api.test.ts` |
 | Every other §25.1 entry | Not built yet | — |
 
 **Payment gateways, as built:**
@@ -2084,6 +2085,15 @@ Platform-user roles are assigned from lookups. The landlord API has no role CRUD
 - **Contract.** `tenant`, `subscription`, `usage` and the module fields of `GET /api/admin/tenants/{tenant}` are typed precisely through `@var` annotations; the tenants list documents `page`.
 
 **Database servers, as built:** a table with capacity bars, **Add server** (the password is write-only) and **Edit** for capacity and "accept new stores". With no row, the platform runs in single-server mode (every store on the main connection), which the empty state says. Once a server is registered, new stores only go to registered servers, so the page warns when none can take a new store, because sign-ups then fail with `no_database_capacity`.
+
+**Administration, as built (slice 5):**
+
+- **Legal documents.** Routes `/legal-documents`, `/legal-documents/new` (`?type=` preselects the document), `/legal-documents/[document]` and `…/edit`. Published versions are read-only (`legal_document_immutable`): the detail offers **New version** instead, and the edit route explains why. **Publish** is a separate permission from editing (`landlord.legal.publish`; content editors draft, super-admins publish) and its confirmation says when stores must accept again. The detail's **Acceptances** tab lists who accepted, when and in what context. `GET /api/admin/legal-documents/{document}` was added for the detail.
+- **Platform users.** Search, role and status filters. Invite needs at least one role. Edit changes name, email and roles; roles are applied as assign and revoke calls and the list refreshes even after a partial failure. `last_super_admin`, `cannot_deactivate_self` and `role_unknown` are explained. Roles come from the admin `platform-roles` lookup.
+- **Notifications, messages tab.** Every landlord template, filtered in the browser (search, audience, on/off/edited). The editor is a side sheet with subject, message, placeholder buttons that insert `{{name}}` at the cursor, the on/off switch (locked for required messages) and a live preview using the API's `[name]` samples. **Restore default** is offered for edited messages.
+- **Unknown placeholders are refused.** The backend now rejects a subject or body with a placeholder that the template doesn't offer (422 on the field). It used to save it and send the raw braces. The template's `variables` now include the scope-wide ones (`platform_name`, and `store_name` in a tenant).
+- **Notifications, channels tab.** A switch per channel (email, in-app, SMS, WhatsApp, push), saved optimistically and rolled back on error. A required message's last channel can't be switched off. The audience is changed in a dialog. The page notes that a channel only delivers when it is set up and the recipient has an address for it.
+- **Header bell (BG-08, BG-09).** A shared `NotificationBell` (`@workspace/admin-kit/shell`) with the unread count (capped at 99+), the latest 20 messages, and **Mark all read**, both optimistic. platform-admin polls every 60 seconds while visible. A notice links to its screen only when that screen exists. Exports, affiliates and helpdesk conversations are linked when slices 6, 7 and 9 add them. The inbox route now validates `page`, `per_page` (1–100) and `unread`, and types `subject`, `body`, `data` and `source`. `meta.unread_count` is outside the generated contract and is read with a runtime check.
 
 **Shared conventions from these slices:**
 
