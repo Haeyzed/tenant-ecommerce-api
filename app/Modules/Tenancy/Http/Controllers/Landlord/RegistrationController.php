@@ -62,6 +62,8 @@ final class RegistrationController extends Controller
             'registration_status' => $registration->status,
             'tenant_status' => $tenant?->status->value,
             'domain' => $tenant?->primaryDomain()?->domain,
+            /** @var list<array{provider: 'flutterwave'|'paystack'|'stripe', label: string}> Gateways for the first payment while awaiting it (BG-19); empty otherwise. */
+            'available_gateways' => $this->registrations->availableGateways($registration),
         ]);
     }
 

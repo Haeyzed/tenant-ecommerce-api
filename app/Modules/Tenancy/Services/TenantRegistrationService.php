@@ -7,6 +7,7 @@ namespace App\Modules\Tenancy\Services;
 use App\Modules\Affiliates\Services\AffiliateAttributionService;
 use App\Modules\Billing\Enums\SubscriptionStatus;
 use App\Modules\Billing\Models\PlatformCoupon;
+use App\Modules\Billing\Models\PlatformPaymentGateway;
 use App\Modules\Billing\Models\Subscription;
 use App\Modules\Billing\Services\PlatformCouponService;
 use App\Modules\Billing\Services\PlatformPaymentGatewayService;
@@ -281,6 +282,36 @@ final readonly class TenantRegistrationService
             'next_action' => $tenant->status === TenantStatus::AwaitingPayment ? 'payment' : 'none',
             'checkout_url' => $checkoutUrl,
         ];
+    }
+
+    /**
+     * The gateways that can take a new store's first payment (BG-19): those
+     * enabled in the current billing mode for its currency and country,
+     * default first. Empty unless the store is awaiting payment.
+     *
+     * @return list<array{provider: string, label: string}>
+     */
+    public function availableGateways(TenantRegistration $registration): array
+    {
+        $tenant = $registration->tenant;
+
+        if ($tenant === null || $tenant->status !== TenantStatus::AwaitingPayment) {
+            return [];
+        }
+
+        $subscription = $this->subscriptions->getCurrentSubscription($tenant);
+
+        if ($subscription === null) {
+            return [];
+        }
+
+        return $this->gateways->availableFor($tenant, $subscription->currency_code)
+            ->map(static fn (PlatformPaymentGateway $gateway): array => [
+                'provider' => $gateway->provider,
+                'label' => ucfirst($gateway->provider),
+            ])
+            ->values()
+            ->all();
     }
 
     /**

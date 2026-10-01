@@ -142,6 +142,12 @@ it('asks for payment when the price has no trial', function (): void {
         ->assertJsonPath('data.tenant_status', 'awaiting_payment')
         ->assertJsonPath('data.next_action', 'payment')
         ->assertJsonPath('data.checkout_url', 'https://checkout.paystack.test/reg');
+
+    // BG-19: the payment step offers only gateways that can take this payment.
+    $this->landlordJson('GET', "/api/register/{$id}/status")
+        ->assertOk()
+        ->assertJsonPath('data.available_gateways.0.provider', 'paystack')
+        ->assertJsonPath('data.available_gateways.0.label', 'Paystack');
 });
 
 it('closes tenants that never paid, releasing nothing but landlord rows', function (): void {
