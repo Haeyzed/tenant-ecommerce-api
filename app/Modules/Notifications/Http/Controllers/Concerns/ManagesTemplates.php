@@ -73,7 +73,9 @@ trait ManagesTemplates
             'is_active' => $template->is_active,
             'is_mandatory' => $template->is_mandatory,
             'is_customized' => $template->is_customized,
+            /** @var array<string, bool> Channel to on/off */
             'channels' => $template->channelMatrix(),
+            /** @var list<string> Placeholders the subject and body may use */
             'variables' => $variables,
             'preview' => $templates->renderContent($template->key, $template->subject, $template->body, $samples),
         ];

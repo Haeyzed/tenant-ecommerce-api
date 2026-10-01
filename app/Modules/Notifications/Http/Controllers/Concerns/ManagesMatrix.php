@@ -24,6 +24,7 @@ trait ManagesMatrix
     public function update(Request $request, string $templateKey, NotificationMatrixService $matrix): JsonResponse
     {
         $validated = $request->validate([
+            /** @var array<string, bool> Channel to on/off, e.g. {"email": true, "sms": false} */
             'channels' => ['sometimes', 'array'],
             'audience' => ['sometimes', 'array', 'min:1'],
         ]);

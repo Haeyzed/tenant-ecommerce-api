@@ -15,10 +15,15 @@ final class LegalAcceptanceController extends Controller
 {
     public function index(Request $request, LegalDocument $document): JsonResponse
     {
+        $filters = $request->validate([
+            'page' => ['sometimes', 'integer', 'min:1'],
+            'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'],
+        ]);
+
         $page = LegalAcceptance::query()
             ->where('legal_document_id', $document->id)
             ->orderByDesc('id')
-            ->paginate(min(100, max(1, $request->integer('per_page', 25))))
+            ->paginate((int) ($filters['per_page'] ?? 25))
             ->through(static fn (LegalAcceptance $a): array => [
                 'id' => $a->id,
                 'tenant_id' => $a->tenant_id,

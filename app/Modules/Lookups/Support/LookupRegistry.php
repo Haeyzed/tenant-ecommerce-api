@@ -16,6 +16,7 @@ use App\Modules\Catalog\Models\ProductOption;
 use App\Modules\Dashboard\Services\Tenant\TenantDashboardService;
 use App\Modules\Hr\Models\HrEmployee;
 use App\Modules\Inventory\Models\InventoryMovement;
+use App\Modules\Legal\Models\LegalDocument;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Payments\Models\OrderPayment;
 use App\Modules\Plans\Models\Plan;
@@ -169,6 +170,17 @@ final readonly class LookupRegistry
                 ),
                 'display-formats' => $displayFormats,
                 'dashboard-ranges' => $dashboardRanges,
+                // Platform-user roles to assign (spec §25.1); the landlord has no role CRUD.
+                'platform-roles' => static fn (): array => DB::connection('landlord')->table('roles')
+                    ->where('guard_name', 'platform')
+                    ->orderBy('name')
+                    ->pluck('name')
+                    ->map(static fn (string $name): array => ['value' => $name, 'label' => ucwords(str_replace('-', ' ', $name))])
+                    ->all(),
+                'legal-document-types' => static fn (): array => array_map(
+                    static fn (string $type): array => ['value' => $type, 'label' => ucwords(str_replace('_', ' ', $type))],
+                    LegalDocument::TYPES,
+                ),
             ],
 
             self::TENANT_PUBLIC => $world + [

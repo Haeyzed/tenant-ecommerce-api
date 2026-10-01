@@ -21,6 +21,8 @@ final class LegalDocumentController extends Controller
         $filters = $request->validate([
             'document_type' => ['sometimes', 'string'],
             'status' => ['sometimes', 'in:draft,published,retired'],
+            'page' => ['sometimes', 'integer', 'min:1'],
+            'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'],
         ]);
 
         return APIResponse::success(LegalDocumentResource::collection(LegalDocument::query()
@@ -28,7 +30,7 @@ final class LegalDocumentController extends Controller
             ->when($filters['status'] ?? null, static fn ($q, $v) => $q->where('status', $v))
             ->orderBy('document_type')
             ->orderByDesc('id')
-            ->paginate(min(100, max(1, $request->integer('per_page', 25))))));
+            ->paginate((int) ($filters['per_page'] ?? 25))));
     }
 
     public function store(Request $request): JsonResponse

@@ -24,6 +24,8 @@ final class PlatformUserController extends Controller
             'search' => ['sometimes', 'string', 'max:100'],
             'is_active' => ['sometimes', 'boolean'],
             'role' => ['sometimes', 'string', 'max:64'],
+            'page' => ['sometimes', 'integer', 'min:1'],
+            'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'],
         ]);
 
         $page = PlatformUser::query()
@@ -35,7 +37,7 @@ final class PlatformUserController extends Controller
             ->when(array_key_exists('is_active', $filters), static fn ($q) => $q->where('is_active', $request->boolean('is_active')))
             ->when($filters['role'] ?? null, static fn ($q, $v) => $q->withPlatformRole($v))
             ->orderBy('name')
-            ->paginate(min(100, max(1, $request->integer('per_page', 25))))
+            ->paginate((int) ($filters['per_page'] ?? 25))
             ->through(fn (PlatformUser $u): array => $this->present($u));
 
         return APIResponse::success($page);
@@ -80,6 +82,7 @@ final class PlatformUserController extends Controller
             'is_active' => $user->is_active,
             'email_verified_at' => $user->email_verified_at?->toIso8601String(),
             'has_password' => $user->password !== null,
+            /** @var list<string> */
             'roles' => $user->getRoleNames()->values()->all(),
             'last_login_at' => $user->last_login_at?->toIso8601String(),
             'created_at' => $user->created_at?->toIso8601String(),

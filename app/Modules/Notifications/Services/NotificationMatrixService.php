@@ -34,6 +34,7 @@ final class NotificationMatrixService
                     'is_mandatory' => $template->is_mandatory,
                     'is_active' => $template->is_active,
                     'target_audience' => $template->target_audience,
+                    /** @var array<string, bool> */
                     'channels' => array_merge(array_fill_keys(NotificationChannel::values(), false), $matrix),
                 ];
             })

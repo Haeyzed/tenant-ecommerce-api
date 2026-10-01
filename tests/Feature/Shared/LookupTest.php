@@ -30,6 +30,11 @@ it('serves landlord admin lookups to any platform user without a permission', fu
 
     $this->landlordJson('GET', '/api/admin/lookups/limit-keys', [], $auth)->assertOk()->assertJsonFragment(['value' => 'max_users']);
     $this->landlordJson('GET', '/api/admin/lookups/tenant-statuses', [], $auth)->assertOk()->assertJsonCount(7, 'data');
+    $this->landlordJson('GET', '/api/admin/lookups/platform-roles', [], $auth)->assertOk()
+        ->assertJsonFragment(['value' => 'super-admin', 'label' => 'Super Admin'])
+        ->assertJsonFragment(['value' => 'content-editor', 'label' => 'Content Editor']);
+    $this->landlordJson('GET', '/api/admin/lookups/legal-document-types', [], $auth)->assertOk()
+        ->assertJsonFragment(['value' => 'terms_of_service', 'label' => 'Terms Of Service']);
     $this->landlordJson('GET', '/api/admin/lookups/limit-keys')->assertUnauthorized();
 });
 

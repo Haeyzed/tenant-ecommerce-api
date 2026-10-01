@@ -2037,6 +2037,7 @@ Platform-user roles are assigned from lookups. The landlord API has no role CRUD
 | Payment gateways | Built | `payment-gateways.spec.ts`, `console.mobile.spec.ts`, `payment-gateways/api.test.ts` |
 | Plans (list, new, editor with details, prices, features, limits) | Built | `plans.spec.ts`, `console.mobile.spec.ts` |
 | Subscriptions (list, detail, extend trial), Transactions (list, detail, refund), Commissions (list, waive), Coupons (list, new, edit, detail with usage and redemptions) | Built | `billing.spec.ts`, `console.mobile.spec.ts`, `coupons/api.test.ts`, `payment-transactions/api.test.ts` |
+| Tenants (list, detail with overview, subscription, modules, limits and settings tabs, lifecycle actions), Database servers | Built | `tenants.spec.ts`, `console.mobile.spec.ts`, `tenants/api.test.ts` |
 | Every other §25.1 entry | Not built yet | — |
 
 **Payment gateways, as built:**
@@ -2070,6 +2071,19 @@ Platform-user roles are assigned from lookups. The landlord API has no role CRUD
 - **Commission waive.** Pending commissions only, with a required reason.
 - **Coupons.** The form covers every rule of `PlatformCouponService::validateDefinition`. Once redeemed, type, value, currency and duration are disabled (`coupon_redeemed`). The form edits plan targets and keeps any plan-price targets unchanged. The coupon code can't change after creation.
 - **Test data.** `billing.spec.ts` never refunds (that would call the gateway) or extends a real trial; its only write is to the coupon `E2E-COUPON`, created once and reused.
+
+**Tenants, as built (slice 4):**
+
+- **List.** Search (name, email or slug), status, plan and country filters, and the `tenants/metrics` KPI strip.
+- **Lifecycle.** The detail header offers only what the status allows (`allowedActions` mirrors `TenantManagementService`): suspend (optional reason), reactivate, close (required reason; data kept until `purge_after`), restore and export (provisioned stores only). Each is confirmed; `invalid_transition`, `tenant_never_provisioned` and `tenant_not_exportable` are explained.
+- **Overview.** Profile, domains, and usage against limits as progress bars (amber from 90%, red when over). Suspended, closed and provisioning-failed states are explained at the top, closed with its purge date.
+- **Subscription.** The governing subscription, with links to it, its payments and its commissions.
+- **Modules.** Every module with its state (enabled, available, turned off, read-only, suspended, not in plan) and source (plan, override). Overrides grant, revoke or suspend a module, optionally as a billed monthly add-on and with an end date.
+- **Limits.** Each limit with usage, the effective value and any override. Overrides can be unlimited where allowed, billed, and time-limited.
+- **Settings.** The store's commission rate; empty uses the platform default. `PATCH /api/admin/tenants/{tenant}/settings` now validates `{values: {...}}` (previously undocumented).
+- **Contract.** `tenant`, `subscription`, `usage` and the module fields of `GET /api/admin/tenants/{tenant}` are typed precisely through `@var` annotations; the tenants list documents `page`.
+
+**Database servers, as built:** a table with capacity bars, **Add server** (the password is write-only) and **Edit** for capacity and "accept new stores". With no row, the platform runs in single-server mode (every store on the main connection), which the empty state says. Once a server is registered, new stores only go to registered servers, so the page warns when none can take a new store, because sign-ups then fail with `no_database_capacity`.
 
 **Shared conventions from these slices:**
 
