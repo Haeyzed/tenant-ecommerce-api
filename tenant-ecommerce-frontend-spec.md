@@ -2036,6 +2036,7 @@ Platform-user roles are assigned from lookups. The landlord API has no role CRUD
 | Dashboard, Settings, Registrations | Built | Browser QA; `console.mobile.spec.ts` |
 | Payment gateways | Built | `payment-gateways.spec.ts`, `console.mobile.spec.ts`, `payment-gateways/api.test.ts` |
 | Plans (list, new, editor with details, prices, features, limits) | Built | `plans.spec.ts`, `console.mobile.spec.ts` |
+| Subscriptions (list, detail, extend trial), Transactions (list, detail, refund), Commissions (list, waive), Coupons (list, new, edit, detail with usage and redemptions) | Built | `billing.spec.ts`, `console.mobile.spec.ts`, `coupons/api.test.ts`, `payment-transactions/api.test.ts` |
 | Every other §25.1 entry | Not built yet | — |
 
 **Payment gateways, as built:**
@@ -2058,6 +2059,17 @@ Platform-user roles are assigned from lookups. The landlord API has no role CRUD
 - **Limits.** Every registered limit, with **Unlimited** where `unlimited_allowed`, saved as one request per changed key.
 - **Contract types.** `PlanResource.limits` (a key→value map), `resolved_trial_days` and `limit_value` (integers) are typed through `@var` annotations and an explicit cast in the backend. An earlier "Scramble ignores @var" note was wrong: the pull was copying a stale document (see §13.3).
 - **Test data.** Writes in `plans.spec.ts` go to one dedicated, inactive, hidden plan (slug `e2e-test-plan`, order 9999), created once and reused, because the API has no plan delete. Feature and limit changes are reverted in the same test.
+
+**Billing screens, as built (slice 3):**
+
+- **Tenant names.** Lists and details show the tenant's name and slug, not its id (BG-20). Every list can be filtered by tenant through a search-as-you-type picker over `/admin/tenants?search=`; only the id is kept in the URL.
+- **KPI strips.** Subscriptions, transactions and coupons show their `…/metrics` KPIs above the list. Money figures follow the list's live/test filter, defaulting to live, and a caption says which billing they cover.
+- **Test records.** Test subscriptions and transactions carry a "Test" badge everywhere.
+- **Trial extension.** Offered for a trialing subscription, or a past-due one with a trial (the backend makes the final call: `invalid_transition` is explained). Days (1–365) and a reason are required; the dialog previews the new end date.
+- **Refunds.** Offered when `refundable_amount` is positive (BG-20). The dialog pre-fills it, allows a partial amount, and sends a full refund without an amount, so the backend refunds exactly what is left. The `Idempotency-Key` is created when the dialog opens and reused on retry. `refund_exceeds_payment` shows the amount left.
+- **Commission waive.** Pending commissions only, with a required reason.
+- **Coupons.** The form covers every rule of `PlatformCouponService::validateDefinition`. Once redeemed, type, value, currency and duration are disabled (`coupon_redeemed`). The form edits plan targets and keeps any plan-price targets unchanged. The coupon code can't change after creation.
+- **Test data.** `billing.spec.ts` never refunds (that would call the gateway) or extends a real trial; its only write is to the coupon `E2E-COUPON`, created once and reused.
 
 **Shared conventions from these slices:**
 
@@ -3226,6 +3238,7 @@ Resolved gaps keep their section and number, with a **Status** row, so reference
 | **Reason** | Scramble documents the validated filters and `per_page` but not the paginator's `page`, which Laravel reads directly from the request. The frontend passes `page` through a cast. |
 | **Required change** | Document `page` (integer, min 1) on every operation whose response has `meta.pagination` with `current_page`, for example in the `ApiResponseTypeExtension` document pass. |
 | **Priority** | P3 |
+| **Status** | **Resolved per screen.** Each list endpoint a screen uses validates `page` (and `per_page`), so Scramble documents both: tenant registrations, subscriptions, payment transactions, platform commissions, platform coupons and coupon redemptions so far. Remaining list endpoints get the rule as their screens are built. |
 
 ### BG-18: Platform Setting Constraints
 
@@ -3237,6 +3250,17 @@ Resolved gaps keep their section and number, with a **Status** row, so reference
 | **Required change** | Each entry also returns `nullable`, `options`, `min` and `max`, parsed from its validation rules. The `values` body of the group update is documented as a map. |
 | **Priority** | P2 |
 | **Status** | **Resolved** in the backend (`PlatformSettingsService::group`, `PlatformSettingsConstraintsTest`). |
+
+### BG-20: Tenant Names and Refundable Amounts on Billing Records
+
+| | |
+|---|---|
+| **Found** | While building the platform-admin billing screens |
+| **Capability** | Show which store a subscription, transaction, commission or coupon redemption belongs to, and how much of a charge can still be refunded |
+| **Reason** | These resources returned only `tenant_id` (a UUID), and nothing said what was left to refund after partial refunds. |
+| **Required change** | Add `tenant {id, name, slug}` (eager-loaded) to the subscription, payment transaction and platform commission resources and `tenant_name` to coupon redemptions; add `refundable_amount` to the transaction detail (null unless the charge can be refunded). |
+| **Priority** | P2 |
+| **Status** | **Resolved** in the backend (`BillingRoutesTest` "names the tenant on billing lists…"). |
 
 ### BG-19: Public List of Enabled Payment Gateways
 
