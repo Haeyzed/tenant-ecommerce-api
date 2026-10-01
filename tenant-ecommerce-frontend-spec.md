@@ -2099,6 +2099,7 @@ Platform-user roles are assigned from lookups. The landlord API has no role CRUD
 
 - **Links styled as buttons** use `ButtonLink` (`@workspace/ui/components/button-link`), so they are announced as links. A Base UI `Button` rendering an anchor announces itself as a button. `PaginationLink` is a plain anchor for the same reason.
 - **After a mutation**, the response is written into the query cache and the refetch runs in the background (not awaited), so dialogs close at once.
+- **Dialogs are responsive.** Form and info dialogs use `ResponsiveDialog` (`@workspace/ui/components/responsive-dialog`). It is a centred dialog from 768 px up and a bottom drawer below, the same as `ConfirmDialog`. Its parts mirror the Dialog ones. In the drawer, the content scrolls, the footer stays at the bottom, and the primary action sits on top at full width. Side sheets (`Sheet`) open from the bottom on phones.
 - **Short static lists** use `StaticCombobox` or `MultiCombobox` from `@workspace/admin-kit/lookup`. API-backed records keep `EntityCombobox`.
 
 **platform-admin tests.** `pnpm --filter platform-admin test` runs vitest. `E2E_PASSWORD=… pnpm --filter platform-admin test:e2e` runs Playwright on one worker against the dev server. It signs in once and saves the session in the git-ignored `e2e/.auth/`. Desktop specs run at 1440 px, and every console page is checked at phone width for page errors and horizontal overflow.
