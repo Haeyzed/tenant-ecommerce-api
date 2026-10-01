@@ -143,6 +143,9 @@ it('asks for payment when the price has no trial', function (): void {
         ->assertJsonPath('data.next_action', 'payment')
         ->assertJsonPath('data.checkout_url', 'https://checkout.paystack.test/reg');
 
+    // The new store has no admin to sign in to yet, so checkout returns to the website's status page.
+    Http::assertSent(fn ($request): bool => str_contains((string) $request['callback_url'], "/signup/status?registration={$id}&reference="));
+
     // BG-19: the payment step offers only gateways that can take this payment.
     $this->landlordJson('GET', "/api/register/{$id}/status")
         ->assertOk()

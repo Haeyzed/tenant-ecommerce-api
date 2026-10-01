@@ -20893,12 +20893,37 @@
                                                         "string",
                                                         "null"
                                                     ]
+                                                },
+                                                "available_gateways": {
+                                                    "type": "array",
+                                                    "description": "Gateways for the first payment while awaiting it (BG-19); empty otherwise.",
+                                                    "items": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "provider": {
+                                                                "type": "string",
+                                                                "enum": [
+                                                                    "flutterwave",
+                                                                    "paystack",
+                                                                    "stripe"
+                                                                ]
+                                                            },
+                                                            "label": {
+                                                                "type": "string"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "provider",
+                                                            "label"
+                                                        ]
+                                                    }
                                                 }
                                             },
                                             "required": [
                                                 "registration_status",
                                                 "tenant_status",
-                                                "domain"
+                                                "domain",
+                                                "available_gateways"
                                             ]
                                         },
                                         "meta": {

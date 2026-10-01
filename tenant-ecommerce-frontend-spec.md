@@ -1973,8 +1973,9 @@ The site-wide layout (header, footer, menus) uses `GET /api/platform/config` and
 
 - **Admin URL.** The done link is built from `TENANT_ADMIN_URL`, a template with `{slug}` (§37.2). Locally it is `http://{slug}.admin.localhost:3001`.
 - **Email for the done link.** The owner's email is kept in `sessionStorage` for the tab, never the password. A different browser or tab gets the link without `?email=`.
-- **Referral.** Until §24.4 capture ships, `ref` is read from the `?ref=` query and carried from `/pricing` to `/signup`. `referral_token` is not sent yet.
-- **Payment methods.** Step 4 offers Paystack, Flutterwave and Stripe as fixed options, because no public route lists the enabled gateways (BG-19). An unavailable gateway shows the backend's error.
+- **Referral.** Captured as in §24.4. `ref` is still read from the `?ref=` query and carried from `/pricing` to `/signup` as a fallback when the capture call fails.
+- **Payment methods.** Step 4 offers only the gateways in `available_gateways` from the status route (BG-19), default first. With none, it explains that payments for the currency aren't open and keeps the sign-up.
+- **Return from checkout.** A first payment at sign-up returns to `/signup/status?registration=…&reference=…`, not to tenant-admin `/billing/callback`, because the store has no admin to sign in to until it is provisioned. With `reference`, the page shows "Confirming your payment…" and polls every 5 seconds for 90 seconds before offering the payment again.
 - **Rendering.** Prices are formatted with one fixed locale (`SITE_LOCALE`), so server and browser output hydrate identically.
 - **Homepage.** `/` is a static hero until the CMS homepage ships.
 
@@ -1983,6 +1984,8 @@ The site-wide layout (header, footer, menus) uses `GET /api/platform/config` and
 
 1. **Capture.** A landing URL carrying `?ref={code}` calls `POST /bff/api/affiliate-clicks` with `{code, visitor_id?, landing_path, referrer, utm_*}`. The BFF stores the returned `referral_token` and `visitor_id` in the `__Host-ref` cookie (HttpOnly, 30 days or the returned `expires_at`) and removes `ref` from the address bar with `history.replaceState`.
 2. **Registration.** `POST /api/register` sends the `ref` code and the `referral_token` from the cookie. The backend applies attribution precedence: coupon, then `ref`, then token.
+**As built.** `ReferralCapture` (mounted in the site shell) posts to `POST /bff/affiliate-clicks`, a platform-web route handler that applies the BFF's CSRF rule. Only after success does it remove `ref` from the address bar. The cookie (`__Host-ref`, base64url JSON of the token and visitor id) is read only by the BFF: the visitor id is reused on the next click, and the generic proxy adds `referral_token` to `POST /api/register`. An unknown code or a paused programme stores nothing. The codec and the body rewrite live in `@workspace/bff` (`encodeReferral`, `decodeReferral`, `withReferralToken`) with unit tests.
+
 3. **Programme page.** `/affiliates` (a CMS page or a static page) describes the programme from `GET /api/affiliate-program` and links to `https://affiliates.ROOT/apply`.
 
 ### 24.5 OAuth Relay
@@ -3296,6 +3299,7 @@ Resolved gaps keep their section and number, with a **Status** row, so reference
 | **Reason** | `POST /api/register/{registration}/checkout` accepts `flutterwave`, `paystack` or `stripe`, but no public route says which are enabled for the plan's currency. The page offers all three and shows the backend's error for an unavailable one. |
 | **Required change** | Add `available_gateways` (provider and label) to `GET /api/register/{registration}/status` while the tenant is `awaiting_payment`, from `PlatformPaymentGatewayService::availableFor`. |
 | **Priority** | P2 |
+| **Status** | **Resolved.** `available_gateways: [{provider, label}]` is returned while the tenant is `awaiting_payment`, empty otherwise. |
 
 ### Contract Note: Public Plan Shape
 

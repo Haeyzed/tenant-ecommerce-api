@@ -1326,11 +1326,29 @@ final readonly class SubscriptionService
             reference: $charge->reference,
             customerEmail: $tenant->email,
             customerName: $tenant->owner_name,
-            callbackUrl: FrontendUrl::tenantAdmin($tenant, '/billing/callback', ['reference' => $charge->reference]),
+            callbackUrl: $this->callbackUrl($tenant, $charge),
             metadata: ['tenant_id' => (string) $tenant->getTenantKey(), 'reference' => $charge->reference],
             saveAuthorization: $saveAuthorization,
             description: (string) $this->settings->get('platform_name').' subscription',
         );
+    }
+
+    /**
+     * Where the gateway returns the payer. A store still awaiting its first
+     * payment from sign-up has no admin to sign in to yet, so it returns to
+     * the website's sign-up status page, which polls until the store is ready.
+     */
+    private function callbackUrl(Tenant $tenant, PaymentTransaction $charge): string
+    {
+        if ($tenant->status === TenantStatus::AwaitingPayment) {
+            $registration = TenantRegistration::query()->where('tenant_id', $tenant->getTenantKey())->value('public_id');
+
+            if (is_string($registration)) {
+                return FrontendUrl::website('/signup/status', ['registration' => $registration, 'reference' => $charge->reference]);
+            }
+        }
+
+        return FrontendUrl::tenantAdmin($tenant, '/billing/callback', ['reference' => $charge->reference]);
     }
 
     private function flushTenantCaches(Tenant $tenant): void
