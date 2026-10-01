@@ -22,16 +22,25 @@ trait ServesNotificationInbox
         /** @var Model&Notifiable $actor */
         $actor = $request->user();
 
+        $request->validate([
+            'unread' => ['sometimes', 'boolean'],
+            'page' => ['sometimes', 'integer', 'min:1'],
+            'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'],
+        ]);
+
         $page = $actor->notifications()
             ->when($request->boolean('unread'), static fn ($q) => $q->whereNull('read_at'))
-            ->paginate(min(100, max(1, $request->integer('per_page', 25))))
+            ->paginate($request->integer('per_page', 25))
             ->through(static fn (DatabaseNotification $n): array => [
                 'id' => $n->id,
                 'key' => $n->type,
+                /** @var string|null */
                 'subject' => $n->data['subject'] ?? null,
+                /** @var string|null */
                 'body' => $n->data['body'] ?? null,
+                /** @var array<string, mixed> Links and ids for the resource it is about, e.g. `import_url` */
                 'data' => $n->data['data'] ?? [],
-                // "platform" for messages from the platform (UD-10), else "store".
+                /** @var 'store'|'platform' "platform" for messages from the platform (UD-10), else "store". */
                 'source' => $n->data['source'] ?? 'store',
                 'read_at' => $n->read_at?->toIso8601String(),
                 'created_at' => $n->created_at?->toIso8601String(),

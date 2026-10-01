@@ -42308,8 +42308,15 @@
                         "name": "unread",
                         "in": "query",
                         "schema": {
-                            "type": "boolean",
-                            "default": false
+                            "type": "boolean"
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
                         }
                     },
                     {
@@ -42317,7 +42324,8 @@
                         "in": "query",
                         "schema": {
                             "type": "integer",
-                            "default": 25
+                            "minimum": 1,
+                            "maximum": 100
                         }
                     }
                 ],
@@ -42346,11 +42354,30 @@
                                                     "key": {
                                                         "type": "string"
                                                     },
-                                                    "subject": {},
-                                                    "body": {},
-                                                    "data": {},
+                                                    "subject": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ]
+                                                    },
+                                                    "body": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ]
+                                                    },
+                                                    "data": {
+                                                        "type": "object",
+                                                        "description": "Links and ids for the resource it is about, e.g. `import_url`",
+                                                        "additionalProperties": {}
+                                                    },
                                                     "source": {
-                                                        "description": "\"platform\" for messages from the platform (UD-10), else \"store\"."
+                                                        "type": "string",
+                                                        "description": "\"platform\" for messages from the platform (UD-10), else \"store\".",
+                                                        "enum": [
+                                                            "store",
+                                                            "platform"
+                                                        ]
                                                     },
                                                     "read_at": {
                                                         "type": [
@@ -42473,6 +42500,9 @@
                                 }
                             }
                         }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
                     }
                 }
             }
@@ -42610,6 +42640,32 @@
                 "tags": [
                     "Inbox"
                 ],
+                "parameters": [
+                    {
+                        "name": "unread",
+                        "in": "query",
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 100
+                        }
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "",
@@ -42635,11 +42691,30 @@
                                                     "key": {
                                                         "type": "string"
                                                     },
-                                                    "subject": {},
-                                                    "body": {},
-                                                    "data": {},
+                                                    "subject": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ]
+                                                    },
+                                                    "body": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ]
+                                                    },
+                                                    "data": {
+                                                        "type": "object",
+                                                        "description": "Links and ids for the resource it is about, e.g. `import_url`",
+                                                        "additionalProperties": {}
+                                                    },
                                                     "source": {
-                                                        "description": "\"platform\" for messages from the platform (UD-10), else \"store\"."
+                                                        "type": "string",
+                                                        "description": "\"platform\" for messages from the platform (UD-10), else \"store\".",
+                                                        "enum": [
+                                                            "store",
+                                                            "platform"
+                                                        ]
                                                     },
                                                     "read_at": {
                                                         "type": [
@@ -42762,6 +42837,9 @@
                                 }
                             }
                         }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
                     }
                 }
             }
