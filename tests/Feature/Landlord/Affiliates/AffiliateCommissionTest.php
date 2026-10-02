@@ -263,6 +263,12 @@ it('shows the affiliate its own dashboard and the platform its affiliate section
     $section = $this->landlordJson('GET', '/api/admin/dashboard/affiliates?range=this_month', [], $managerAuth)->assertOk()->json('data');
     expect(collect($section['kpis'])->firstWhere('key', 'affiliate_attributed_revenue')['value'])->toBe('39.0000');
 
+    // Admin lists name the referred store and validate paging (BG-17).
+    $this->landlordJson('GET', '/api/admin/affiliate-commissions?page=1&per_page=10', [], $managerAuth)
+        ->assertOk()->assertJsonPath('data.0.tenant_name', $this->tenant->name);
+    $this->landlordJson('GET', '/api/admin/affiliate-referrals?page=0', [], $managerAuth)->assertStatus(422)->assertJsonValidationErrors(['page']);
+    $this->landlordJson('GET', '/api/admin/affiliates?search=50%25', [], $managerAuth)->assertOk()->assertJsonCount(0, 'data');
+
     $this->landlordJson('GET', '/api/admin/affiliate-commissions/metrics', [], $managerAuth)->assertOk();
     $this->landlordJson('GET', '/api/admin/affiliates/metrics', [], $managerAuth)->assertOk()->assertJsonPath('data.kpis.0.value', 1);
 });
